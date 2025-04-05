@@ -6,6 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import { 
   ITR, 
   Subsystem, 
@@ -15,7 +16,9 @@ import {
   getSubsystemsBySystemId,
   System,
   Project,
-  getProjects
+  getProjects,
+  getUserProfiles,
+  Profile
 } from "@/services/supabaseService";
 
 interface ITRFormModalProps {
@@ -39,8 +42,10 @@ export const ITRFormModal = ({
   const [projects, setProjects] = useState<Project[]>([]);
   const [systems, setSystems] = useState<System[]>([]);
   const [subsystems, setSubsystems] = useState<Subsystem[]>([]);
+  const [profiles, setProfiles] = useState<Profile[]>([]);
   const [loading, setLoading] = useState(false);
   const [formLoading, setFormLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   
   const [formData, setFormData] = useState({
     name: itr?.name || "",
@@ -56,30 +61,45 @@ export const ITRFormModal = ({
   useEffect(() => {
     const loadInitialData = async () => {
       setFormLoading(true);
+      setError(null);
       try {
         // Cargar proyectos
         const projectsData = await getProjects();
         setProjects(projectsData);
+        
+        // Cargar perfiles de usuario para asignación
+        const profilesData = await getUserProfiles();
+        setProfiles(profilesData);
         
         // Si hay un proyecto seleccionado o un ITR con proyecto, cargar sus sistemas
         if (formData.project_id) {
           const systemsData = await getSystemsByProjectId(formData.project_id);
           setSystems(systemsData);
           
-          // Si estamos editando un ITR existente, también necesitamos cargar el sistema y el subsistema
+          // Si estamos editando un ITR existente
           if (isEditMode && itr) {
-            // Aquí tendríamos que buscar el sistema basado en el subsistema del ITR
-            // Esto requeriría una función adicional que necesitaríamos implementar
-            // Por ahora, dejaremos que el usuario seleccione el sistema nuevamente
+            // Necesitamos encontrar el sistema al que pertenece el subsistema del ITR
+            for (const system of systemsData) {
+              const subsystemsForSystem = await getSubsystemsBySystemId(system.id);
+              const matchingSubsystem = subsystemsForSystem.find(sub => sub.id === itr.subsystem_id);
+              
+              if (matchingSubsystem) {
+                // Actualizamos el sistema seleccionado
+                setFormData(prev => ({ 
+                  ...prev, 
+                  system_id: system.id
+                }));
+                
+                // Cargamos los subsistemas para este sistema
+                setSubsystems(subsystemsForSystem);
+                break;
+              }
+            }
           }
         }
-      } catch (error) {
+      } catch (error: any) {
         console.error("Error al cargar datos iniciales:", error);
-        toast({
-          title: "Error",
-          description: "No se pudieron cargar los datos necesarios",
-          variant: "destructive"
-        });
+        setError(`Error al cargar datos: ${error.message || "Ocurrió un problema al conectar con la base de datos"}`);
       } finally {
         setFormLoading(false);
       }
@@ -95,13 +115,9 @@ export const ITRFormModal = ({
         try {
           const subsystemsData = await getSubsystemsBySystemId(formData.system_id);
           setSubsystems(subsystemsData);
-        } catch (error) {
+        } catch (error: any) {
           console.error("Error al cargar subsistemas:", error);
-          toast({
-            title: "Error",
-            description: "No se pudieron cargar los subsistemas",
-            variant: "destructive"
-          });
+          setError(`Error al cargar subsistemas: ${error.message}`);
         }
       } else {
         setSubsystems([]);
@@ -139,13 +155,15 @@ export const ITRFormModal = ({
   
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setError(null);
     
     if (!formData.name || !formData.subsystem_id) {
-      toast({
-        title: "Campos requeridos",
-        description: "Por favor complete todos los campos obligatorios",
-        variant: "destructive"
-      });
+      setError("Por favor complete todos los campos obligatorios");
+      return;
+    }
+    
+    if (!formData.project_id) {
+      setError("Debe seleccionar un proyecto");
       return;
     }
     
@@ -159,6 +177,8 @@ export const ITRFormModal = ({
       
       // Eliminamos project_id y system_id ya que no son parte del modelo ITR en la base de datos
       const { project_id, system_id, ...submitData } = itrData;
+      
+      console.log("Guardando ITR con datos:", submitData);
       
       if (isEditMode && itr) {
         await updateITR(itr.id, submitData);
@@ -175,13 +195,9 @@ export const ITRFormModal = ({
       }
       
       onSuccess();
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error al guardar ITR:", error);
-      toast({
-        title: "Error",
-        description: "No se pudo guardar el ITR",
-        variant: "destructive"
-      });
+      setError(`Error al guardar ITR: ${error.message || "Hubo un problema al guardar los datos"}`);
     } finally {
       setLoading(false);
     }
@@ -201,12 +217,18 @@ export const ITRFormModal = ({
   
   return (
     <Dialog open={open} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-[425px]">
+      <DialogContent className="sm:max-w-[500px]">
         <DialogHeader>
           <DialogTitle>
             {isEditMode ? "Editar ITR" : "Nuevo ITR"}
           </DialogTitle>
         </DialogHeader>
+        
+        {error && (
+          <Alert variant="destructive" className="my-2">
+            <AlertDescription>{error}</AlertDescription>
+          </Alert>
+        )}
         
         <form onSubmit={handleSubmit} className="space-y-4 pt-4">
           <div className="space-y-2">
@@ -232,11 +254,15 @@ export const ITRFormModal = ({
                 <SelectValue placeholder="Seleccionar proyecto" />
               </SelectTrigger>
               <SelectContent>
-                {projects.map(project => (
-                  <SelectItem key={project.id} value={project.id}>
-                    {project.name}
-                  </SelectItem>
-                ))}
+                {projects.length === 0 ? (
+                  <SelectItem value="no-projects" disabled>No hay proyectos disponibles</SelectItem>
+                ) : (
+                  projects.map(project => (
+                    <SelectItem key={project.id} value={project.id}>
+                      {project.name}
+                    </SelectItem>
+                  ))
+                )}
               </SelectContent>
             </Select>
           </div>
@@ -252,11 +278,15 @@ export const ITRFormModal = ({
                 <SelectValue placeholder={formData.project_id ? "Seleccionar sistema" : "Primero seleccione un proyecto"} />
               </SelectTrigger>
               <SelectContent>
-                {systems.map(system => (
-                  <SelectItem key={system.id} value={system.id}>
-                    {system.name}
-                  </SelectItem>
-                ))}
+                {systems.length === 0 ? (
+                  <SelectItem value="no-systems" disabled>No hay sistemas disponibles para este proyecto</SelectItem>
+                ) : (
+                  systems.map(system => (
+                    <SelectItem key={system.id} value={system.id}>
+                      {system.name}
+                    </SelectItem>
+                  ))
+                )}
               </SelectContent>
             </Select>
           </div>
@@ -272,11 +302,15 @@ export const ITRFormModal = ({
                 <SelectValue placeholder={formData.system_id ? "Seleccionar subsistema" : "Primero seleccione un sistema"} />
               </SelectTrigger>
               <SelectContent>
-                {subsystems.map(subsystem => (
-                  <SelectItem key={subsystem.id} value={subsystem.id}>
-                    {subsystem.name}
-                  </SelectItem>
-                ))}
+                {subsystems.length === 0 ? (
+                  <SelectItem value="no-subsystems" disabled>No hay subsistemas disponibles para este sistema</SelectItem>
+                ) : (
+                  subsystems.map(subsystem => (
+                    <SelectItem key={subsystem.id} value={subsystem.id}>
+                      {subsystem.name}
+                    </SelectItem>
+                  ))
+                )}
               </SelectContent>
             </Select>
           </div>
@@ -325,13 +359,22 @@ export const ITRFormModal = ({
           
           <div className="space-y-2">
             <Label htmlFor="assigned_to">Asignado a</Label>
-            <Input
-              id="assigned_to"
-              name="assigned_to"
+            <Select
               value={formData.assigned_to}
-              onChange={handleInputChange}
-              placeholder="Nombre del responsable"
-            />
+              onValueChange={(value) => handleSelectChange("assigned_to", value)}
+            >
+              <SelectTrigger id="assigned_to">
+                <SelectValue placeholder="Seleccionar responsable" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="">Sin asignar</SelectItem>
+                {profiles.map(profile => (
+                  <SelectItem key={profile.id} value={profile.id}>
+                    {profile.full_name || profile.id}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
           
           <div className="flex justify-end space-x-2 pt-4">

@@ -5,7 +5,6 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Download, Upload } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import * as XLSX from "xlsx";
 import { generateImportTemplate, importDataFromExcel } from "@/services/supabaseService";
 
 interface ImportStats {
@@ -47,8 +46,9 @@ export function DataImport() {
         title: "Plantilla descargada",
         description: "La plantilla para importación de datos se ha descargado correctamente.",
       });
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error al generar plantilla:", error);
+      setError(`Error al generar plantilla: ${error.message || "Verifica tu conexión con Supabase"}`);
       toast({
         title: "Error",
         description: "No se pudo generar la plantilla de importación",
@@ -70,10 +70,18 @@ export function DataImport() {
       
       reader.onload = async (e) => {
         try {
-          const data = new Uint8Array(e.target?.result as ArrayBuffer);
+          if (!e.target?.result) {
+            throw new Error("Error al leer el archivo");
+          }
+          
+          const data = new Uint8Array(e.target.result as ArrayBuffer);
+          
+          console.log("Archivo cargado, procesando importación...");
           
           // Usar la función del servicio para procesar la importación
           const stats = await importDataFromExcel(data);
+          
+          console.log("Importación completada con estadísticas:", stats);
           
           // Establecer estadísticas para mostrar
           setImportStats(stats);
@@ -87,6 +95,11 @@ export function DataImport() {
         } catch (err: any) {
           console.error("Error procesando archivo:", err);
           setError("Error al procesar el archivo: " + (err.message || "Verifica que tenga el formato correcto."));
+          toast({
+            title: "Error de importación",
+            description: `Error al procesar el archivo: ${err.message || "Formato incorrecto"}`,
+            variant: "destructive"
+          });
         } finally {
           setImporting(false);
         }
@@ -95,6 +108,11 @@ export function DataImport() {
       reader.onerror = () => {
         setError("Error al leer el archivo. Inténtalo de nuevo.");
         setImporting(false);
+        toast({
+          title: "Error de lectura",
+          description: "No se pudo leer el archivo. Inténtalo de nuevo.",
+          variant: "destructive"
+        });
       };
       
       reader.readAsArrayBuffer(file);
@@ -103,6 +121,11 @@ export function DataImport() {
       console.error("Error durante la importación:", err);
       setError("Ocurrió un error durante la importación: " + (err.message || "Inténtalo de nuevo."));
       setImporting(false);
+      toast({
+        title: "Error",
+        description: `Error durante la importación: ${err.message || "Error desconocido"}`,
+        variant: "destructive"
+      });
     }
   };
 
@@ -156,6 +179,17 @@ export function DataImport() {
             </ul>
           </div>
         )}
+        
+        <div className="text-sm border rounded-md p-4 bg-blue-50/50 border-blue-200">
+          <h4 className="font-medium mb-2 text-blue-600">Instrucciones de importación:</h4>
+          <ol className="space-y-1 list-decimal pl-4 text-blue-800">
+            <li>Descarga la plantilla Excel haciendo clic en el botón "Descargar plantilla Excel"</li>
+            <li>Completa la plantilla con los datos de tus proyectos, sistemas, subsistemas, tareas, ITRs y usuarios</li>
+            <li>Guarda el archivo Excel sin cambiar su estructura</li>
+            <li>Haz clic en "Subir archivo de datos" y selecciona el archivo Excel que acabas de guardar</li>
+            <li>Espera a que se complete la importación y revisa el resumen</li>
+          </ol>
+        </div>
       </CardContent>
     </Card>
   );

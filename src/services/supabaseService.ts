@@ -794,18 +794,18 @@ export const generateImportTemplate = (): ArrayBuffer => {
   const templateData = [
     [
       "project_name", "project_location", "project_status", "project_progress", 
-      "system_name", "system_completion_rate", 
-      "subsystem_name", "subsystem_completion_rate", 
-      "task_name", "task_description", "task_status", 
-      "itr_name", "itr_status", "itr_progress", "itr_due_date", "itr_assigned_to",
+      "system_name", "system_completion_rate", "system_project_id",
+      "subsystem_name", "subsystem_completion_rate", "subsystem_system_id", 
+      "task_name", "task_description", "task_status", "task_subsystem_id",
+      "itr_name", "itr_status", "itr_progress", "itr_due_date", "itr_assigned_to", "itr_subsystem_id",
       "user_email", "user_full_name", "user_role"
     ],
     [
       "Proyecto Ejemplo", "Ubicación Ejemplo", "inprogress", 50,
-      "Sistema Ejemplo", 60,
-      "Subsistema Ejemplo", 70,
-      "Tarea Ejemplo", "Descripción de tarea", "pending",
-      "ITR Ejemplo", "inprogress", 40, "2025-01-15", "responsable@ejemplo.com",
+      "Sistema Ejemplo", 60, "",
+      "Subsistema Ejemplo", 70, "",
+      "Tarea Ejemplo", "Descripción de tarea", "pending", "",
+      "ITR Ejemplo", "inprogress", 40, "2025-01-15", "responsable@ejemplo.com", "",
       "usuario@ejemplo.com", "Nombre Completo", "user"
     ]
   ];
@@ -813,11 +813,28 @@ export const generateImportTemplate = (): ArrayBuffer => {
   const ws = XLSX.utils.aoa_to_sheet(templateData);
   
   ws.A1.c = [{ a: "Nombre del proyecto", t: { color: { rgb: "FF0000" } } }];
+  ws.B1.c = [{ a: "Ubicación del proyecto", t: { color: { rgb: "FF0000" } } }];
   ws.C1.c = [{ a: "Estado: complete, inprogress, delayed", t: { color: { rgb: "FF0000" } } }];
   ws.D1.c = [{ a: "Progreso: 0-100", t: { color: { rgb: "FF0000" } } }];
-  ws.K1.c = [{ a: "Estado de tarea: pending, inprogress, complete", t: { color: { rgb: "FF0000" } } }];
-  ws.M1.c = [{ a: "Estado de ITR: inprogress, complete, delayed", t: { color: { rgb: "FF0000" } } }];
-  ws.S1.c = [{ a: "Rol: admin, user, tecnico", t: { color: { rgb: "FF0000" } } }];
+  ws.E1.c = [{ a: "Nombre del sistema", t: { color: { rgb: "FF0000" } } }];
+  ws.F1.c = [{ a: "Tasa de completado del sistema: 0-100", t: { color: { rgb: "FF0000" } } }];
+  ws.G1.c = [{ a: "ID del proyecto (se puede dejar vacío y se relacionará automáticamente)", t: { color: { rgb: "FF0000" } } }];
+  ws.H1.c = [{ a: "Nombre del subsistema", t: { color: { rgb: "FF0000" } } }];
+  ws.I1.c = [{ a: "Tasa de completado del subsistema: 0-100", t: { color: { rgb: "FF0000" } } }];
+  ws.J1.c = [{ a: "ID del sistema (se puede dejar vacío y se relacionará automáticamente)", t: { color: { rgb: "FF0000" } } }];
+  ws.K1.c = [{ a: "Nombre de la tarea", t: { color: { rgb: "FF0000" } } }];
+  ws.L1.c = [{ a: "Descripción de la tarea", t: { color: { rgb: "FF0000" } } }];
+  ws.M1.c = [{ a: "Estado de tarea: pending, inprogress, complete", t: { color: { rgb: "FF0000" } } }];
+  ws.N1.c = [{ a: "ID del subsistema (se puede dejar vacío y se relacionará automáticamente)", t: { color: { rgb: "FF0000" } } }];
+  ws.O1.c = [{ a: "Nombre del ITR", t: { color: { rgb: "FF0000" } } }];
+  ws.P1.c = [{ a: "Estado de ITR: inprogress, complete, delayed", t: { color: { rgb: "FF0000" } } }];
+  ws.Q1.c = [{ a: "Progreso del ITR: 0-100", t: { color: { rgb: "FF0000" } } }];
+  ws.R1.c = [{ a: "Fecha límite del ITR (formato YYYY-MM-DD)", t: { color: { rgb: "FF0000" } } }];
+  ws.S1.c = [{ a: "Email del responsable del ITR", t: { color: { rgb: "FF0000" } } }];
+  ws.T1.c = [{ a: "ID del subsistema (se puede dejar vacío y se relacionará automáticamente)", t: { color: { rgb: "FF0000" } } }];
+  ws.U1.c = [{ a: "Email del usuario", t: { color: { rgb: "FF0000" } } }];
+  ws.V1.c = [{ a: "Nombre completo del usuario", t: { color: { rgb: "FF0000" } } }];
+  ws.W1.c = [{ a: "Rol: admin, user, tecnico", t: { color: { rgb: "FF0000" } } }];
   
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, ws, "Datos de Importación");
@@ -864,15 +881,31 @@ export const importDataFromExcel = async (buffer: ArrayBuffer): Promise<{
           const projectName = row.project_name.toString();
           
           if (!projectMap.has(projectName)) {
-            const newProject = await createProject({
-              name: projectName,
-              location: row.project_location || null,
-              status: row.project_status || 'inprogress',
-              progress: row.project_progress || 0
-            });
+            let projectQuery = supabase
+              .from('projects')
+              .select('id')
+              .eq('name', projectName);
+            let { data: existingProjects } = await projectQuery;
             
-            projectMap.set(projectName, newProject.id);
-            stats.projects++;
+            if (!existingProjects || existingProjects.length === 0) {
+              const { data: newProject, error } = await supabase
+                .from('projects')
+                .insert({
+                  name: projectName,
+                  location: row.project_location || null,
+                  status: row.project_status || 'inprogress',
+                  progress: row.project_progress || 0
+                })
+                .select('id')
+                .single();
+              
+              if (error) throw error;
+              
+              projectMap.set(projectName, newProject.id);
+              stats.projects++;
+            } else {
+              projectMap.set(projectName, existingProjects[0].id);
+            }
           }
           
           const projectId = projectMap.get(projectName);
@@ -882,14 +915,31 @@ export const importDataFromExcel = async (buffer: ArrayBuffer): Promise<{
             const systemKey = `${projectName}:${systemName}`;
             
             if (!systemMap.has(systemKey)) {
-              const newSystem = await createSystem({
-                name: systemName,
-                project_id: projectId,
-                completion_rate: row.system_completion_rate || 0
-              });
+              let systemQuery = supabase
+                .from('systems')
+                .select('id')
+                .eq('name', systemName)
+                .eq('project_id', projectId);
+              let { data: existingSystems } = await systemQuery;
               
-              systemMap.set(systemKey, newSystem.id);
-              stats.systems++;
+              if (!existingSystems || existingSystems.length === 0) {
+                const { data: newSystem, error } = await supabase
+                  .from('systems')
+                  .insert({
+                    name: systemName,
+                    project_id: row.system_project_id || projectId,
+                    completion_rate: row.system_completion_rate || 0
+                  })
+                  .select('id')
+                  .single();
+                
+                if (error) throw error;
+                
+                systemMap.set(systemKey, newSystem.id);
+                stats.systems++;
+              } else {
+                systemMap.set(systemKey, existingSystems[0].id);
+              }
             }
             
             const systemId = systemMap.get(systemKey);
@@ -899,14 +949,31 @@ export const importDataFromExcel = async (buffer: ArrayBuffer): Promise<{
               const subsystemKey = `${systemKey}:${subsystemName}`;
               
               if (!subsystemMap.has(subsystemKey)) {
-                const newSubsystem = await createSubsystem({
-                  name: subsystemName,
-                  system_id: systemId,
-                  completion_rate: row.subsystem_completion_rate || 0
-                });
+                let subsystemQuery = supabase
+                  .from('subsystems')
+                  .select('id')
+                  .eq('name', subsystemName)
+                  .eq('system_id', systemId);
+                let { data: existingSubsystems } = await subsystemQuery;
                 
-                subsystemMap.set(subsystemKey, newSubsystem.id);
-                stats.subsystems++;
+                if (!existingSubsystems || existingSubsystems.length === 0) {
+                  const { data: newSubsystem, error } = await supabase
+                    .from('subsystems')
+                    .insert({
+                      name: subsystemName,
+                      system_id: row.subsystem_system_id || systemId,
+                      completion_rate: row.subsystem_completion_rate || 0
+                    })
+                    .select('id')
+                    .single();
+                  
+                  if (error) throw error;
+                  
+                  subsystemMap.set(subsystemKey, newSubsystem.id);
+                  stats.subsystems++;
+                } else {
+                  subsystemMap.set(subsystemKey, existingSubsystems[0].id);
+                }
               }
               
               const subsystemId = subsystemMap.get(subsystemKey);
@@ -915,7 +982,7 @@ export const importDataFromExcel = async (buffer: ArrayBuffer): Promise<{
                 await createTask({
                   name: row.task_name.toString(),
                   description: row.task_description || null,
-                  subsystem_id: subsystemId,
+                  subsystem_id: row.task_subsystem_id || subsystemId,
                   status: row.task_status || 'pending'
                 });
                 
@@ -925,7 +992,7 @@ export const importDataFromExcel = async (buffer: ArrayBuffer): Promise<{
               if (row.itr_name && subsystemId) {
                 await createITR({
                   name: row.itr_name.toString(),
-                  subsystem_id: subsystemId,
+                  subsystem_id: row.itr_subsystem_id || subsystemId,
                   status: row.itr_status || 'inprogress',
                   progress: row.itr_progress || 0,
                   due_date: row.itr_due_date || null,
@@ -937,22 +1004,27 @@ export const importDataFromExcel = async (buffer: ArrayBuffer): Promise<{
             }
           }
           
-          if (row.user_email) {
-            try {
-              await bulkCreateUsers([{
-                email: row.user_email.toString(),
-                full_name: row.user_full_name || row.user_email.toString().split('@')[0],
-                role: row.user_role || 'user'
-              }]);
+          if (row.user_email && row.user_full_name) {
+            let { data: existingProfiles } = await supabase
+              .from('profiles')
+              .select('id')
+              .eq('full_name', row.user_full_name);
+            
+            if (!existingProfiles || existingProfiles.length === 0) {
+              const { error } = await supabase
+                .from('profiles')
+                .insert({
+                  id: crypto.randomUUID(),
+                  full_name: row.user_full_name,
+                  role: row.user_role || 'user'
+                });
               
-              stats.users++;
-            } catch (err) {
-              console.error(`Error procesando usuario ${row.user_email}:`, err);
+              if (!error) stats.users++;
             }
           }
         }
-      } catch (err) {
-        console.error("Error procesando fila:", row, err);
+      } catch (error) {
+        console.error("Error procesando fila:", error, row);
       }
     }
     
@@ -965,4 +1037,37 @@ export const importDataFromExcel = async (buffer: ArrayBuffer): Promise<{
 
 export const updateApplicationLanguage = () => {
   console.log("Configurando idioma de la aplicación a español");
+};
+
+export const getUserProfiles = async (): Promise<Profile[]> => {
+  try {
+    const { data, error } = await supabase
+      .from('profiles')
+      .select('*');
+      
+    if (error) throw error;
+    return data || [];
+  } catch (error) {
+    console.error("Error obteniendo perfiles de usuario:", error);
+    throw error;
+  }
+};
+
+export const createUserProfile = async (profile: Omit<Profile, "id" | "created_at" | "updated_at">): Promise<Profile> => {
+  try {
+    const { data, error } = await supabase
+      .from('profiles')
+      .insert({
+        ...profile,
+        id: crypto.randomUUID()
+      })
+      .select()
+      .single();
+      
+    if (error) throw error;
+    return data;
+  } catch (error) {
+    console.error("Error creando perfil de usuario:", error);
+    throw error;
+  }
 };

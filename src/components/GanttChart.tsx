@@ -61,7 +61,7 @@ export const GanttChart: React.FC<GanttProps> = ({ data }) => {
         column_duration: "Duración",
         column_add: "",
         
-        /* Añadiendo las propiedades faltantes que causaban el error */
+        /* Propiedades adicionales */
         section_deadline: "Fecha límite",
         section_baselines: "Líneas base",
         column_wbs: "EDT",
@@ -99,7 +99,7 @@ export const GanttChart: React.FC<GanttProps> = ({ data }) => {
         column_constraint_type: "Tipo de restricción",
         column_constraint_date: "Fecha de restricción",
         
-        // Añadiendo propiedades faltantes según el error
+        // Propiedades faltantes
         message_ok: "OK",
         message_cancel: "Cancelar",
         section_constraint: "Restricción",
@@ -111,7 +111,20 @@ export const GanttChart: React.FC<GanttProps> = ({ data }) => {
         section_dynamicforms: "Formularios dinámicos",
         section_resources_filter: "Filtro de recursos",
         section_details: "Detalles",
-        section_wbs: "EDT"
+        section_wbs: "EDT",
+        
+        // Propiedades adicionales faltantes según el error
+        asap: "Lo antes posible",
+        alap: "Lo más tarde posible",
+        snet: "Fecha de inicio lo antes posible",
+        snlt: "Fecha de inicio lo más tarde posible",
+        fnlt: "Fecha de fin lo más tarde posible",
+        fnet: "Fecha de fin lo antes posible",
+        target_start: "Inicio objetivo",
+        target_end: "Fin objetivo",
+        task_time: "Tiempo de tarea",
+        task_baseline: "Línea base",
+        scheduling_mode: "Modo de planificación"
       };
 
       // Traducción del resto de elementos

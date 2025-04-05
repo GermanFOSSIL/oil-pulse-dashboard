@@ -7,13 +7,43 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { ProjectSelector } from "@/components/ProjectSelector";
-import { generateReport } from "@/services/supabaseService";
+import { generateReport, getProjects, Project } from "@/services/supabaseService";
+import jsPDF from 'jspdf';
+import 'jspdf-autotable';
+
+// Extender jsPDF para añadir autotable
+declare module 'jspdf' {
+  interface jsPDF {
+    autoTable: (options: any) => jsPDF;
+  }
+}
 
 const Reports = () => {
   const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null);
+  const [selectedProject, setSelectedProject] = useState<Project | null>(null);
   const [generatingReport, setGeneratingReport] = useState<string | null>(null);
   const [reportUrl, setReportUrl] = useState<string | null>(null);
   const { toast } = useToast();
+
+  useEffect(() => {
+    // Cargar información del proyecto seleccionado
+    const loadProjectDetails = async () => {
+      if (!selectedProjectId) {
+        setSelectedProject(null);
+        return;
+      }
+      
+      try {
+        const projects = await getProjects();
+        const project = projects.find(p => p.id === selectedProjectId);
+        setSelectedProject(project || null);
+      } catch (error) {
+        console.error("Error al cargar detalles del proyecto:", error);
+      }
+    };
+    
+    loadProjectDetails();
+  }, [selectedProjectId]);
 
   const handleSelectProject = (projectId: string | null) => {
     setSelectedProjectId(projectId);
@@ -40,23 +70,108 @@ const Reports = () => {
       const url = await generateReport(reportType, selectedProjectId);
       setReportUrl(url);
       
+      // Crear un PDF con jsPDF
+      const doc = new jsPDF();
+      
+      // Añadir título
+      doc.setFontSize(18);
+      doc.text(`Reporte: ${reportType}`, 14, 22);
+      
+      // Añadir información del proyecto
+      doc.setFontSize(12);
+      doc.text(`Proyecto: ${selectedProject?.name || 'No seleccionado'}`, 14, 32);
+      doc.text(`Estado: ${translateStatus(selectedProject?.status || '')}`, 14, 38);
+      doc.text(`Progreso: ${selectedProject?.progress || 0}%`, 14, 44);
+      doc.text(`Fecha del reporte: ${new Date().toLocaleDateString('es-ES')}`, 14, 50);
+      
+      // Añadir separador
+      doc.line(14, 55, 196, 55);
+      
+      // Información obtenida por simulación
+      const reportData = await fetch(url).then(res => res.json());
+      
+      // Tabla resumen de sistemas
+      doc.setFontSize(14);
+      doc.text('Resumen de Sistemas', 14, 65);
+      
+      // Crear tabla con autotable
+      doc.autoTable({
+        startY: 70,
+        head: [['Sistema', 'Progreso', 'Subsistemas', 'ITRs']],
+        body: reportData.systems.map((system: any) => {
+          const subsystemsCount = reportData.subsystems.filter((s: any) => s.system_id === system.id).length;
+          const itrsCount = reportData.itrs.filter((itr: any) => {
+            const subsystem = reportData.subsystems.find((s: any) => s.id === itr.subsystem_id);
+            return subsystem && subsystem.system_id === system.id;
+          }).length;
+          
+          return [
+            system.name,
+            `${system.completion_rate || 0}%`,
+            subsystemsCount.toString(),
+            itrsCount.toString()
+          ];
+        })
+      });
+      
+      // Añadir estadísticas de ITRs
+      const totalITRs = reportData.itrs.length;
+      const completedITRs = reportData.itrs.filter((itr: any) => itr.status === 'complete').length;
+      const inProgressITRs = reportData.itrs.filter((itr: any) => itr.status === 'inprogress').length;
+      const delayedITRs = reportData.itrs.filter((itr: any) => itr.status === 'delayed').length;
+      
+      const currentY = (doc as any).lastAutoTable.finalY + 15;
+      
+      doc.setFontSize(14);
+      doc.text('Estadísticas de ITRs', 14, currentY);
+      
+      doc.setFontSize(12);
+      doc.text(`Total de ITRs: ${totalITRs}`, 14, currentY + 10);
+      doc.text(`Completados: ${completedITRs} (${Math.round(completedITRs / Math.max(totalITRs, 1) * 100)}%)`, 14, currentY + 16);
+      doc.text(`En Progreso: ${inProgressITRs} (${Math.round(inProgressITRs / Math.max(totalITRs, 1) * 100)}%)`, 14, currentY + 22);
+      doc.text(`Retrasados: ${delayedITRs} (${Math.round(delayedITRs / Math.max(totalITRs, 1) * 100)}%)`, 14, currentY + 28);
+      
+      // Añadir detalle de ITRs
+      doc.addPage();
+      doc.setFontSize(16);
+      doc.text('Detalle de ITRs', 14, 22);
+      
+      doc.autoTable({
+        startY: 30,
+        head: [['ITR', 'Estado', 'Progreso', 'Asignado a', 'Fecha Límite']],
+        body: reportData.itrs.map((itr: any) => [
+          itr.name,
+          translateStatus(itr.status),
+          `${itr.progress || 0}%`,
+          itr.assigned_to || 'No asignado',
+          itr.due_date ? new Date(itr.due_date).toLocaleDateString('es-ES') : 'Sin fecha'
+        ])
+      });
+      
+      // Guardar el PDF y crear URL para descarga
+      const pdfBlob = doc.output('blob');
+      const pdfUrl = URL.createObjectURL(pdfBlob);
+      
       // Descargar automáticamente el archivo
       const a = document.createElement('a');
-      a.href = url;
-      a.download = `${reportType.toLowerCase().replace(/ /g, '_')}_${new Date().toISOString().split('T')[0]}.pdf`;
+      a.href = pdfUrl;
+      a.download = `${reportType.toLowerCase().replace(/ /g, '_')}_${selectedProject?.name.toLowerCase().replace(/ /g, '_')}_${new Date().toISOString().split('T')[0]}.pdf`;
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
+      
+      // También guardar la URL para previsualización
+      setReportUrl(pdfUrl);
       
       toast({
         title: "Reporte generado",
         description: "El reporte ha sido generado y descargado con éxito"
       });
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error al generar reporte:", error);
       toast({
         title: "Error",
-        description: "No se pudo generar el reporte",
+        description: `No se pudo generar el reporte: ${error.message || "Error desconocido"}`,
         variant: "destructive"
       });
     } finally {
@@ -64,7 +179,7 @@ const Reports = () => {
     }
   };
 
-  const handlePreviewReport = (reportType: string) => {
+  const handlePreviewReport = () => {
     if (!selectedProjectId) {
       toast({
         title: "Seleccione un proyecto",
@@ -85,36 +200,19 @@ const Reports = () => {
     }
   };
 
-  const handleDownloadTemplate = () => {
-    // Descargar plantilla para reportes personalizados
-    const dummyData = "Plantilla para reportes personalizados";
-    const blob = new Blob([dummyData], { type: 'text/plain' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = "plantilla_reporte_personalizado.txt";
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
-    
-    toast({
-      title: "Plantilla descargada",
-      description: "Se ha descargado la plantilla para informes personalizados"
-    });
-  };
-
-  const handleCreateCustomReport = () => {
-    if (!selectedProjectId) {
-      toast({
-        title: "Seleccione un proyecto",
-        description: "Debe seleccionar un proyecto para crear un reporte personalizado",
-        variant: "destructive"
-      });
-      return;
+  const translateStatus = (status: string): string => {
+    switch (status) {
+      case 'complete':
+        return 'Completado';
+      case 'inprogress':
+        return 'En Progreso';
+      case 'delayed':
+        return 'Retrasado';
+      case 'pending':
+        return 'Pendiente';
+      default:
+        return status;
     }
-    
-    handleGenerateReport("Reporte Personalizado");
   };
 
   return (
@@ -146,7 +244,6 @@ const Reports = () => {
           <TabsList className="mb-4">
             <TabsTrigger value="standard">Reportes Estándar</TabsTrigger>
             <TabsTrigger value="custom">Reportes Personalizados</TabsTrigger>
-            <TabsTrigger value="scheduled">Reportes Programados</TabsTrigger>
           </TabsList>
           
           <TabsContent value="standard">
@@ -167,8 +264,8 @@ const Reports = () => {
                   </p>
                   <div className="flex justify-end">
                     <Button variant="outline" size="sm" className="mr-2" 
-                      onClick={() => handlePreviewReport("Estado del Proyecto")}
-                      disabled={generatingReport !== null}
+                      onClick={handlePreviewReport}
+                      disabled={generatingReport !== null || !reportUrl}
                     >
                       Previsualizar
                     </Button>
@@ -198,8 +295,8 @@ const Reports = () => {
                   </p>
                   <div className="flex justify-end">
                     <Button variant="outline" size="sm" className="mr-2" 
-                      onClick={() => handlePreviewReport("Cumplimiento de ITR")}
-                      disabled={generatingReport !== null}
+                      onClick={handlePreviewReport}
+                      disabled={generatingReport !== null || !reportUrl}
                     >
                       Previsualizar
                     </Button>
@@ -229,8 +326,8 @@ const Reports = () => {
                   </p>
                   <div className="flex justify-end">
                     <Button variant="outline" size="sm" className="mr-2" 
-                      onClick={() => handlePreviewReport("Utilización de Recursos")}
-                      disabled={generatingReport !== null}
+                      onClick={handlePreviewReport}
+                      disabled={generatingReport !== null || !reportUrl}
                     >
                       Previsualizar
                     </Button>
@@ -260,8 +357,8 @@ const Reports = () => {
                   </p>
                   <div className="flex justify-end">
                     <Button variant="outline" size="sm" className="mr-2" 
-                      onClick={() => handlePreviewReport("Salud del Sistema")}
-                      disabled={generatingReport !== null}
+                      onClick={handlePreviewReport}
+                      disabled={generatingReport !== null || !reportUrl}
                     >
                       Previsualizar
                     </Button>
@@ -291,8 +388,8 @@ const Reports = () => {
                   </p>
                   <div className="flex justify-end">
                     <Button variant="outline" size="sm" className="mr-2" 
-                      onClick={() => handlePreviewReport("Progreso Mensual")}
-                      disabled={generatingReport !== null}
+                      onClick={handlePreviewReport}
+                      disabled={generatingReport !== null || !reportUrl}
                     >
                       Previsualizar
                     </Button>
@@ -322,8 +419,8 @@ const Reports = () => {
                   </p>
                   <div className="flex justify-end">
                     <Button variant="outline" size="sm" className="mr-2" 
-                      onClick={() => handlePreviewReport("Métricas de Rendimiento")}
-                      disabled={generatingReport !== null}
+                      onClick={handlePreviewReport}
+                      disabled={generatingReport !== null || !reportUrl}
                     >
                       Previsualizar
                     </Button>
@@ -402,103 +499,14 @@ const Reports = () => {
                   </div>
                 </div>
                 
-                <div className="flex justify-between items-center">
-                  <Button variant="outline" onClick={handleDownloadTemplate}>
-                    <Download className="h-4 w-4 mr-2" />
-                    Descargar Plantilla
-                  </Button>
+                <div className="flex justify-end">
                   <Button 
-                    onClick={handleCreateCustomReport}
+                    onClick={() => handleGenerateReport("Reporte Personalizado")}
                     disabled={generatingReport !== null}
                   >
                     {generatingReport === "Reporte Personalizado" ? "Generando..." : "Crear Reporte Personalizado"}
                   </Button>
                 </div>
-              </CardContent>
-            </Card>
-          </TabsContent>
-          
-          <TabsContent value="scheduled">
-            <Card>
-              <CardHeader>
-                <CardTitle>Reportes Programados</CardTitle>
-                <CardDescription>
-                  Configura la generación y distribución automática de reportes
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-6">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium">Tipo de Reporte</label>
-                    <Select defaultValue="status">
-                      <SelectTrigger>
-                        <SelectValue placeholder="Seleccione tipo de reporte" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="status">Estado del Proyecto</SelectItem>
-                        <SelectItem value="compliance">Cumplimiento de ITR</SelectItem>
-                        <SelectItem value="resources">Utilización de Recursos</SelectItem>
-                        <SelectItem value="health">Salud del Sistema</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium">Frecuencia</label>
-                    <Select defaultValue="weekly">
-                      <SelectTrigger>
-                        <SelectValue placeholder="Seleccione frecuencia" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="daily">Diario</SelectItem>
-                        <SelectItem value="weekly">Semanal</SelectItem>
-                        <SelectItem value="biweekly">Quincenal</SelectItem>
-                        <SelectItem value="monthly">Mensual</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium">Día de envío</label>
-                    <Select defaultValue="monday">
-                      <SelectTrigger>
-                        <SelectValue placeholder="Seleccione día" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="monday">Lunes</SelectItem>
-                        <SelectItem value="tuesday">Martes</SelectItem>
-                        <SelectItem value="wednesday">Miércoles</SelectItem>
-                        <SelectItem value="thursday">Jueves</SelectItem>
-                        <SelectItem value="friday">Viernes</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium">Formato</label>
-                    <Select defaultValue="pdf">
-                      <SelectTrigger>
-                        <SelectValue placeholder="Seleccione formato" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="pdf">PDF</SelectItem>
-                        <SelectItem value="excel">Excel</SelectItem>
-                        <SelectItem value="html">HTML</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                </div>
-                
-                <div className="space-y-2">
-                  <label className="text-sm font-medium">Destinatarios</label>
-                  <textarea 
-                    className="w-full p-2 border border-gray-300 rounded-md" 
-                    placeholder="Ingrese correos electrónicos separados por coma"
-                    rows={3}
-                  ></textarea>
-                </div>
-                
-                <Button>Programar Nuevo Reporte</Button>
               </CardContent>
             </Card>
           </TabsContent>
