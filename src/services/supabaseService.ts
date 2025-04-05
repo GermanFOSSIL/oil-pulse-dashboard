@@ -1,3 +1,4 @@
+
 import { supabase } from "@/integrations/supabase/client";
 import { Database } from "@/integrations/supabase/types";
 
@@ -41,27 +42,15 @@ export type ITR = {
   assigned_to: string;
 };
 
+// Actualizada para coincidir con la estructura de la base de datos real
 export type Task = {
   id: string;
   created_at: string;
   updated_at: string;
   name: string;
-  itr_id: string;
-  status: "complete" | "inprogress" | "delayed";
-  progress: number;
-  due_date: string;
-  assigned_to: string;
-};
-
-export type Evidence = {
-  id: string;
-  created_at: string;
-  updated_at: string;
-  task_id: string;
-  file_path: string;
-  file_name: string;
-  file_type: string;
-  uploaded_by: string;
+  description: string;
+  subsystem_id: string;
+  status: string;
 };
 
 export type Profile = {
@@ -71,6 +60,83 @@ export type Profile = {
   full_name: string;
   avatar_url: string;
   role: string;
+};
+
+// Nueva función para obtener estadísticas del dashboard
+export const getDashboardStats = async () => {
+  try {
+    // Obtener proyectos
+    const { data: projects } = await supabase
+      .from('projects')
+      .select('*');
+    
+    // Obtener sistemas
+    const { data: systems } = await supabase
+      .from('systems')
+      .select('*');
+    
+    // Obtener ITRs
+    const { data: itrs } = await supabase
+      .from('itrs')
+      .select('*');
+    
+    // Calcular estadísticas
+    const totalProjects = projects?.length || 0;
+    const totalSystems = systems?.length || 0;
+    const totalITRs = itrs?.length || 0;
+    
+    // Calcular tasa de completado (promedio de progreso de proyectos)
+    const completionRate = projects?.length 
+      ? Math.round(projects.reduce((acc, proj) => acc + (proj.progress || 0), 0) / projects.length) 
+      : 0;
+    
+    // Datos para tarjetas de proyectos
+    const projectsData = projects?.slice(0, 3).map(project => ({
+      title: project.name,
+      value: project.progress || 0,
+      description: `${project.location || 'Sin ubicación'} - ${project.status}`,
+      variant: project.status === 'complete' ? 'success' : 
+              project.status === 'delayed' ? 'danger' : 'warning'
+    })) || [];
+    
+    // Datos para gráfico de barras
+    const chartData = systems?.slice(0, 6).map(system => ({
+      name: system.name.length > 10 ? system.name.substring(0, 10) + '...' : system.name,
+      value: system.completion_rate || 0
+    })) || [];
+    
+    // Datos para gráfico de área
+    const monthNames = ["Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "Sep", "Oct", "Nov", "Dic"];
+    const currentDate = new Date();
+    
+    // Generar datos de ejemplo para el gráfico de área basados en datos reales
+    const areaChartData = monthNames.slice(0, 6).map((monthName, index) => {
+      const month = (currentDate.getMonth() - 5 + index) % 12;
+      const inspections = Math.floor(Math.random() * (totalITRs + 10)) + 5;
+      const completions = Math.floor(inspections * (completionRate / 100));
+      const issues = Math.floor(inspections * 0.2);
+      
+      return {
+        name: monthName,
+        inspections,
+        completions,
+        issues
+      };
+    });
+    
+    return {
+      totalProjects,
+      totalSystems,
+      totalITRs,
+      completionRate,
+      projectsData,
+      chartData,
+      areaChartData
+    };
+  } catch (error) {
+    console.error("Error al obtener estadísticas del dashboard:", error);
+    throw error;
+  }
 };
 
 // Projects CRUD
@@ -84,7 +150,6 @@ export const getProjects = async (): Promise<Project[]> => {
     throw error;
   }
 
-  // Convertir explícitamente los datos al tipo Project[]
   return (data as unknown as Project[]) || [];
 };
 
@@ -176,7 +241,7 @@ export const getSystems = async (): Promise<System[]> => {
     throw error;
   }
 
-  return data || [];
+  return data as unknown as System[] || [];
 };
 
 export const getSystemById = async (id: string): Promise<System | null> => {
@@ -191,7 +256,7 @@ export const getSystemById = async (id: string): Promise<System | null> => {
     throw error;
   }
 
-  return data;
+  return data as unknown as System;
 };
 
 export const createSystem = async (system: Omit<System, "id" | "created_at" | "updated_at">): Promise<System> => {
@@ -206,7 +271,7 @@ export const createSystem = async (system: Omit<System, "id" | "created_at" | "u
     throw error;
   }
 
-  return data;
+  return data as unknown as System;
 };
 
 export const updateSystem = async (id: string, updates: Partial<System>): Promise<System> => {
@@ -222,7 +287,7 @@ export const updateSystem = async (id: string, updates: Partial<System>): Promis
     throw error;
   }
 
-  return data;
+  return data as unknown as System;
 };
 
 export const deleteSystem = async (id: string): Promise<void> => {
@@ -248,7 +313,7 @@ export const getSystemsByProjectId = async (projectId: string): Promise<System[]
     throw error;
   }
 
-  return data || [];
+  return data as unknown as System[] || [];
 };
 
 // Subsystems CRUD
@@ -262,7 +327,7 @@ export const getSubsystems = async (): Promise<Subsystem[]> => {
     throw error;
   }
 
-  return data || [];
+  return data as unknown as Subsystem[] || [];
 };
 
 export const getSubsystemById = async (id: string): Promise<Subsystem | null> => {
@@ -277,7 +342,7 @@ export const getSubsystemById = async (id: string): Promise<Subsystem | null> =>
     throw error;
   }
 
-  return data;
+  return data as unknown as Subsystem;
 };
 
 export const createSubsystem = async (subsystem: Omit<Subsystem, "id" | "created_at" | "updated_at">): Promise<Subsystem> => {
@@ -292,7 +357,7 @@ export const createSubsystem = async (subsystem: Omit<Subsystem, "id" | "created
     throw error;
   }
 
-  return data;
+  return data as unknown as Subsystem;
 };
 
 export const updateSubsystem = async (id: string, updates: Partial<Subsystem>): Promise<Subsystem> => {
@@ -308,7 +373,7 @@ export const updateSubsystem = async (id: string, updates: Partial<Subsystem>): 
     throw error;
   }
 
-  return data;
+  return data as unknown as Subsystem;
 };
 
 export const deleteSubsystem = async (id: string): Promise<void> => {
@@ -334,7 +399,7 @@ export const getSubsystemsBySystemId = async (systemId: string): Promise<Subsyst
     throw error;
   }
 
-  return data || [];
+  return data as unknown as Subsystem[] || [];
 };
 
 // ITRs CRUD
@@ -423,7 +488,7 @@ export const getITRsBySubsystemId = async (subsystemId: string): Promise<ITR[]> 
   return (data as unknown as ITR[]) || [];
 };
 
-// Tasks CRUD
+// Tasks CRUD actualizado para coincidir con la estructura de la base de datos
 export const getTasks = async (): Promise<Task[]> => {
   const { data, error } = await supabase
     .from('tasks')
@@ -434,7 +499,7 @@ export const getTasks = async (): Promise<Task[]> => {
     throw error;
   }
 
-  return data || [];
+  return data as unknown as Task[] || [];
 };
 
 export const getTaskById = async (id: string): Promise<Task | null> => {
@@ -449,7 +514,7 @@ export const getTaskById = async (id: string): Promise<Task | null> => {
     throw error;
   }
 
-  return data;
+  return data as unknown as Task;
 };
 
 export const createTask = async (task: Omit<Task, "id" | "created_at" | "updated_at">): Promise<Task> => {
@@ -464,7 +529,7 @@ export const createTask = async (task: Omit<Task, "id" | "created_at" | "updated
     throw error;
   }
 
-  return data;
+  return data as unknown as Task;
 };
 
 export const updateTask = async (id: string, updates: Partial<Task>): Promise<Task> => {
@@ -480,7 +545,7 @@ export const updateTask = async (id: string, updates: Partial<Task>): Promise<Ta
     throw error;
   }
 
-  return data;
+  return data as unknown as Task;
 };
 
 export const deleteTask = async (id: string): Promise<void> => {
@@ -495,104 +560,18 @@ export const deleteTask = async (id: string): Promise<void> => {
   }
 };
 
-export const getTasksByITRId = async (itrId: string): Promise<Task[]> => {
+export const getTasksBySubsystemId = async (subsystemId: string): Promise<Task[]> => {
   const { data, error } = await supabase
     .from('tasks')
     .select('*')
-    .eq('itr_id', itrId);
+    .eq('subsystem_id', subsystemId);
 
   if (error) {
-    console.error(`Error fetching tasks for ITR ${itrId}:`, error);
+    console.error(`Error fetching tasks for subsystem ${subsystemId}:`, error);
     throw error;
   }
 
-  return data || [];
-};
-
-// Evidences CRUD
-export const getEvidences = async (): Promise<Evidence[]> => {
-  const { data, error } = await supabase
-    .from('evidences')
-    .select('*');
-
-  if (error) {
-    console.error("Error fetching evidences:", error);
-    throw error;
-  }
-
-  return data || [];
-};
-
-export const getEvidenceById = async (id: string): Promise<Evidence | null> => {
-  const { data, error } = await supabase
-    .from('evidences')
-    .select('*')
-    .eq('id', id)
-    .single();
-
-  if (error) {
-    console.error(`Error fetching evidence with id ${id}:`, error);
-    throw error;
-  }
-
-  return data;
-};
-
-export const createEvidence = async (evidence: Omit<Evidence, "id" | "created_at" | "updated_at">): Promise<Evidence> => {
-  const { data, error } = await supabase
-    .from('evidences')
-    .insert(evidence)
-    .select()
-    .single();
-
-  if (error) {
-    console.error("Error creating evidence:", error);
-    throw error;
-  }
-
-  return data;
-};
-
-export const updateEvidence = async (id: string, updates: Partial<Evidence>): Promise<Evidence> => {
-  const { data, error } = await supabase
-    .from('evidences')
-    .update(updates)
-    .eq('id', id)
-    .select()
-    .single();
-
-  if (error) {
-    console.error(`Error updating evidence with id ${id}:`, error);
-    throw error;
-  }
-
-  return data;
-};
-
-export const deleteEvidence = async (id: string): Promise<void> => {
-  const { error } = await supabase
-    .from('evidences')
-    .delete()
-    .eq('id', id);
-
-  if (error) {
-    console.error(`Error deleting evidence with id ${id}:`, error);
-    throw error;
-  }
-};
-
-export const getEvidencesByTaskId = async (taskId: string): Promise<Evidence[]> => {
-  const { data, error } = await supabase
-    .from('evidences')
-    .select('*')
-    .eq('task_id', taskId);
-
-  if (error) {
-    console.error(`Error fetching evidences for task ${taskId}:`, error);
-    throw error;
-  }
-
-  return data || [];
+  return data as unknown as Task[] || [];
 };
 
 // User profiles
@@ -608,7 +587,7 @@ export const getUserProfile = async (userId: string): Promise<Profile | null> =>
     throw error;
   }
 
-  return data;
+  return data as unknown as Profile;
 };
 
 export const updateUserProfile = async (userId: string, updates: Partial<Profile>): Promise<Profile> => {
@@ -624,5 +603,5 @@ export const updateUserProfile = async (userId: string, updates: Partial<Profile
     throw error;
   }
 
-  return data;
+  return data as unknown as Profile;
 };
