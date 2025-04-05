@@ -6,6 +6,7 @@ import { Plus } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { getSubsystems, Subsystem, getSystems, System, deleteSubsystem, getITRsBySubsystemId } from "@/services/supabaseService";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { SubsystemFormModal } from "@/components/modals/SubsystemFormModal";
 
 interface SubsystemWithDetails extends Subsystem {
   systemName?: string;
@@ -17,6 +18,8 @@ const Subsystems = () => {
   const [subsystems, setSubsystems] = useState<SubsystemWithDetails[]>([]);
   const [systems, setSystems] = useState<System[]>([]);
   const [loading, setLoading] = useState(true);
+  const [showModal, setShowModal] = useState(false);
+  const [selectedSubsystem, setSelectedSubsystem] = useState<Subsystem | undefined>(undefined);
   const { toast } = useToast();
 
   const fetchData = async () => {
@@ -39,7 +42,7 @@ const Subsystems = () => {
           
           return {
             ...subsystem,
-            systemName: system?.name || 'Unknown System',
+            systemName: system?.name || 'Sistema Desconocido',
             itrsCount: itrs.length
           };
         })
@@ -65,11 +68,11 @@ const Subsystems = () => {
 
   const columns = [
     {
-      header: "Subsystem Name",
+      header: "Nombre del Subsistema",
       accessorKey: "name" as const,
     },
     {
-      header: "System",
+      header: "Sistema",
       accessorKey: "systemName" as const,
     },
     {
@@ -77,7 +80,7 @@ const Subsystems = () => {
       accessorKey: "itrsCount" as const,
     },
     {
-      header: "Completion Rate",
+      header: "Tasa de Completado",
       accessorKey: "completion_rate" as const,
       cell: (subsystem: SubsystemWithDetails) => (
         <div className="flex items-center">
@@ -100,12 +103,8 @@ const Subsystems = () => {
   ];
 
   const handleEditSubsystem = (subsystem: SubsystemWithDetails) => {
-    console.log("Edit subsystem:", subsystem);
-    // Will be implemented in a future update
-    toast({
-      title: "Funcionalidad no implementada",
-      description: "La edición de subsistemas se implementará próximamente",
-    });
+    setSelectedSubsystem(subsystem);
+    setShowModal(true);
   };
 
   const handleDeleteSubsystem = async (subsystem: SubsystemWithDetails) => {
@@ -129,25 +128,33 @@ const Subsystems = () => {
   };
 
   const handleNewSubsystem = () => {
-    // Will be implemented in a future update
-    toast({
-      title: "Funcionalidad no implementada",
-      description: "La creación de subsistemas se implementará próximamente",
-    });
+    setSelectedSubsystem(undefined);
+    setShowModal(true);
+  };
+
+  const handleModalClose = () => {
+    setShowModal(false);
+    setSelectedSubsystem(undefined);
+  };
+
+  const handleModalSuccess = () => {
+    fetchData();
+    setShowModal(false);
+    setSelectedSubsystem(undefined);
   };
 
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">Subsystems</h1>
+          <h1 className="text-3xl font-bold tracking-tight">Subsistemas</h1>
           <p className="text-muted-foreground">
-            Manage subsystems within your systems
+            Gestiona los subsistemas dentro de tus sistemas
           </p>
         </div>
         <Button onClick={handleNewSubsystem}>
           <Plus className="h-4 w-4 mr-2" />
-          New Subsystem
+          Nuevo Subsistema
         </Button>
       </div>
 
@@ -170,6 +177,16 @@ const Subsystems = () => {
           onEdit={handleEditSubsystem}
           onDelete={handleDeleteSubsystem}
           loading={loading}
+        />
+      )}
+
+      {showModal && (
+        <SubsystemFormModal
+          open={showModal}
+          onClose={handleModalClose}
+          onSuccess={handleModalSuccess}
+          subsystem={selectedSubsystem}
+          systems={systems}
         />
       )}
     </div>

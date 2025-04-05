@@ -14,6 +14,7 @@ import {
 import { useToast } from "@/hooks/use-toast";
 import { getITRs, ITR, getSubsystems, Subsystem, deleteITR } from "@/services/supabaseService";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { ITRFormModal } from "@/components/modals/ITRFormModal";
 
 interface ITRWithDetails extends ITR {
   subsystemName?: string;
@@ -26,6 +27,8 @@ const ITRs = () => {
   const [subsystems, setSubsystems] = useState<Subsystem[]>([]);
   const [loading, setLoading] = useState(true);
   const [statusFilter, setStatusFilter] = useState<string>("all");
+  const [showModal, setShowModal] = useState(false);
+  const [selectedITR, setSelectedITR] = useState<ITR | undefined>(undefined);
   const { toast } = useToast();
 
   const fetchData = async () => {
@@ -41,7 +44,7 @@ const ITRs = () => {
         const relatedSubsystem = subsystemsData.find(sub => sub.id === itr.subsystem_id);
         return {
           ...itr,
-          subsystemName: relatedSubsystem?.name || 'Unknown Subsystem'
+          subsystemName: relatedSubsystem?.name || 'Subsistema Desconocido'
         };
       });
       
@@ -65,30 +68,30 @@ const ITRs = () => {
 
   const columns = [
     {
-      header: "ITR Name",
+      header: "Nombre ITR",
       accessorKey: "name" as const,
     },
     {
-      header: "Subsystem",
+      header: "Subsistema",
       accessorKey: "subsystemName" as const,
     },
     {
-      header: "Assigned To",
+      header: "Asignado a",
       accessorKey: "assigned_to" as const,
-      cell: (itr: ITRWithDetails) => <span>{itr.assigned_to || 'Not Assigned'}</span>,
+      cell: (itr: ITRWithDetails) => <span>{itr.assigned_to || 'No Asignado'}</span>,
     },
     {
-      header: "Due Date",
+      header: "Fecha Límite",
       accessorKey: "due_date" as const,
-      cell: (itr: ITRWithDetails) => <span>{itr.due_date || 'No Date Set'}</span>,
+      cell: (itr: ITRWithDetails) => <span>{itr.due_date ? new Date(itr.due_date).toLocaleDateString('es-ES') : 'Sin Fecha'}</span>,
     },
     {
-      header: "Status",
+      header: "Estado",
       accessorKey: "status" as const,
       cell: (itr: ITRWithDetails) => <StatusBadge status={itr.status} />,
     },
     {
-      header: "Progress",
+      header: "Progreso",
       accessorKey: "progress" as const,
       cell: (itr: ITRWithDetails) => (
         <div className="w-full bg-secondary/10 rounded-full h-2.5">
@@ -113,12 +116,8 @@ const ITRs = () => {
       : itrs.filter((itr) => itr.status === statusFilter);
 
   const handleEditITR = (itr: ITRWithDetails) => {
-    console.log("Edit ITR:", itr);
-    // Will be implemented in a future update
-    toast({
-      title: "Funcionalidad no implementada",
-      description: "La edición de ITRs se implementará próximamente",
-    });
+    setSelectedITR(itr);
+    setShowModal(true);
   };
 
   const handleDeleteITR = async (itr: ITRWithDetails) => {
@@ -142,11 +141,19 @@ const ITRs = () => {
   };
 
   const handleNewITR = () => {
-    // Will be implemented in a future update
-    toast({
-      title: "Funcionalidad no implementada",
-      description: "La creación de ITRs se implementará próximamente",
-    });
+    setSelectedITR(undefined);
+    setShowModal(true);
+  };
+
+  const handleModalClose = () => {
+    setShowModal(false);
+    setSelectedITR(undefined);
+  };
+
+  const handleModalSuccess = () => {
+    fetchData();
+    setShowModal(false);
+    setSelectedITR(undefined);
   };
 
   return (
@@ -155,12 +162,12 @@ const ITRs = () => {
         <div>
           <h1 className="text-3xl font-bold tracking-tight">ITRs</h1>
           <p className="text-muted-foreground">
-            Inspection Test Records Management
+            Gestión de Registros de Inspección (ITRs)
           </p>
         </div>
         <Button onClick={handleNewITR}>
           <Plus className="h-4 w-4 mr-2" />
-          New ITR
+          Nuevo ITR
         </Button>
       </div>
 
@@ -171,13 +178,13 @@ const ITRs = () => {
             onValueChange={setStatusFilter}
           >
             <SelectTrigger>
-              <SelectValue placeholder="Filter by status" />
+              <SelectValue placeholder="Filtrar por estado" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="all">All Statuses</SelectItem>
-              <SelectItem value="complete">Complete</SelectItem>
-              <SelectItem value="inprogress">In Progress</SelectItem>
-              <SelectItem value="delayed">Delayed</SelectItem>
+              <SelectItem value="all">Todos los estados</SelectItem>
+              <SelectItem value="complete">Completado</SelectItem>
+              <SelectItem value="inprogress">En Progreso</SelectItem>
+              <SelectItem value="delayed">Retrasado</SelectItem>
             </SelectContent>
           </Select>
         </div>
@@ -202,6 +209,16 @@ const ITRs = () => {
           onEdit={handleEditITR}
           onDelete={handleDeleteITR}
           loading={loading}
+        />
+      )}
+
+      {showModal && (
+        <ITRFormModal
+          open={showModal}
+          onClose={handleModalClose}
+          onSuccess={handleModalSuccess}
+          itr={selectedITR}
+          subsystems={subsystems}
         />
       )}
     </div>

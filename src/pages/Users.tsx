@@ -86,39 +86,39 @@ const Users = () => {
 
   const columns = [
     {
-      header: "Name",
-      accessorKey: "profile.full_name" as const,
-      cell: (user: User) => <span>{user.profile?.full_name || 'No Name'}</span>
+      header: "Nombre",
+      accessorKey: "profile" as keyof User,
+      cell: (user: User) => <span>{user.profile?.full_name || 'Sin nombre'}</span>
     },
     {
       header: "Email",
-      accessorKey: "email" as const,
+      accessorKey: "email" as keyof User,
     },
     {
-      header: "Role",
-      accessorKey: "profile.role" as const,
+      header: "Rol",
+      accessorKey: "profile" as keyof User,
       cell: (user: User) => (
         <Badge variant={user.profile?.role === "admin" ? "default" : "secondary"}>
-          {user.profile?.role || 'user'}
+          {user.profile?.role || 'usuario'}
         </Badge>
       ),
     },
     {
-      header: "Status",
-      accessorKey: "status" as const,
-      cell: (user: User) => (
+      header: "Estado",
+      accessorKey: "id" as keyof User,
+      cell: () => (
         <Badge 
           variant="outline"
           className="border-green-500 text-green-500"
         >
-          Active
+          Activo
         </Badge>
       ),
     },
     {
-      header: "Last Active",
-      accessorKey: "last_sign_in_at" as const,
-      cell: (user: User) => <span>{user.last_sign_in_at || 'Never'}</span>
+      header: "Último Acceso",
+      accessorKey: "last_sign_in_at" as keyof User,
+      cell: (user: User) => <span>{user.last_sign_in_at || 'Nunca'}</span>
     },
   ];
 
@@ -151,14 +151,14 @@ const Users = () => {
     <div className="space-y-6">
       <div className="flex justify-between items-center">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">Users</h1>
+          <h1 className="text-3xl font-bold tracking-tight">Usuarios</h1>
           <p className="text-muted-foreground">
-            Manage system users and permissions
+            Gestiona los usuarios y permisos del sistema
           </p>
         </div>
         <Button onClick={handleNewUser}>
           <Plus className="h-4 w-4 mr-2" />
-          New User
+          Nuevo Usuario
         </Button>
       </div>
 

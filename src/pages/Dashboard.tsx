@@ -10,6 +10,8 @@ import { getDashboardStats } from "@/services/supabaseService";
 import { initializeStorage } from "@/services/storageService";
 import { Button } from "@/components/ui/button";
 import { useNavigate } from "react-router-dom";
+import { ProjectSelector } from "@/components/ProjectSelector";
+import { GanttChart } from "@/components/GanttChart";
 
 interface DashboardStats {
   totalProjects: number;
@@ -29,11 +31,20 @@ interface DashboardStats {
     completions: number; 
     issues: number;
   }[];
+  ganttData: {
+    id: string;
+    task: string;
+    start: string;
+    end: string;
+    progress: number;
+    dependencies: string;
+  }[];
 }
 
 const Dashboard = () => {
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [loading, setLoading] = useState(true);
+  const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null);
   const navigate = useNavigate();
 
   const fetchData = async () => {
@@ -43,7 +54,7 @@ const Dashboard = () => {
       await initializeStorage();
       
       // Obtener estadísticas del dashboard
-      const dashboardData = await getDashboardStats();
+      const dashboardData = await getDashboardStats(selectedProjectId);
       setStats(dashboardData as DashboardStats);
     } catch (error) {
       console.error("Error al cargar datos del dashboard:", error);
@@ -54,7 +65,7 @@ const Dashboard = () => {
 
   useEffect(() => {
     fetchData();
-  }, []);
+  }, [selectedProjectId]);
 
   // Refetch data every 30 seconds for real-time updates
   useEffect(() => {
@@ -63,7 +74,11 @@ const Dashboard = () => {
     }, 30000);
     
     return () => clearInterval(interval);
-  }, []);
+  }, [selectedProjectId]);
+
+  const handleSelectProject = (projectId: string | null) => {
+    setSelectedProjectId(projectId);
+  };
 
   if (loading) {
     return (
@@ -86,11 +101,17 @@ const Dashboard = () => {
   if (isEmpty) {
     return (
       <div className="space-y-6">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">Dashboard</h1>
-          <p className="text-muted-foreground">
-            Resumen de la gestión de proyectos y métricas clave
-          </p>
+        <div className="flex justify-between items-center">
+          <div>
+            <h1 className="text-3xl font-bold tracking-tight">Dashboard</h1>
+            <p className="text-muted-foreground">
+              Resumen de la gestión de proyectos y métricas clave
+            </p>
+          </div>
+          <ProjectSelector 
+            onSelectProject={handleSelectProject}
+            selectedProjectId={selectedProjectId}
+          />
         </div>
         
         <Card className="p-8">
@@ -112,11 +133,17 @@ const Dashboard = () => {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-3xl font-bold tracking-tight">Dashboard</h1>
-        <p className="text-muted-foreground">
-          Resumen de la gestión de proyectos y métricas clave
-        </p>
+      <div className="flex justify-between items-center">
+        <div>
+          <h1 className="text-3xl font-bold tracking-tight">Dashboard</h1>
+          <p className="text-muted-foreground">
+            Resumen de la gestión de proyectos y métricas clave
+          </p>
+        </div>
+        <ProjectSelector 
+          onSelectProject={handleSelectProject}
+          selectedProjectId={selectedProjectId}
+        />
       </div>
 
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
@@ -208,6 +235,7 @@ const Dashboard = () => {
                   stroke="hsl(var(--secondary))" 
                   fill="hsl(var(--secondary)/0.2)" 
                   stackId="1" 
+                  name="Inspecciones"
                 />
                 <Area 
                   type="monotone" 
@@ -215,6 +243,7 @@ const Dashboard = () => {
                   stroke="#22c55e" 
                   fill="#22c55e20" 
                   stackId="2" 
+                  name="Completados"
                 />
                 <Area 
                   type="monotone" 
@@ -222,12 +251,34 @@ const Dashboard = () => {
                   stroke="#ef4444" 
                   fill="#ef444420" 
                   stackId="3" 
+                  name="Problemas"
                 />
               </RechartsAreaChart>
             </ResponsiveContainer>
           </CardContent>
         </Card>
       </div>
+
+      {/* Gantt Chart Section */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Cronograma de Tareas</CardTitle>
+          <CardDescription>
+            Planificación y progreso de las tareas del proyecto
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          {stats.ganttData && stats.ganttData.length > 0 ? (
+            <div className="h-[400px]">
+              <GanttChart data={stats.ganttData} />
+            </div>
+          ) : (
+            <div className="text-center py-10">
+              <p className="text-muted-foreground">No hay tareas programadas para este proyecto</p>
+            </div>
+          )}
+        </CardContent>
+      </Card>
     </div>
   );
 };

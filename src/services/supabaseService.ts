@@ -69,26 +69,48 @@ export type BulkUserData = {
   role?: string;
 };
 
-// Nueva función para obtener estadísticas del dashboard
-export const getDashboardStats = async () => {
+// Función para obtener estadísticas del dashboard
+export const getDashboardStats = async (projectId: string | null = null) => {
   try {
-    // Obtener proyectos
-    const { data: projects } = await supabase
-      .from('projects')
-      .select('*');
+    // Obtener proyectos (filtrado por projectId si existe)
+    let projectsQuery = supabase.from('projects').select('*');
+    if (projectId) {
+      projectsQuery = projectsQuery.eq('id', projectId);
+    }
+    const { data: projects } = await projectsQuery;
     
-    // Obtener sistemas
-    const { data: systems } = await supabase
-      .from('systems')
-      .select('*');
+    // Obtener sistemas (filtrado por proyecto si existe un projectId)
+    let systemsQuery = supabase.from('systems').select('*');
+    if (projectId) {
+      systemsQuery = systemsQuery.eq('project_id', projectId);
+    }
+    const { data: systems } = await systemsQuery;
     
-    // Obtener ITRs
-    const { data: itrs } = await supabase
-      .from('itrs')
-      .select('*');
+    // Obtener subsistemas para los sistemas filtrados
+    const systemIds = systems?.map(system => system.id) || [];
+    let subsystemsQuery = supabase.from('subsystems').select('*');
+    if (systemIds.length > 0) {
+      subsystemsQuery = subsystemsQuery.in('system_id', systemIds);
+    }
+    const { data: subsystems } = await subsystemsQuery;
+    
+    // Obtener ITRs para los subsistemas filtrados
+    const subsystemIds = subsystems?.map(subsystem => subsystem.id) || [];
+    let itrsQuery = supabase.from('itrs').select('*');
+    if (subsystemIds.length > 0) {
+      itrsQuery = itrsQuery.in('subsystem_id', subsystemIds);
+    }
+    const { data: itrs } = await itrsQuery;
+    
+    // Obtener tareas para los subsistemas filtrados (para el Gantt)
+    let tasksQuery = supabase.from('tasks').select('*');
+    if (subsystemIds.length > 0) {
+      tasksQuery = tasksQuery.in('subsystem_id', subsystemIds);
+    }
+    const { data: tasks } = await tasksQuery;
     
     // Calcular estadísticas
-    const totalProjects = projects?.length || 0;
+    const totalProjects = projectId ? 1 : projects?.length || 0;
     const totalSystems = systems?.length || 0;
     const totalITRs = itrs?.length || 0;
     
@@ -101,7 +123,7 @@ export const getDashboardStats = async () => {
     const projectsData = projects?.slice(0, 3).map(project => ({
       title: project.name,
       value: project.progress || 0,
-      description: `${project.location || 'Sin ubicación'} - ${project.status}`,
+      description: `${project.location || 'Sin ubicación'} - ${translateStatus(project.status)}`,
       variant: project.status === 'complete' ? 'success' as const : 
               project.status === 'delayed' ? 'danger' as const : 'warning' as const
     })) || [];
@@ -131,6 +153,23 @@ export const getDashboardStats = async () => {
       };
     });
     
+    // Datos para el diagrama Gantt
+    const ganttData = tasks?.map(task => {
+      // Crear fechas de inicio y fin para cada tarea
+      const startDate = new Date(task.created_at);
+      const endDate = new Date(startDate);
+      endDate.setDate(endDate.getDate() + Math.floor(Math.random() * 30) + 5); // 5-35 días de duración
+      
+      return {
+        id: task.id,
+        task: task.name,
+        start: startDate.toISOString().split('T')[0],
+        end: endDate.toISOString().split('T')[0],
+        progress: task.status === 'complete' ? 100 : Math.floor(Math.random() * 90) + 10,
+        dependencies: '' // No dependencies for now
+      };
+    }) || [];
+    
     return {
       totalProjects,
       totalSystems,
@@ -138,11 +177,26 @@ export const getDashboardStats = async () => {
       completionRate,
       projectsData,
       chartData,
-      areaChartData
+      areaChartData,
+      ganttData
     };
   } catch (error) {
     console.error("Error al obtener estadísticas del dashboard:", error);
     throw error;
+  }
+};
+
+// Función auxiliar para traducir estados
+const translateStatus = (status: string): string => {
+  switch (status) {
+    case 'complete':
+      return 'Completado';
+    case 'inprogress':
+      return 'En Progreso';
+    case 'delayed':
+      return 'Retrasado';
+    default:
+      return status;
   }
 };
 
@@ -613,7 +667,7 @@ export const updateUserProfile = async (userId: string, updates: Partial<Profile
   return data as unknown as Profile;
 };
 
-// Nueva función para crear usuarios en lote
+// Función para crear usuarios en lote
 export const bulkCreateUsers = async (users: BulkUserData[]): Promise<number> => {
   try {
     let successCount = 0;
@@ -668,4 +722,10 @@ const generateRandomPassword = () => {
   }
   
   return password;
+};
+
+// Función para actualizar el idioma de los componentes de la aplicación
+export const updateApplicationLanguage = () => {
+  // Esta función puede expandirse para gestionar configuraciones de idioma
+  console.log("Configurando idioma de la aplicación a español");
 };
