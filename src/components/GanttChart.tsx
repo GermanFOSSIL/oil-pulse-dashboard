@@ -41,7 +41,7 @@ export const GanttChart: React.FC<GanttProps> = ({ data }) => {
         }
       ];
 
-      // Configurar la localización española (solución al error)
+      // Definir traducciones completas para solucionar el error de tipos
       gantt.locale.labels = {
         new_task: "Nueva tarea",
         icon_save: "Guardar",
@@ -97,7 +97,21 @@ export const GanttChart: React.FC<GanttProps> = ({ data }) => {
         column_successor: "Sucesor",
         column_slack: "Holgura",
         column_constraint_type: "Tipo de restricción",
-        column_constraint_date: "Fecha de restricción"
+        column_constraint_date: "Fecha de restricción",
+        
+        // Añadiendo propiedades faltantes según el error
+        message_ok: "OK",
+        message_cancel: "Cancelar",
+        section_constraint: "Restricción",
+        constraint_type: "Tipo de restricción",
+        constraint_date: "Fecha de restricción",
+        section_constraint_type: "Tipo de restricción",
+        section_constraint_date: "Fecha de restricción",
+        section_custom_fields: "Campos personalizados",
+        section_dynamicforms: "Formularios dinámicos",
+        section_resources_filter: "Filtro de recursos",
+        section_details: "Detalles",
+        section_wbs: "EDT"
       };
 
       // Traducción del resto de elementos

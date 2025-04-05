@@ -44,7 +44,7 @@ export const ITRFormModal = ({
   
   const [formData, setFormData] = useState({
     name: itr?.name || "",
-    project_id: initialProjectId || itr?.project_id || "",
+    project_id: initialProjectId || "",
     system_id: "",
     subsystem_id: itr?.subsystem_id || "",
     status: itr?.status || "inprogress",
