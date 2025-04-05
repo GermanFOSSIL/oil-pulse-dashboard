@@ -28,19 +28,7 @@ const Users = () => {
     setLoading(true);
     
     try {
-      // Fetch all users from Supabase Auth
-      const { data: authUsers, error: authError } = await supabase.auth.admin.listUsers();
-      
-      if (authError) {
-        throw authError;
-      }
-      
-      if (!authUsers) {
-        setUsers([]);
-        return;
-      }
-      
-      // Get profiles for all users
+      // Obtener perfiles de usuario
       const { data: profiles, error: profilesError } = await supabase
         .from('profiles')
         .select('*');
@@ -49,23 +37,25 @@ const Users = () => {
         throw profilesError;
       }
       
-      // Map profiles to users
+      // Mapear los perfiles por ID para un acceso más fácil
       const profilesMap = new Map();
       profiles?.forEach(profile => {
         profilesMap.set(profile.id, profile);
       });
       
-      // Transform users to include profile info
-      const transformedUsers = authUsers.users.map(user => ({
-        id: user.id,
-        email: user.email || 'No Email',
-        last_sign_in_at: user.last_sign_in_at,
-        created_at: user.created_at,
+      // Ahora obtenemos la lista de usuarios desde Auth
+      // Necesitaríamos una función admin de Supabase Edge Functions para hacer esto correctamente
+      // Para simplificar, usaremos los perfiles como base de los datos de usuario
+      const transformedUsers = profiles?.map(profile => ({
+        id: profile.id,
+        email: 'No disponible', // En una implementación completa, esto vendría de auth.users
+        last_sign_in_at: null,  // En una implementación completa, esto vendría de auth.users
+        created_at: profile.created_at,
         profile: {
-          full_name: profilesMap.get(user.id)?.full_name || null,
-          role: profilesMap.get(user.id)?.role || 'user'
+          full_name: profile.full_name,
+          role: profile.role
         }
-      }));
+      })) || [];
       
       setUsers(transformedUsers);
     } catch (error) {

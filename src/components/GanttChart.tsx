@@ -41,34 +41,71 @@ export const GanttChart: React.FC<GanttProps> = ({ data }) => {
         }
       ];
 
-      // Traducción de escala de tiempo
-      gantt.locale = {
-        ...gantt.locale,
-        date: {
-          month_full: ["Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"],
-          month_short: ["Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "Sep", "Oct", "Nov", "Dic"],
-          day_full: ["Domingo", "Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado"],
-          day_short: ["Dom", "Lun", "Mar", "Mié", "Jue", "Vie", "Sáb"]
-        },
-        labels: {
-          new_task: "Nueva tarea",
-          icon_save: "Guardar",
-          icon_cancel: "Cancelar",
-          icon_details: "Detalles",
-          icon_edit: "Editar",
-          icon_delete: "Eliminar",
-          confirm_closing: "Sus cambios se perderán, ¿está seguro?",
-          confirm_deleting: "La tarea será eliminada permanentemente, ¿está seguro?",
-          section_description: "Descripción",
-          section_time: "Período",
-          section_type: "Tipo",
-          
-          /* grid columns */
-          column_text: "Nombre de tarea",
-          column_start_date: "Inicio",
-          column_duration: "Duración",
-          column_add: ""
-        }
+      // Configurar la localización española (solución al error)
+      gantt.locale.labels = {
+        new_task: "Nueva tarea",
+        icon_save: "Guardar",
+        icon_cancel: "Cancelar",
+        icon_details: "Detalles",
+        icon_edit: "Editar",
+        icon_delete: "Eliminar",
+        confirm_closing: "Sus cambios se perderán, ¿está seguro?",
+        confirm_deleting: "La tarea será eliminada permanentemente, ¿está seguro?",
+        section_description: "Descripción",
+        section_time: "Período",
+        section_type: "Tipo",
+        
+        /* grid columns */
+        column_text: "Nombre de tarea",
+        column_start_date: "Inicio",
+        column_duration: "Duración",
+        column_add: "",
+        
+        /* Añadiendo las propiedades faltantes que causaban el error */
+        section_deadline: "Fecha límite",
+        section_baselines: "Líneas base",
+        column_wbs: "EDT",
+        link: "Enlace",
+        section_priority: "Prioridad",
+        section_progress: "Progreso",
+        section_milestone: "Hito",
+        section_start_date: "Fecha de inicio",
+        section_end_date: "Fecha de fin",
+        section_color: "Color",
+        section_parent: "Tarea padre",
+        section_constraints: "Restricciones",
+        section_resources: "Recursos",
+        confirm_link_deleting: "¿Desea eliminar este enlace?",
+        link_start: "(inicio)",
+        link_end: "(fin)",
+        type_task: "Tarea",
+        type_project: "Proyecto",
+        type_milestone: "Hito",
+        minutes: "Minutos",
+        hours: "Horas",
+        days: "Días",
+        weeks: "Semanas",
+        months: "Meses",
+        years: "Años",
+        column_planned_start: "Inicio planeado",
+        column_planned_end: "Fin planeado",
+        column_planned_duration: "Duración planeada",
+        column_progress: "Progreso",
+        column_priority: "Prioridad",
+        column_planned: "Planeado",
+        column_predecessor: "Predecesor",
+        column_successor: "Sucesor",
+        column_slack: "Holgura",
+        column_constraint_type: "Tipo de restricción",
+        column_constraint_date: "Fecha de restricción"
+      };
+
+      // Traducción del resto de elementos
+      gantt.locale.date = {
+        month_full: ["Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"],
+        month_short: ["Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "Sep", "Oct", "Nov", "Dic"],
+        day_full: ["Domingo", "Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado"],
+        day_short: ["Dom", "Lun", "Mar", "Mié", "Jue", "Vie", "Sáb"]
       };
 
       // Configurar la escala de tiempo

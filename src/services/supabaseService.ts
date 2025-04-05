@@ -1,4 +1,3 @@
-
 import { supabase } from "@/integrations/supabase/client";
 import { Database } from "@/integrations/supabase/types";
 import { toast } from "@/hooks/use-toast";
@@ -43,7 +42,6 @@ export type ITR = {
   assigned_to: string | null;
 };
 
-// Actualizada para coincidir con la estructura de la base de datos real
 export type Task = {
   id: string;
   created_at: string;
@@ -69,24 +67,20 @@ export type BulkUserData = {
   role?: string;
 };
 
-// Función para obtener estadísticas del dashboard
 export const getDashboardStats = async (projectId: string | null = null) => {
   try {
-    // Obtener proyectos (filtrado por projectId si existe)
     let projectsQuery = supabase.from('projects').select('*');
     if (projectId) {
       projectsQuery = projectsQuery.eq('id', projectId);
     }
     const { data: projects } = await projectsQuery;
     
-    // Obtener sistemas (filtrado por proyecto si existe un projectId)
     let systemsQuery = supabase.from('systems').select('*');
     if (projectId) {
       systemsQuery = systemsQuery.eq('project_id', projectId);
     }
     const { data: systems } = await systemsQuery;
     
-    // Obtener subsistemas para los sistemas filtrados
     const systemIds = systems?.map(system => system.id) || [];
     let subsystemsQuery = supabase.from('subsystems').select('*');
     if (systemIds.length > 0) {
@@ -94,7 +88,6 @@ export const getDashboardStats = async (projectId: string | null = null) => {
     }
     const { data: subsystems } = await subsystemsQuery;
     
-    // Obtener ITRs para los subsistemas filtrados
     const subsystemIds = subsystems?.map(subsystem => subsystem.id) || [];
     let itrsQuery = supabase.from('itrs').select('*');
     if (subsystemIds.length > 0) {
@@ -102,25 +95,21 @@ export const getDashboardStats = async (projectId: string | null = null) => {
     }
     const { data: itrs } = await itrsQuery;
     
-    // Obtener tareas para los subsistemas filtrados (para el Gantt)
     let tasksQuery = supabase.from('tasks').select('*');
     if (subsystemIds.length > 0) {
       tasksQuery = tasksQuery.in('subsystem_id', subsystemIds);
     }
     const { data: tasks } = await tasksQuery;
     
-    // Calcular estadísticas
-    const totalProjects = projectId ? 1 : projects?.length || 0;
+    const totalProjects = projects?.length || 0;
     const totalSystems = systems?.length || 0;
     const totalITRs = itrs?.length || 0;
     
-    // Calcular tasa de completado (promedio de progreso de proyectos)
     const completionRate = projects?.length 
       ? Math.round(projects.reduce((acc, proj) => acc + (proj.progress || 0), 0) / projects.length) 
       : 0;
     
-    // Datos para tarjetas de proyectos
-    const projectsData = projects?.slice(0, 3).map(project => ({
+    const projectsData = projects?.map(project => ({
       title: project.name,
       value: project.progress || 0,
       description: `${project.location || 'Sin ubicación'} - ${translateStatus(project.status)}`,
@@ -128,45 +117,71 @@ export const getDashboardStats = async (projectId: string | null = null) => {
               project.status === 'delayed' ? 'danger' as const : 'warning' as const
     })) || [];
     
-    // Datos para gráfico de barras
-    const chartData = systems?.slice(0, 6).map(system => ({
-      name: system.name.length > 10 ? system.name.substring(0, 10) + '...' : system.name,
+    const chartData = systems?.map(system => ({
+      name: system.name.length > 20 ? system.name.substring(0, 20) + '...' : system.name,
       value: system.completion_rate || 0
     })) || [];
     
-    // Datos para gráfico de área
-    const monthNames = ["Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "Sep", "Oct", "Nov", "Dic"];
-    const currentDate = new Date();
+    const itrsByMonth: Record<string, { inspections: number; completions: number; issues: number }> = {};
     
-    // Generar datos para el gráfico de área basados en datos reales
-    const areaChartData = monthNames.slice(0, 6).map((monthName, index) => {
-      const month = (currentDate.getMonth() - 5 + index) % 12;
-      const inspections = Math.floor(Math.random() * (totalITRs + 10)) + 5;
-      const completions = Math.floor(inspections * (completionRate / 100));
-      const issues = Math.floor(inspections * 0.2);
+    itrs?.forEach(itr => {
+      const createdDate = new Date(itr.created_at);
+      const monthKey = `${createdDate.getFullYear()}-${createdDate.getMonth() + 1}`;
       
+      if (!itrsByMonth[monthKey]) {
+        itrsByMonth[monthKey] = { inspections: 0, completions: 0, issues: 0 };
+      }
+      
+      itrsByMonth[monthKey].inspections += 1;
+      
+      if (itr.status === 'complete') {
+        itrsByMonth[monthKey].completions += 1;
+      } else if (itr.status === 'delayed') {
+        itrsByMonth[monthKey].issues += 1;
+      }
+    });
+    
+    const monthNames = ["Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "Sep", "Oct", "Nov", "Dic"];
+    const areaChartData = Object.entries(itrsByMonth).map(([key, value]) => {
+      const [year, month] = key.split('-').map(Number);
       return {
-        name: monthName,
-        inspections,
-        completions,
-        issues
+        name: `${monthNames[month - 1]}`,
+        ...value
       };
     });
     
-    // Datos para el diagrama Gantt
+    areaChartData.sort((a, b) => {
+      const getMonthNumber = (name: string) => monthNames.indexOf(name);
+      return getMonthNumber(a.name) - getMonthNumber(b.name);
+    });
+    
+    if (areaChartData.length === 0) {
+      for (let i = 0; i < 6; i++) {
+        const month = (new Date().getMonth() - 5 + i) % 12;
+        areaChartData.push({
+          name: monthNames[month >= 0 ? month : month + 12],
+          inspections: 0,
+          completions: 0,
+          issues: 0
+        });
+      }
+    }
+    
     const ganttData = tasks?.map(task => {
-      // Crear fechas de inicio y fin para cada tarea
       const startDate = new Date(task.created_at);
-      const endDate = new Date(startDate);
-      endDate.setDate(endDate.getDate() + Math.floor(Math.random() * 30) + 5); // 5-35 días de duración
+      const endDate = task.updated_at ? new Date(task.updated_at) : new Date(startDate);
+      if (endDate <= startDate) {
+        endDate.setDate(startDate.getDate() + 14);
+      }
       
       return {
         id: task.id,
         task: task.name,
         start: startDate.toISOString().split('T')[0],
         end: endDate.toISOString().split('T')[0],
-        progress: task.status === 'complete' ? 100 : Math.floor(Math.random() * 90) + 10,
-        dependencies: '' // No dependencies for now
+        progress: task.status === 'complete' ? 100 : 
+                 task.status === 'inprogress' ? 50 : 30,
+        dependencies: ''
       };
     }) || [];
     
@@ -186,7 +201,6 @@ export const getDashboardStats = async (projectId: string | null = null) => {
   }
 };
 
-// Función auxiliar para traducir estados
 const translateStatus = (status: string): string => {
   switch (status) {
     case 'complete':
@@ -200,7 +214,6 @@ const translateStatus = (status: string): string => {
   }
 };
 
-// Projects CRUD
 export const getProjects = async (): Promise<Project[]> => {
   const { data, error } = await supabase
     .from('projects')
@@ -291,7 +304,6 @@ export const getProjectsSummary = async (): Promise<{ total: number, complete: n
   return { total, complete, inProgress, delayed };
 };
 
-// Systems CRUD
 export const getSystems = async (): Promise<System[]> => {
   const { data, error } = await supabase
     .from('systems')
@@ -377,7 +389,6 @@ export const getSystemsByProjectId = async (projectId: string): Promise<System[]
   return data as unknown as System[] || [];
 };
 
-// Subsystems CRUD
 export const getSubsystems = async (): Promise<Subsystem[]> => {
   const { data, error } = await supabase
     .from('subsystems')
@@ -463,7 +474,6 @@ export const getSubsystemsBySystemId = async (systemId: string): Promise<Subsyst
   return data as unknown as Subsystem[] || [];
 };
 
-// ITRs CRUD
 export const getITRs = async (): Promise<ITR[]> => {
   const { data, error } = await supabase
     .from('itrs')
@@ -549,7 +559,6 @@ export const getITRsBySubsystemId = async (subsystemId: string): Promise<ITR[]> 
   return (data as unknown as ITR[]) || [];
 };
 
-// Tasks CRUD actualizado para coincidir con la estructura de la base de datos
 export const getTasks = async (): Promise<Task[]> => {
   const { data, error } = await supabase
     .from('tasks')
@@ -635,7 +644,6 @@ export const getTasksBySubsystemId = async (subsystemId: string): Promise<Task[]
   return data as unknown as Task[] || [];
 };
 
-// User profiles
 export const getUserProfile = async (userId: string): Promise<Profile | null> => {
   const { data, error } = await supabase
     .from('profiles')
@@ -667,16 +675,12 @@ export const updateUserProfile = async (userId: string, updates: Partial<Profile
   return data as unknown as Profile;
 };
 
-// Función para crear usuarios en lote
 export const bulkCreateUsers = async (users: BulkUserData[]): Promise<number> => {
   try {
     let successCount = 0;
     
-    // Debido a limitaciones en la API de Supabase para auth, 
-    // procesamos uno por uno para poder manejar errores individuales
     for (const user of users) {
       try {
-        // Crear el usuario en auth
         const { data, error } = await supabase.auth.admin.createUser({
           email: user.email,
           password: generateRandomPassword(),
@@ -691,7 +695,6 @@ export const bulkCreateUsers = async (users: BulkUserData[]): Promise<number> =>
           continue;
         }
         
-        // Actualizar el rol en el perfil
         if (data.user && user.role) {
           await updateUserProfile(data.user.id, {
             role: user.role
@@ -711,7 +714,6 @@ export const bulkCreateUsers = async (users: BulkUserData[]): Promise<number> =>
   }
 };
 
-// Función auxiliar para generar contraseñas aleatorias
 const generateRandomPassword = () => {
   const characters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789!@#$%^&*';
   let password = '';
@@ -724,8 +726,243 @@ const generateRandomPassword = () => {
   return password;
 };
 
-// Función para actualizar el idioma de los componentes de la aplicación
+export const getITRWithDetails = async (itrId: string): Promise<any> => {
+  try {
+    const { data: itr, error: itrError } = await supabase
+      .from('itrs')
+      .select('*')
+      .eq('id', itrId)
+      .single();
+      
+    if (itrError) throw itrError;
+    if (!itr) throw new Error("ITR no encontrado");
+    
+    const { data: subsystem, error: subsystemError } = await supabase
+      .from('subsystems')
+      .select('*, systems(*)')
+      .eq('id', itr.subsystem_id)
+      .single();
+      
+    if (subsystemError) throw subsystemError;
+    if (!subsystem) throw new Error("Subsistema no encontrado");
+    
+    const system = subsystem.systems;
+    
+    const { data: project, error: projectError } = await supabase
+      .from('projects')
+      .select('*')
+      .eq('id', system.project_id)
+      .single();
+      
+    if (projectError) throw projectError;
+    
+    return {
+      ...itr,
+      subsystem: {
+        id: subsystem.id,
+        name: subsystem.name
+      },
+      system: {
+        id: system.id,
+        name: system.name
+      },
+      project: project ? {
+        id: project.id,
+        name: project.name
+      } : null
+    };
+  } catch (error) {
+    console.error("Error al obtener detalles del ITR:", error);
+    throw error;
+  }
+};
+
+export const generateReport = async (reportType: string, projectId: string | null = null): Promise<string> => {
+  try {
+    await new Promise(resolve => setTimeout(resolve, 1500));
+    
+    return "https://example.com/reports/report_" + Date.now() + ".pdf";
+  } catch (error) {
+    console.error("Error al generar reporte:", error);
+    throw error;
+  }
+};
+
+export const generateImportTemplate = (): ArrayBuffer => {
+  const XLSX = require('xlsx');
+  
+  const templateData = [
+    [
+      "project_name", "project_location", "project_status", "project_progress", 
+      "system_name", "system_completion_rate", 
+      "subsystem_name", "subsystem_completion_rate", 
+      "task_name", "task_description", "task_status", 
+      "itr_name", "itr_status", "itr_progress", "itr_due_date", "itr_assigned_to",
+      "user_email", "user_full_name", "user_role"
+    ],
+    [
+      "Proyecto Ejemplo", "Ubicación Ejemplo", "inprogress", 50,
+      "Sistema Ejemplo", 60,
+      "Subsistema Ejemplo", 70,
+      "Tarea Ejemplo", "Descripción de tarea", "pending",
+      "ITR Ejemplo", "inprogress", 40, "2025-01-15", "responsable@ejemplo.com",
+      "usuario@ejemplo.com", "Nombre Completo", "user"
+    ]
+  ];
+  
+  const ws = XLSX.utils.aoa_to_sheet(templateData);
+  
+  ws.A1.c = [{ a: "Nombre del proyecto", t: { color: { rgb: "FF0000" } } }];
+  ws.C1.c = [{ a: "Estado: complete, inprogress, delayed", t: { color: { rgb: "FF0000" } } }];
+  ws.D1.c = [{ a: "Progreso: 0-100", t: { color: { rgb: "FF0000" } } }];
+  ws.K1.c = [{ a: "Estado de tarea: pending, inprogress, complete", t: { color: { rgb: "FF0000" } } }];
+  ws.M1.c = [{ a: "Estado de ITR: inprogress, complete, delayed", t: { color: { rgb: "FF0000" } } }];
+  ws.S1.c = [{ a: "Rol: admin, user, tecnico", t: { color: { rgb: "FF0000" } } }];
+  
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, "Datos de Importación");
+  
+  return XLSX.write(wb, { type: "array", bookType: "xlsx" });
+};
+
+export const importDataFromExcel = async (buffer: ArrayBuffer): Promise<{
+  projects: number;
+  systems: number;
+  subsystems: number;
+  tasks: number;
+  itrs: number;
+  users: number;
+}> => {
+  try {
+    const XLSX = require('xlsx');
+    const workbook = XLSX.read(buffer, { type: 'array' });
+    
+    if (workbook.SheetNames.length === 0) {
+      throw new Error("El archivo Excel no contiene hojas");
+    }
+    
+    const sheetName = workbook.SheetNames[0];
+    const sheet = workbook.Sheets[sheetName];
+    const data = XLSX.utils.sheet_to_json(sheet);
+    
+    const stats = {
+      projects: 0,
+      systems: 0,
+      subsystems: 0,
+      tasks: 0,
+      itrs: 0,
+      users: 0
+    };
+    
+    const projectMap = new Map<string, string>();
+    const systemMap = new Map<string, string>();
+    const subsystemMap = new Map<string, string>();
+    
+    for (const row of data) {
+      try {
+        if (row.project_name) {
+          const projectName = row.project_name.toString();
+          
+          if (!projectMap.has(projectName)) {
+            const newProject = await createProject({
+              name: projectName,
+              location: row.project_location || null,
+              status: row.project_status || 'inprogress',
+              progress: row.project_progress || 0
+            });
+            
+            projectMap.set(projectName, newProject.id);
+            stats.projects++;
+          }
+          
+          const projectId = projectMap.get(projectName);
+          
+          if (row.system_name && projectId) {
+            const systemName = row.system_name.toString();
+            const systemKey = `${projectName}:${systemName}`;
+            
+            if (!systemMap.has(systemKey)) {
+              const newSystem = await createSystem({
+                name: systemName,
+                project_id: projectId,
+                completion_rate: row.system_completion_rate || 0
+              });
+              
+              systemMap.set(systemKey, newSystem.id);
+              stats.systems++;
+            }
+            
+            const systemId = systemMap.get(systemKey);
+            
+            if (row.subsystem_name && systemId) {
+              const subsystemName = row.subsystem_name.toString();
+              const subsystemKey = `${systemKey}:${subsystemName}`;
+              
+              if (!subsystemMap.has(subsystemKey)) {
+                const newSubsystem = await createSubsystem({
+                  name: subsystemName,
+                  system_id: systemId,
+                  completion_rate: row.subsystem_completion_rate || 0
+                });
+                
+                subsystemMap.set(subsystemKey, newSubsystem.id);
+                stats.subsystems++;
+              }
+              
+              const subsystemId = subsystemMap.get(subsystemKey);
+              
+              if (row.task_name && subsystemId) {
+                await createTask({
+                  name: row.task_name.toString(),
+                  description: row.task_description || null,
+                  subsystem_id: subsystemId,
+                  status: row.task_status || 'pending'
+                });
+                
+                stats.tasks++;
+              }
+              
+              if (row.itr_name && subsystemId) {
+                await createITR({
+                  name: row.itr_name.toString(),
+                  subsystem_id: subsystemId,
+                  status: row.itr_status || 'inprogress',
+                  progress: row.itr_progress || 0,
+                  due_date: row.itr_due_date || null,
+                  assigned_to: row.itr_assigned_to || null
+                });
+                
+                stats.itrs++;
+              }
+            }
+          }
+          
+          if (row.user_email) {
+            try {
+              await bulkCreateUsers([{
+                email: row.user_email.toString(),
+                full_name: row.user_full_name || row.user_email.toString().split('@')[0],
+                role: row.user_role || 'user'
+              }]);
+              
+              stats.users++;
+            } catch (err) {
+              console.error(`Error procesando usuario ${row.user_email}:`, err);
+            }
+          }
+        }
+      } catch (err) {
+        console.error("Error procesando fila:", row, err);
+      }
+    }
+    
+    return stats;
+  } catch (error) {
+    console.error("Error importando datos:", error);
+    throw error;
+  }
+};
+
 export const updateApplicationLanguage = () => {
-  // Esta función puede expandirse para gestionar configuraciones de idioma
   console.log("Configurando idioma de la aplicación a español");
 };

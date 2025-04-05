@@ -12,9 +12,10 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
-import { getITRs, ITR, getSubsystems, Subsystem, deleteITR } from "@/services/supabaseService";
+import { getITRs, ITR, getSubsystems, Subsystem, deleteITR, getSystemsByProjectId, System } from "@/services/supabaseService";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { ITRFormModal } from "@/components/modals/ITRFormModal";
+import { ProjectSelector } from "@/components/ProjectSelector";
 
 interface ITRWithDetails extends ITR {
   subsystemName?: string;
@@ -25,31 +26,71 @@ interface ITRWithDetails extends ITR {
 const ITRs = () => {
   const [itrs, setITRs] = useState<ITRWithDetails[]>([]);
   const [subsystems, setSubsystems] = useState<Subsystem[]>([]);
+  const [systems, setSystems] = useState<System[]>([]);
   const [loading, setLoading] = useState(true);
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [showModal, setShowModal] = useState(false);
   const [selectedITR, setSelectedITR] = useState<ITR | undefined>(undefined);
+  const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null);
   const { toast } = useToast();
 
   const fetchData = async () => {
     setLoading(true);
     try {
-      const [itrsData, subsystemsData] = await Promise.all([
-        getITRs(),
-        getSubsystems()
-      ]);
-      
-      // Enrich ITRs with subsystem details
-      const enrichedITRs = itrsData.map(itr => {
-        const relatedSubsystem = subsystemsData.find(sub => sub.id === itr.subsystem_id);
-        return {
-          ...itr,
-          subsystemName: relatedSubsystem?.name || 'Subsistema Desconocido'
-        };
-      });
-      
-      setITRs(enrichedITRs);
+      // Primero obtenemos los subsistemas
+      const subsystemsData = await getSubsystems();
       setSubsystems(subsystemsData);
+      
+      // Si hay un proyecto seleccionado, obtenemos sus sistemas
+      if (selectedProjectId) {
+        const systemsData = await getSystemsByProjectId(selectedProjectId);
+        setSystems(systemsData);
+        
+        // Filtramos los subsistemas por los sistemas del proyecto
+        const systemIds = systemsData.map(system => system.id);
+        const filteredSubsystems = subsystemsData.filter(
+          subsystem => systemIds.includes(subsystem.system_id)
+        );
+        
+        // Obtenemos todos los ITRs y luego filtramos
+        const itrsData = await getITRs();
+        
+        // Enriquecemos los ITRs con información de subsistema
+        const enrichedITRs = itrsData
+          .filter(itr => {
+            // Solo incluimos ITRs cuyos subsistemas pertenezcan al proyecto seleccionado
+            return filteredSubsystems.some(sub => sub.id === itr.subsystem_id);
+          })
+          .map(itr => {
+            const relatedSubsystem = subsystemsData.find(sub => sub.id === itr.subsystem_id);
+            const relatedSystem = systemsData.find(sys => sys.id === relatedSubsystem?.system_id);
+            
+            return {
+              ...itr,
+              subsystemName: relatedSubsystem?.name || 'Subsistema Desconocido',
+              systemName: relatedSystem?.name || 'Sistema Desconocido',
+            };
+          });
+        
+        setITRs(enrichedITRs);
+      } else {
+        // Si no hay proyecto seleccionado, mostramos todos los ITRs
+        const itrsData = await getITRs();
+        
+        // Enriquecemos los ITRs con información de subsistema
+        const enrichedITRs = itrsData.map(itr => {
+          const relatedSubsystem = subsystemsData.find(sub => sub.id === itr.subsystem_id);
+          // Necesitaríamos los sistemas para obtener los nombres
+          // Esto podría ser optimizado con una consulta JOIN en el backend
+          
+          return {
+            ...itr,
+            subsystemName: relatedSubsystem?.name || 'Subsistema Desconocido'
+          };
+        });
+        
+        setITRs(enrichedITRs);
+      }
     } catch (error) {
       console.error("Error fetching data:", error);
       toast({
@@ -64,7 +105,7 @@ const ITRs = () => {
 
   useEffect(() => {
     fetchData();
-  }, []);
+  }, [selectedProjectId]);
 
   const columns = [
     {
@@ -74,6 +115,11 @@ const ITRs = () => {
     {
       header: "Subsistema",
       accessorKey: "subsystemName" as const,
+    },
+    {
+      header: "Sistema",
+      accessorKey: "systemName" as const,
+      cell: (itr: ITRWithDetails) => <span>{itr.systemName || 'No disponible'}</span>,
     },
     {
       header: "Asignado a",
@@ -156,6 +202,10 @@ const ITRs = () => {
     setSelectedITR(undefined);
   };
 
+  const handleSelectProject = (projectId: string | null) => {
+    setSelectedProjectId(projectId);
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center">
@@ -165,51 +215,70 @@ const ITRs = () => {
             Gestión de Registros de Inspección (ITRs)
           </p>
         </div>
-        <Button onClick={handleNewITR}>
-          <Plus className="h-4 w-4 mr-2" />
-          Nuevo ITR
-        </Button>
-      </div>
-
-      <div className="flex flex-wrap gap-4">
-        <div className="w-[180px]">
-          <Select
-            value={statusFilter}
-            onValueChange={setStatusFilter}
-          >
-            <SelectTrigger>
-              <SelectValue placeholder="Filtrar por estado" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">Todos los estados</SelectItem>
-              <SelectItem value="complete">Completado</SelectItem>
-              <SelectItem value="inprogress">En Progreso</SelectItem>
-              <SelectItem value="delayed">Retrasado</SelectItem>
-            </SelectContent>
-          </Select>
+        <div className="flex items-center space-x-4">
+          <ProjectSelector 
+            onSelectProject={handleSelectProject}
+            selectedProjectId={selectedProjectId}
+          />
+          <Button onClick={handleNewITR} disabled={!selectedProjectId}>
+            <Plus className="h-4 w-4 mr-2" />
+            Nuevo ITR
+          </Button>
         </div>
       </div>
 
-      {filteredITRs.length === 0 && !loading ? (
+      {!selectedProjectId ? (
         <Card>
           <CardHeader>
-            <CardTitle>No hay ITRs</CardTitle>
+            <CardTitle>Seleccione un proyecto</CardTitle>
             <CardDescription>
-              No se encontraron registros de inspección en la base de datos
+              Por favor seleccione un proyecto para ver y gestionar sus ITRs
             </CardDescription>
           </CardHeader>
-          <CardContent>
-            <p>Puede importar datos utilizando la función de importación en la página de configuración.</p>
-          </CardContent>
         </Card>
       ) : (
-        <DataTable
-          data={filteredITRs}
-          columns={columns}
-          onEdit={handleEditITR}
-          onDelete={handleDeleteITR}
-          loading={loading}
-        />
+        <>
+          <div className="flex flex-wrap gap-4">
+            <div className="w-[180px]">
+              <Select
+                value={statusFilter}
+                onValueChange={setStatusFilter}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Filtrar por estado" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Todos los estados</SelectItem>
+                  <SelectItem value="complete">Completado</SelectItem>
+                  <SelectItem value="inprogress">En Progreso</SelectItem>
+                  <SelectItem value="delayed">Retrasado</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+
+          {filteredITRs.length === 0 && !loading ? (
+            <Card>
+              <CardHeader>
+                <CardTitle>No hay ITRs</CardTitle>
+                <CardDescription>
+                  No se encontraron registros de inspección para el proyecto seleccionado
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <p>Puede crear un nuevo ITR usando el botón "Nuevo ITR" o importar datos desde la página de configuración.</p>
+              </CardContent>
+            </Card>
+          ) : (
+            <DataTable
+              data={filteredITRs}
+              columns={columns}
+              onEdit={handleEditITR}
+              onDelete={handleDeleteITR}
+              loading={loading}
+            />
+          )}
+        </>
       )}
 
       {showModal && (
@@ -218,7 +287,7 @@ const ITRs = () => {
           onClose={handleModalClose}
           onSuccess={handleModalSuccess}
           itr={selectedITR}
-          subsystems={subsystems}
+          initialProjectId={selectedProjectId}
         />
       )}
     </div>
