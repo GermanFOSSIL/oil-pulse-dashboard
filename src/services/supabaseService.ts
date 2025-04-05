@@ -1,6 +1,7 @@
 
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
+import { Database } from "@/integrations/supabase/types";
 
 // Tipos para las entidades
 export interface Project {
@@ -101,7 +102,12 @@ export const getProject = async (id: string): Promise<Project | null> => {
   }
 };
 
-export const createProject = async (project: Omit<Project, "id" | "created_at" | "updated_at">): Promise<Project> => {
+export const createProject = async (project: {
+  name: string;
+  location: string | null;
+  status: "complete" | "inprogress" | "delayed";
+  progress: number;
+}): Promise<Project> => {
   try {
     const { data, error } = await supabase
       .from("projects")
@@ -122,7 +128,12 @@ export const createProject = async (project: Omit<Project, "id" | "created_at" |
   }
 };
 
-export const updateProject = async (id: string, project: Partial<Project>): Promise<Project> => {
+export const updateProject = async (id: string, project: Partial<{
+  name: string;
+  location: string | null;
+  status: "complete" | "inprogress" | "delayed";
+  progress: number;
+}>): Promise<Project> => {
   try {
     const { data, error } = await supabase
       .from("projects")
@@ -195,7 +206,11 @@ export const getSystem = async (id: string): Promise<System | null> => {
   }
 };
 
-export const createSystem = async (system: Omit<System, "id" | "created_at" | "updated_at">): Promise<System> => {
+export const createSystem = async (system: {
+  name: string;
+  project_id: string;
+  completion_rate: number;
+}): Promise<System> => {
   try {
     const { data, error } = await supabase
       .from("systems")
@@ -216,7 +231,11 @@ export const createSystem = async (system: Omit<System, "id" | "created_at" | "u
   }
 };
 
-export const updateSystem = async (id: string, system: Partial<System>): Promise<System> => {
+export const updateSystem = async (id: string, system: Partial<{
+  name: string;
+  project_id: string;
+  completion_rate: number;
+}>): Promise<System> => {
   try {
     const { data, error } = await supabase
       .from("systems")
@@ -289,7 +308,11 @@ export const getSubsystem = async (id: string): Promise<Subsystem | null> => {
   }
 };
 
-export const createSubsystem = async (subsystem: Omit<Subsystem, "id" | "created_at" | "updated_at">): Promise<Subsystem> => {
+export const createSubsystem = async (subsystem: {
+  name: string;
+  system_id: string;
+  completion_rate: number;
+}): Promise<Subsystem> => {
   try {
     const { data, error } = await supabase
       .from("subsystems")
@@ -310,7 +333,11 @@ export const createSubsystem = async (subsystem: Omit<Subsystem, "id" | "created
   }
 };
 
-export const updateSubsystem = async (id: string, subsystem: Partial<Subsystem>): Promise<Subsystem> => {
+export const updateSubsystem = async (id: string, subsystem: Partial<{
+  name: string;
+  system_id: string;
+  completion_rate: number;
+}>): Promise<Subsystem> => {
   try {
     const { data, error } = await supabase
       .from("subsystems")
@@ -383,7 +410,14 @@ export const getITR = async (id: string): Promise<ITR | null> => {
   }
 };
 
-export const createITR = async (itr: Omit<ITR, "id" | "created_at" | "updated_at">): Promise<ITR> => {
+export const createITR = async (itr: {
+  name: string;
+  subsystem_id: string;
+  assigned_to?: string | null;
+  due_date?: string | null;
+  status: "complete" | "inprogress" | "delayed";
+  progress: number;
+}): Promise<ITR> => {
   try {
     const { data, error } = await supabase
       .from("itrs")
@@ -404,7 +438,14 @@ export const createITR = async (itr: Omit<ITR, "id" | "created_at" | "updated_at
   }
 };
 
-export const updateITR = async (id: string, itr: Partial<ITR>): Promise<ITR> => {
+export const updateITR = async (id: string, itr: Partial<{
+  name: string;
+  subsystem_id: string;
+  assigned_to?: string | null;
+  due_date?: string | null;
+  status: "complete" | "inprogress" | "delayed";
+  progress: number;
+}>): Promise<ITR> => {
   try {
     const { data, error } = await supabase
       .from("itrs")
@@ -477,7 +518,12 @@ export const getTask = async (id: string): Promise<Task | null> => {
   }
 };
 
-export const createTask = async (task: Omit<Task, "id" | "created_at" | "updated_at">): Promise<Task> => {
+export const createTask = async (task: {
+  name: string;
+  description?: string | null;
+  subsystem_id: string;
+  status: string;
+}): Promise<Task> => {
   try {
     const { data, error } = await supabase
       .from("tasks")
@@ -498,7 +544,12 @@ export const createTask = async (task: Omit<Task, "id" | "created_at" | "updated
   }
 };
 
-export const updateTask = async (id: string, task: Partial<Task>): Promise<Task> => {
+export const updateTask = async (id: string, task: Partial<{
+  name: string;
+  description?: string | null;
+  subsystem_id: string;
+  status: string;
+}>): Promise<Task> => {
   try {
     const { data, error } = await supabase
       .from("tasks")
@@ -603,7 +654,11 @@ export const getProfile = async (id: string): Promise<Profile | null> => {
   }
 };
 
-export const updateProfile = async (id: string, profile: Partial<Profile>): Promise<Profile> => {
+export const updateProfile = async (id: string, profile: Partial<{
+  full_name?: string | null;
+  avatar_url?: string | null;
+  role?: string | null;
+}>): Promise<Profile> => {
   try {
     const { data, error } = await supabase
       .from("profiles")
@@ -639,6 +694,13 @@ export const getDashboardStats = async () => {
     const totalITRs = itrs.length;
     const completionRate = totalITRs > 0 ? Math.round((completedITRs / totalITRs) * 100) : 0;
 
+    // Asegurar que variant es uno de los valores permitidos: "success", "warning", "danger"
+    const getVariant = (progress: number): "success" | "warning" | "danger" => {
+      if (progress >= 75) return "success";
+      if (progress >= 40) return "warning";
+      return "danger";
+    };
+
     return {
       totalProjects: projects.length,
       totalSystems: systems.length,
@@ -648,7 +710,7 @@ export const getDashboardStats = async () => {
         title: p.name,
         value: p.progress,
         description: `${p.progress} de 100 ITRs completados`,
-        variant: p.progress >= 75 ? "success" : p.progress >= 40 ? "warning" : "danger"
+        variant: getVariant(p.progress)
       })),
       chartData: [
         { name: "Ene", value: Math.floor(Math.random() * 700) + 100 },

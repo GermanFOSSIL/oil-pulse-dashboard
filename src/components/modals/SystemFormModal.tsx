@@ -80,7 +80,11 @@ export function SystemFormModal({ open, onClose, onSuccess, system, projectId }:
       if (isEditing && system?.id) {
         await updateSystem(system.id, data);
       } else {
-        await createSystem(data);
+        await createSystem({
+          name: data.name,
+          project_id: data.project_id,
+          completion_rate: data.completion_rate,
+        });
       }
       onSuccess();
       onClose();

@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { z } from "zod";
 import { useForm } from "react-hook-form";
@@ -66,7 +65,12 @@ export function ProjectFormModal({ open, onClose, onSuccess, project }: ProjectF
       if (isEditing && project.id) {
         await updateProject(project.id, data);
       } else {
-        await createProject(data);
+        await createProject({
+          name: data.name,
+          location: data.location || null,
+          status: data.status,
+          progress: data.progress,
+        });
       }
       onSuccess();
       onClose();

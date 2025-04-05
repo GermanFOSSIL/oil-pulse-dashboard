@@ -1,4 +1,3 @@
-
 import { useEffect, useState } from "react";
 import { AreaChart, BarChart3, Briefcase, Layers } from "lucide-react";
 import { StatCard } from "@/components/ui/stat-card";
@@ -41,7 +40,7 @@ const Dashboard = () => {
         
         // Obtener estadísticas del dashboard
         const dashboardData = await getDashboardStats();
-        setStats(dashboardData);
+        setStats(dashboardData as DashboardStats);
       } catch (error) {
         console.error("Error al cargar datos del dashboard:", error);
       } finally {
