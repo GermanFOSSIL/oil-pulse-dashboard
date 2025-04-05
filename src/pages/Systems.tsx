@@ -1,128 +1,118 @@
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { DataTable } from "@/components/ui/data-table";
 import { Plus } from "lucide-react";
-
-interface System {
-  id: number;
-  name: string;
-  project: string;
-  subsystems: number;
-  itrs: number;
-  completionRate: number;
-}
-
-const mockSystems: System[] = [
-  {
-    id: 1,
-    name: "Pipeline System",
-    project: "North Sea Platform A",
-    subsystems: 5,
-    itrs: 48,
-    completionRate: 85,
-  },
-  {
-    id: 2,
-    name: "Power Generation",
-    project: "Gulf of Mexico Drilling",
-    subsystems: 4,
-    itrs: 32,
-    completionRate: 60,
-  },
-  {
-    id: 3,
-    name: "Safety Systems",
-    project: "North Sea Platform A",
-    subsystems: 6,
-    itrs: 56,
-    completionRate: 90,
-  },
-  {
-    id: 4,
-    name: "Gas Compression",
-    project: "Brazilian Offshore Platform",
-    subsystems: 3,
-    itrs: 24,
-    completionRate: 45,
-  },
-  {
-    id: 5,
-    name: "Instrumentation",
-    project: "Caspian Pipeline",
-    subsystems: 8,
-    itrs: 76,
-    completionRate: 30,
-  },
-  {
-    id: 6,
-    name: "Water Injection",
-    project: "Norwegian Oil Field",
-    subsystems: 4,
-    itrs: 36,
-    completionRate: 100,
-  },
-];
+import { useToast } from "@/hooks/use-toast";
+import { System, Project, getSystems, deleteSystem, getProjects } from "@/services/supabaseService";
+import { SystemFormModal } from "@/components/modals/SystemFormModal";
 
 const Systems = () => {
-  const [systems, setSystems] = useState<System[]>(mockSystems);
+  const [systems, setSystems] = useState<System[]>([]);
+  const [projects, setProjects] = useState<{ [key: string]: Project }>({});
+  const [loading, setLoading] = useState(true);
+  const [showModal, setShowModal] = useState(false);
+  const [selectedSystem, setSelectedSystem] = useState<System | undefined>(undefined);
+  const { toast } = useToast();
+
+  const fetchData = async () => {
+    setLoading(true);
+    try {
+      const [systemsData, projectsData] = await Promise.all([
+        getSystems(),
+        getProjects()
+      ]);
+      
+      setSystems(systemsData);
+      
+      // Crear un mapa de proyectos para búsqueda rápida
+      const projectsMap: { [key: string]: Project } = {};
+      projectsData.forEach(project => {
+        projectsMap[project.id] = project;
+      });
+      setProjects(projectsMap);
+    } catch (error) {
+      console.error("Error al obtener datos:", error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchData();
+  }, []);
 
   const columns = [
     {
-      header: "System Name",
+      header: "Nombre del Sistema",
       accessorKey: "name" as const,
     },
     {
-      header: "Project",
-      accessorKey: "project" as const,
+      header: "Proyecto",
+      accessorKey: "project_id" as const,
+      cell: (system: System) => (
+        <span>{projects[system.project_id]?.name || "Desconocido"}</span>
+      ),
     },
     {
-      header: "Subsystems",
-      accessorKey: "subsystems" as const,
-    },
-    {
-      header: "ITRs",
-      accessorKey: "itrs" as const,
-    },
-    {
-      header: "Completion Rate",
-      accessorKey: "completionRate" as const,
+      header: "Tasa de Completado",
+      accessorKey: "completion_rate" as const,
       cell: (system: System) => (
         <div className="flex items-center">
           <div className="w-full bg-secondary/10 rounded-full h-2.5 mr-2">
             <div
               className="bg-secondary h-2.5 rounded-full"
-              style={{ width: `${system.completionRate}%` }}
+              style={{ width: `${system.completion_rate}%` }}
             ></div>
           </div>
-          <span>{system.completionRate}%</span>
+          <span>{system.completion_rate}%</span>
         </div>
       ),
     },
   ];
 
   const handleEditSystem = (system: System) => {
-    console.log("Edit system:", system);
+    setSelectedSystem(system);
+    setShowModal(true);
   };
 
-  const handleDeleteSystem = (system: System) => {
-    if (confirm(`Are you sure you want to delete ${system.name}?`)) {
-      setSystems(systems.filter((s) => s.id !== system.id));
+  const handleDeleteSystem = async (system: System) => {
+    if (confirm(`¿Estás seguro de que deseas eliminar ${system.name}?`)) {
+      try {
+        await deleteSystem(system.id);
+        toast({
+          title: "Sistema eliminado",
+          description: "El sistema se ha eliminado correctamente",
+        });
+        fetchData();
+      } catch (error) {
+        console.error("Error al eliminar sistema:", error);
+      }
     }
+  };
+
+  const handleNewSystem = () => {
+    setSelectedSystem(undefined);
+    setShowModal(true);
+  };
+
+  const handleModalClose = () => {
+    setShowModal(false);
+    setSelectedSystem(undefined);
   };
 
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">Systems</h1>
+          <h1 className="text-3xl font-bold tracking-tight">Sistemas</h1>
           <p className="text-muted-foreground">
-            Manage systems within your projects
+            Gestiona los sistemas dentro de tus proyectos
           </p>
         </div>
-        <Button>
+        <Button onClick={handleNewSystem}>
           <Plus className="h-4 w-4 mr-2" />
-          New System
+          Nuevo Sistema
         </Button>
       </div>
 
@@ -131,7 +121,17 @@ const Systems = () => {
         columns={columns}
         onEdit={handleEditSystem}
         onDelete={handleDeleteSystem}
+        loading={loading}
       />
+
+      {showModal && (
+        <SystemFormModal
+          open={showModal}
+          onClose={handleModalClose}
+          onSuccess={fetchData}
+          system={selectedSystem}
+        />
+      )}
     </div>
   );
 };

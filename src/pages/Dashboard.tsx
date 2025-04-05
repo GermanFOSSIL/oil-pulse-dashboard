@@ -1,136 +1,145 @@
 
+import { useEffect, useState } from "react";
 import { AreaChart, BarChart3, Briefcase, Layers } from "lucide-react";
 import { StatCard } from "@/components/ui/stat-card";
 import { ProgressCard } from "@/components/ui/progress-card";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Bar, BarChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { Area, AreaChart as RechartsAreaChart, CartesianGrid, Legend } from "recharts";
+import { getDashboardStats } from "@/services/supabaseService";
+import { initializeStorage } from "@/services/storageService";
 
-const chartData = [
-  { name: "Jan", value: 400 },
-  { name: "Feb", value: 300 },
-  { name: "Mar", value: 500 },
-  { name: "Apr", value: 700 },
-  { name: "May", value: 400 },
-  { name: "Jun", value: 300 },
-  { name: "Jul", value: 500 },
-];
-
-const areaChartData = [
-  { 
-    name: "Jan", 
-    inspections: 40, 
-    completions: 24, 
-    issues: 10 
-  },
-  { 
-    name: "Feb", 
-    inspections: 30, 
-    completions: 18, 
-    issues: 8 
-  },
-  { 
-    name: "Mar", 
-    inspections: 80, 
-    completions: 32, 
-    issues: 14 
-  },
-  { 
-    name: "Apr", 
-    inspections: 90, 
-    completions: 45, 
-    issues: 6 
-  },
-  { 
-    name: "May", 
-    inspections: 70, 
-    completions: 52, 
-    issues: 5 
-  },
-  { 
-    name: "Jun", 
-    inspections: 60, 
-    completions: 40, 
-    issues: 12 
-  },
-];
+interface DashboardStats {
+  totalProjects: number;
+  totalSystems: number;
+  totalITRs: number;
+  completionRate: number;
+  projectsData: {
+    title: string;
+    value: number;
+    description: string;
+    variant: "success" | "warning" | "danger";
+  }[];
+  chartData: { name: string; value: number }[];
+  areaChartData: { 
+    name: string; 
+    inspections: number; 
+    completions: number; 
+    issues: number;
+  }[];
+}
 
 const Dashboard = () => {
+  const [stats, setStats] = useState<DashboardStats | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        // Inicializar buckets de almacenamiento
+        await initializeStorage();
+        
+        // Obtener estadísticas del dashboard
+        const dashboardData = await getDashboardStats();
+        setStats(dashboardData);
+      } catch (error) {
+        console.error("Error al cargar datos del dashboard:", error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchData();
+  }, []);
+
+  if (loading) {
+    return (
+      <div className="flex h-[80vh] items-center justify-center">
+        <div className="text-center">
+          <div className="inline-block h-8 w-8 animate-spin rounded-full border-4 border-solid border-current border-r-transparent align-[-0.125em] motion-reduce:animate-[spin_1.5s_linear_infinite]"></div>
+          <p className="mt-2 text-muted-foreground">Cargando dashboard...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!stats) {
+    return (
+      <div className="space-y-6">
+        <div>
+          <h1 className="text-3xl font-bold tracking-tight">Dashboard</h1>
+          <p className="text-muted-foreground">
+            No se pudieron cargar los datos. Inténtalo de nuevo más tarde.
+          </p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6">
       <div>
         <h1 className="text-3xl font-bold tracking-tight">Dashboard</h1>
         <p className="text-muted-foreground">
-          Project management overview and key metrics
+          Resumen de la gestión de proyectos y métricas clave
         </p>
       </div>
 
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
         <StatCard
-          title="Total Projects"
-          value="12"
-          description="Active oil and gas projects"
+          title="Total de Proyectos"
+          value={stats.totalProjects.toString()}
+          description="Proyectos activos de petróleo y gas"
           icon={<Briefcase className="h-4 w-4" />}
           trend={{ value: 16, positive: true }}
         />
         <StatCard
-          title="Systems"
-          value="48"
-          description="Across all projects"
+          title="Sistemas"
+          value={stats.totalSystems.toString()}
+          description="A través de todos los proyectos"
           icon={<Layers className="h-4 w-4" />}
           trend={{ value: 8, positive: true }}
         />
         <StatCard
           title="ITRs"
-          value="324"
-          description="Total inspection records"
+          value={stats.totalITRs.toString()}
+          description="Total de registros de inspección"
           icon={<BarChart3 className="h-4 w-4" />}
           trend={{ value: 5, positive: true }}
         />
         <StatCard
-          title="Completion Rate"
-          value="72%"
-          description="Average across all projects"
+          title="Tasa de Completado"
+          value={`${stats.completionRate}%`}
+          description="Promedio en todos los proyectos"
           icon={<AreaChart className="h-4 w-4" />}
           trend={{ value: 12, positive: true }}
         />
       </div>
 
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-        <ProgressCard
-          title="North Sea Platform A"
-          value={78}
-          description="78 of 100 ITRs completed"
-          variant="success"
-          className="col-span-1"
-        />
-        <ProgressCard
-          title="Gulf of Mexico Drilling"
-          value={45}
-          description="45 of 100 ITRs completed"
-          variant="warning"
-          className="col-span-1"
-        />
-        <ProgressCard
-          title="Caspian Pipeline"
-          value={23}
-          description="23 of 100 ITRs completed"
-          variant="danger"
-          className="col-span-1"
-        />
+        {stats.projectsData.map((project, index) => (
+          <ProgressCard
+            key={index}
+            title={project.title}
+            value={project.value}
+            description={project.description}
+            variant={project.variant}
+            className="col-span-1"
+          />
+        ))}
       </div>
 
       <div className="grid gap-4 md:grid-cols-2">
         <Card>
           <CardHeader>
-            <CardTitle>Project Progress</CardTitle>
+            <CardTitle>Progreso del Proyecto</CardTitle>
             <CardDescription>
-              Monthly completion rates across all projects
+              Tasas de finalización mensuales en todos los proyectos
             </CardDescription>
           </CardHeader>
           <CardContent>
             <ResponsiveContainer width="100%" height={300}>
-              <BarChart data={chartData}>
+              <BarChart data={stats.chartData}>
                 <XAxis dataKey="name" stroke="#888888" fontSize={12} />
                 <YAxis stroke="#888888" fontSize={12} />
                 <Tooltip />
@@ -146,14 +155,14 @@ const Dashboard = () => {
 
         <Card>
           <CardHeader>
-            <CardTitle>ITR Activity</CardTitle>
+            <CardTitle>Actividad ITR</CardTitle>
             <CardDescription>
-              Inspection and completion trends
+              Tendencias de inspección y finalización
             </CardDescription>
           </CardHeader>
           <CardContent>
             <ResponsiveContainer width="100%" height={300}>
-              <RechartsAreaChart data={areaChartData}>
+              <RechartsAreaChart data={stats.areaChartData}>
                 <CartesianGrid strokeDasharray="3 3" />
                 <XAxis dataKey="name" stroke="#888888" fontSize={12} />
                 <YAxis stroke="#888888" fontSize={12} />

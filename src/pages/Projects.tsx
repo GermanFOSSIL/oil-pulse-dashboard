@@ -1,97 +1,54 @@
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { DataTable } from "@/components/ui/data-table";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { Plus } from "lucide-react";
-
-interface Project {
-  id: number;
-  name: string;
-  location: string;
-  systems: number;
-  itrs: number;
-  status: "complete" | "inprogress" | "delayed";
-  progress: number;
-}
-
-const mockProjects: Project[] = [
-  {
-    id: 1,
-    name: "North Sea Platform A",
-    location: "North Sea",
-    systems: 12,
-    itrs: 156,
-    status: "inprogress",
-    progress: 78,
-  },
-  {
-    id: 2,
-    name: "Gulf of Mexico Drilling",
-    location: "Gulf of Mexico",
-    systems: 8,
-    itrs: 92,
-    status: "inprogress",
-    progress: 45,
-  },
-  {
-    id: 3,
-    name: "Caspian Pipeline",
-    location: "Caspian Sea",
-    systems: 6,
-    itrs: 76,
-    status: "delayed",
-    progress: 23,
-  },
-  {
-    id: 4,
-    name: "Norwegian Oil Field",
-    location: "Norway",
-    systems: 10,
-    itrs: 120,
-    status: "complete",
-    progress: 100,
-  },
-  {
-    id: 5,
-    name: "Brazilian Offshore Platform",
-    location: "Brazil",
-    systems: 14,
-    itrs: 186,
-    status: "inprogress",
-    progress: 62,
-  },
-];
+import { useToast } from "@/hooks/use-toast";
+import { Project, getProjects, deleteProject } from "@/services/supabaseService";
+import { ProjectFormModal } from "@/components/modals/ProjectFormModal";
 
 const Projects = () => {
-  const [projects, setProjects] = useState<Project[]>(mockProjects);
+  const [projects, setProjects] = useState<Project[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [showModal, setShowModal] = useState(false);
+  const [selectedProject, setSelectedProject] = useState<Project | undefined>(undefined);
+  const { toast } = useToast();
+
+  const fetchProjects = async () => {
+    setLoading(true);
+    try {
+      const data = await getProjects();
+      setProjects(data);
+    } catch (error) {
+      console.error("Error al obtener proyectos:", error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchProjects();
+  }, []);
 
   const columns = [
     {
-      header: "Project Name",
+      header: "Nombre del Proyecto",
       accessorKey: "name" as const,
     },
     {
-      header: "Location",
+      header: "Ubicación",
       accessorKey: "location" as const,
     },
     {
-      header: "Systems",
-      accessorKey: "systems" as const,
-    },
-    {
-      header: "ITRs",
-      accessorKey: "itrs" as const,
-    },
-    {
-      header: "Status",
+      header: "Estado",
       accessorKey: "status" as const,
       cell: (project: Project) => (
         <StatusBadge status={project.status} />
       ),
     },
     {
-      header: "Progress",
+      header: "Progreso",
       accessorKey: "progress" as const,
       cell: (project: Project) => (
         <div className="w-full bg-secondary/10 rounded-full h-2.5">
@@ -105,27 +62,47 @@ const Projects = () => {
   ];
 
   const handleEditProject = (project: Project) => {
-    console.log("Edit project:", project);
+    setSelectedProject(project);
+    setShowModal(true);
   };
 
-  const handleDeleteProject = (project: Project) => {
-    if (confirm(`Are you sure you want to delete ${project.name}?`)) {
-      setProjects(projects.filter((p) => p.id !== project.id));
+  const handleDeleteProject = async (project: Project) => {
+    if (confirm(`¿Estás seguro de que deseas eliminar ${project.name}?`)) {
+      try {
+        await deleteProject(project.id);
+        toast({
+          title: "Proyecto eliminado",
+          description: "El proyecto se ha eliminado correctamente",
+        });
+        fetchProjects();
+      } catch (error) {
+        console.error("Error al eliminar proyecto:", error);
+      }
     }
+  };
+
+  const handleNewProject = () => {
+    setSelectedProject(undefined);
+    setShowModal(true);
+  };
+
+  const handleModalClose = () => {
+    setShowModal(false);
+    setSelectedProject(undefined);
   };
 
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">Projects</h1>
+          <h1 className="text-3xl font-bold tracking-tight">Proyectos</h1>
           <p className="text-muted-foreground">
-            Manage your oil and gas projects
+            Gestiona tus proyectos de petróleo y gas
           </p>
         </div>
-        <Button>
+        <Button onClick={handleNewProject}>
           <Plus className="h-4 w-4 mr-2" />
-          New Project
+          Nuevo Proyecto
         </Button>
       </div>
 
@@ -134,7 +111,17 @@ const Projects = () => {
         columns={columns}
         onEdit={handleEditProject}
         onDelete={handleDeleteProject}
+        loading={loading}
       />
+
+      {showModal && (
+        <ProjectFormModal
+          open={showModal}
+          onClose={handleModalClose}
+          onSuccess={fetchProjects}
+          project={selectedProject}
+        />
+      )}
     </div>
   );
 };
