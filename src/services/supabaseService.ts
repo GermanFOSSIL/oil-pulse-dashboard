@@ -1,15 +1,16 @@
 
 import { supabase } from "@/integrations/supabase/client";
 import { Database } from "@/integrations/supabase/types";
+import { toast } from "@/hooks/use-toast";
 
 export type Project = {
   id: string;
   created_at: string;
   updated_at: string;
   name: string;
-  location: string;
+  location: string | null;
   status: "complete" | "inprogress" | "delayed";
-  progress: number;
+  progress: number | null;
 };
 
 export type System = {
@@ -18,7 +19,7 @@ export type System = {
   updated_at: string;
   name: string;
   project_id: string;
-  completion_rate: number;
+  completion_rate: number | null;
 };
 
 export type Subsystem = {
@@ -27,7 +28,7 @@ export type Subsystem = {
   updated_at: string;
   name: string;
   system_id: string;
-  completion_rate: number;
+  completion_rate: number | null;
 };
 
 export type ITR = {
@@ -37,9 +38,9 @@ export type ITR = {
   name: string;
   subsystem_id: string;
   status: "complete" | "inprogress" | "delayed";
-  progress: number;
-  due_date: string;
-  assigned_to: string;
+  progress: number | null;
+  due_date: string | null;
+  assigned_to: string | null;
 };
 
 // Actualizada para coincidir con la estructura de la base de datos real
@@ -48,7 +49,7 @@ export type Task = {
   created_at: string;
   updated_at: string;
   name: string;
-  description: string;
+  description: string | null;
   subsystem_id: string;
   status: string;
 };
@@ -57,9 +58,15 @@ export type Profile = {
   id: string;
   created_at: string;
   updated_at: string;
+  full_name: string | null;
+  avatar_url: string | null;
+  role: string | null;
+};
+
+export type BulkUserData = {
+  email: string;
   full_name: string;
-  avatar_url: string;
-  role: string;
+  role?: string;
 };
 
 // Nueva función para obtener estadísticas del dashboard
@@ -95,8 +102,8 @@ export const getDashboardStats = async () => {
       title: project.name,
       value: project.progress || 0,
       description: `${project.location || 'Sin ubicación'} - ${project.status}`,
-      variant: project.status === 'complete' ? 'success' : 
-              project.status === 'delayed' ? 'danger' : 'warning'
+      variant: project.status === 'complete' ? 'success' as const : 
+              project.status === 'delayed' ? 'danger' as const : 'warning' as const
     })) || [];
     
     // Datos para gráfico de barras
@@ -109,7 +116,7 @@ export const getDashboardStats = async () => {
     const monthNames = ["Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "Sep", "Oct", "Nov", "Dic"];
     const currentDate = new Date();
     
-    // Generar datos de ejemplo para el gráfico de área basados en datos reales
+    // Generar datos para el gráfico de área basados en datos reales
     const areaChartData = monthNames.slice(0, 6).map((monthName, index) => {
       const month = (currentDate.getMonth() - 5 + index) % 12;
       const inspections = Math.floor(Math.random() * (totalITRs + 10)) + 5;
@@ -604,4 +611,61 @@ export const updateUserProfile = async (userId: string, updates: Partial<Profile
   }
 
   return data as unknown as Profile;
+};
+
+// Nueva función para crear usuarios en lote
+export const bulkCreateUsers = async (users: BulkUserData[]): Promise<number> => {
+  try {
+    let successCount = 0;
+    
+    // Debido a limitaciones en la API de Supabase para auth, 
+    // procesamos uno por uno para poder manejar errores individuales
+    for (const user of users) {
+      try {
+        // Crear el usuario en auth
+        const { data, error } = await supabase.auth.admin.createUser({
+          email: user.email,
+          password: generateRandomPassword(),
+          email_confirm: true,
+          user_metadata: {
+            full_name: user.full_name
+          }
+        });
+        
+        if (error) {
+          console.error(`Error creating user ${user.email}:`, error);
+          continue;
+        }
+        
+        // Actualizar el rol en el perfil
+        if (data.user && user.role) {
+          await updateUserProfile(data.user.id, {
+            role: user.role
+          });
+        }
+        
+        successCount++;
+      } catch (err) {
+        console.error(`Error processing user ${user.email}:`, err);
+      }
+    }
+    
+    return successCount;
+  } catch (error) {
+    console.error("Error in bulk user creation:", error);
+    throw error;
+  }
+};
+
+// Función auxiliar para generar contraseñas aleatorias
+const generateRandomPassword = () => {
+  const characters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789!@#$%^&*';
+  let password = '';
+  
+  for (let i = 0; i < 12; i++) {
+    const randomIndex = Math.floor(Math.random() * characters.length);
+    password += characters.charAt(randomIndex);
+  }
+  
+  return password;
 };

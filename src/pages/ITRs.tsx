@@ -1,5 +1,5 @@
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { DataTable } from "@/components/ui/data-table";
 import { StatusBadge } from "@/components/ui/status-badge";
@@ -11,91 +11,57 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { useToast } from "@/hooks/use-toast";
+import { getITRs, ITR, getSubsystems, Subsystem, deleteITR } from "@/services/supabaseService";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 
-interface ITR {
-  id: number;
-  name: string;
-  project: string;
-  system: string;
-  subsystem: string;
-  assignedTo: string;
-  dueDate: string;
-  status: "complete" | "inprogress" | "delayed";
-  progress: number;
+interface ITRWithDetails extends ITR {
+  subsystemName?: string;
+  systemName?: string;
+  projectName?: string;
 }
 
-const mockITRs: ITR[] = [
-  {
-    id: 1,
-    name: "Pressure Testing",
-    project: "North Sea Platform A",
-    system: "Pipeline System",
-    subsystem: "High Pressure Lines",
-    assignedTo: "John Doe",
-    dueDate: "2025-05-15",
-    status: "inprogress",
-    progress: 65,
-  },
-  {
-    id: 2,
-    name: "Electrical Inspection",
-    project: "Gulf of Mexico Drilling",
-    system: "Power Generation",
-    subsystem: "Control Panels",
-    assignedTo: "Jane Smith",
-    dueDate: "2025-04-30",
-    status: "delayed",
-    progress: 30,
-  },
-  {
-    id: 3,
-    name: "Valve Certification",
-    project: "North Sea Platform A",
-    system: "Safety Systems",
-    subsystem: "Emergency Shutdown",
-    assignedTo: "Michael Brown",
-    dueDate: "2025-04-10",
-    status: "complete",
-    progress: 100,
-  },
-  {
-    id: 4,
-    name: "Compressor Inspection",
-    project: "Brazilian Offshore Platform",
-    system: "Gas Compression",
-    subsystem: "Main Compressor",
-    assignedTo: "Sarah Johnson",
-    dueDate: "2025-06-05",
-    status: "inprogress",
-    progress: 40,
-  },
-  {
-    id: 5,
-    name: "Instrument Calibration",
-    project: "Caspian Pipeline",
-    system: "Instrumentation",
-    subsystem: "Flow Meters",
-    assignedTo: "David Wilson",
-    dueDate: "2025-05-20",
-    status: "inprogress",
-    progress: 70,
-  },
-  {
-    id: 6,
-    name: "Pump Testing",
-    project: "Norwegian Oil Field",
-    system: "Water Injection",
-    subsystem: "Primary Pumps",
-    assignedTo: "Anna Lee",
-    dueDate: "2025-04-25",
-    status: "complete",
-    progress: 100,
-  },
-];
-
 const ITRs = () => {
-  const [itrs, setITRs] = useState<ITR[]>(mockITRs);
+  const [itrs, setITRs] = useState<ITRWithDetails[]>([]);
+  const [subsystems, setSubsystems] = useState<Subsystem[]>([]);
+  const [loading, setLoading] = useState(true);
   const [statusFilter, setStatusFilter] = useState<string>("all");
+  const { toast } = useToast();
+
+  const fetchData = async () => {
+    setLoading(true);
+    try {
+      const [itrsData, subsystemsData] = await Promise.all([
+        getITRs(),
+        getSubsystems()
+      ]);
+      
+      // Enrich ITRs with subsystem details
+      const enrichedITRs = itrsData.map(itr => {
+        const relatedSubsystem = subsystemsData.find(sub => sub.id === itr.subsystem_id);
+        return {
+          ...itr,
+          subsystemName: relatedSubsystem?.name || 'Unknown Subsystem'
+        };
+      });
+      
+      setITRs(enrichedITRs);
+      setSubsystems(subsystemsData);
+    } catch (error) {
+      console.error("Error fetching data:", error);
+      toast({
+        title: "Error",
+        description: "No se pudieron cargar los datos de ITRs",
+        variant: "destructive"
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchData();
+  }, []);
 
   const columns = [
     {
@@ -103,34 +69,28 @@ const ITRs = () => {
       accessorKey: "name" as const,
     },
     {
-      header: "Project",
-      accessorKey: "project" as const,
-    },
-    {
-      header: "System",
-      accessorKey: "system" as const,
-    },
-    {
       header: "Subsystem",
-      accessorKey: "subsystem" as const,
+      accessorKey: "subsystemName" as const,
     },
     {
       header: "Assigned To",
-      accessorKey: "assignedTo" as const,
+      accessorKey: "assigned_to" as const,
+      cell: (itr: ITRWithDetails) => <span>{itr.assigned_to || 'Not Assigned'}</span>,
     },
     {
       header: "Due Date",
-      accessorKey: "dueDate" as const,
+      accessorKey: "due_date" as const,
+      cell: (itr: ITRWithDetails) => <span>{itr.due_date || 'No Date Set'}</span>,
     },
     {
       header: "Status",
       accessorKey: "status" as const,
-      cell: (itr: ITR) => <StatusBadge status={itr.status} />,
+      cell: (itr: ITRWithDetails) => <StatusBadge status={itr.status} />,
     },
     {
       header: "Progress",
       accessorKey: "progress" as const,
-      cell: (itr: ITR) => (
+      cell: (itr: ITRWithDetails) => (
         <div className="w-full bg-secondary/10 rounded-full h-2.5">
           <div
             className={`h-2.5 rounded-full ${
@@ -140,7 +100,7 @@ const ITRs = () => {
                 ? "bg-status-delayed"
                 : "bg-status-inprogress"
             }`}
-            style={{ width: `${itr.progress}%` }}
+            style={{ width: `${itr.progress || 0}%` }}
           ></div>
         </div>
       ),
@@ -152,14 +112,41 @@ const ITRs = () => {
       ? itrs
       : itrs.filter((itr) => itr.status === statusFilter);
 
-  const handleEditITR = (itr: ITR) => {
+  const handleEditITR = (itr: ITRWithDetails) => {
     console.log("Edit ITR:", itr);
+    // Will be implemented in a future update
+    toast({
+      title: "Funcionalidad no implementada",
+      description: "La edición de ITRs se implementará próximamente",
+    });
   };
 
-  const handleDeleteITR = (itr: ITR) => {
-    if (confirm(`Are you sure you want to delete ${itr.name}?`)) {
-      setITRs(itrs.filter((i) => i.id !== itr.id));
+  const handleDeleteITR = async (itr: ITRWithDetails) => {
+    if (confirm(`¿Está seguro que desea eliminar ${itr.name}?`)) {
+      try {
+        await deleteITR(itr.id);
+        toast({
+          title: "ITR eliminado",
+          description: "El ITR ha sido eliminado correctamente",
+        });
+        fetchData();
+      } catch (error) {
+        console.error("Error al eliminar ITR:", error);
+        toast({
+          title: "Error",
+          description: "No se pudo eliminar el ITR",
+          variant: "destructive"
+        });
+      }
     }
+  };
+
+  const handleNewITR = () => {
+    // Will be implemented in a future update
+    toast({
+      title: "Funcionalidad no implementada",
+      description: "La creación de ITRs se implementará próximamente",
+    });
   };
 
   return (
@@ -171,7 +158,7 @@ const ITRs = () => {
             Inspection Test Records Management
           </p>
         </div>
-        <Button>
+        <Button onClick={handleNewITR}>
           <Plus className="h-4 w-4 mr-2" />
           New ITR
         </Button>
@@ -196,12 +183,27 @@ const ITRs = () => {
         </div>
       </div>
 
-      <DataTable
-        data={filteredITRs}
-        columns={columns}
-        onEdit={handleEditITR}
-        onDelete={handleDeleteITR}
-      />
+      {filteredITRs.length === 0 && !loading ? (
+        <Card>
+          <CardHeader>
+            <CardTitle>No hay ITRs</CardTitle>
+            <CardDescription>
+              No se encontraron registros de inspección en la base de datos
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <p>Puede importar datos utilizando la función de importación en la página de configuración.</p>
+          </CardContent>
+        </Card>
+      ) : (
+        <DataTable
+          data={filteredITRs}
+          columns={columns}
+          onEdit={handleEditITR}
+          onDelete={handleDeleteITR}
+          loading={loading}
+        />
+      )}
     </div>
   );
 };

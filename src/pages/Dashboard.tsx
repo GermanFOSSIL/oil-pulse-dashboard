@@ -1,3 +1,4 @@
+
 import { useEffect, useState } from "react";
 import { AreaChart, BarChart3, Briefcase, Layers } from "lucide-react";
 import { StatCard } from "@/components/ui/stat-card";
@@ -7,6 +8,8 @@ import { Bar, BarChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recha
 import { Area, AreaChart as RechartsAreaChart, CartesianGrid, Legend } from "recharts";
 import { getDashboardStats } from "@/services/supabaseService";
 import { initializeStorage } from "@/services/storageService";
+import { Button } from "@/components/ui/button";
+import { useNavigate } from "react-router-dom";
 
 interface DashboardStats {
   totalProjects: number;
@@ -31,24 +34,35 @@ interface DashboardStats {
 const Dashboard = () => {
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [loading, setLoading] = useState(true);
+  const navigate = useNavigate();
+
+  const fetchData = async () => {
+    try {
+      setLoading(true);
+      // Inicializar buckets de almacenamiento
+      await initializeStorage();
+      
+      // Obtener estadísticas del dashboard
+      const dashboardData = await getDashboardStats();
+      setStats(dashboardData as DashboardStats);
+    } catch (error) {
+      console.error("Error al cargar datos del dashboard:", error);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   useEffect(() => {
-    const fetchData = async () => {
-      try {
-        // Inicializar buckets de almacenamiento
-        await initializeStorage();
-        
-        // Obtener estadísticas del dashboard
-        const dashboardData = await getDashboardStats();
-        setStats(dashboardData as DashboardStats);
-      } catch (error) {
-        console.error("Error al cargar datos del dashboard:", error);
-      } finally {
-        setLoading(false);
-      }
-    };
-
     fetchData();
+  }, []);
+
+  // Refetch data every 30 seconds for real-time updates
+  useEffect(() => {
+    const interval = setInterval(() => {
+      fetchData();
+    }, 30000);
+    
+    return () => clearInterval(interval);
   }, []);
 
   if (loading) {
@@ -62,15 +76,36 @@ const Dashboard = () => {
     );
   }
 
-  if (!stats) {
+  // Display empty state if no data exists
+  const isEmpty = !stats || (
+    stats.totalProjects === 0 &&
+    stats.totalSystems === 0 &&
+    stats.totalITRs === 0
+  );
+
+  if (isEmpty) {
     return (
       <div className="space-y-6">
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Dashboard</h1>
           <p className="text-muted-foreground">
-            No se pudieron cargar los datos. Inténtalo de nuevo más tarde.
+            Resumen de la gestión de proyectos y métricas clave
           </p>
         </div>
+        
+        <Card className="p-8">
+          <div className="text-center space-y-6">
+            <div className="mx-auto max-w-md">
+              <h2 className="text-2xl font-bold">No hay datos disponibles</h2>
+              <p className="text-muted-foreground mt-2">
+                La aplicación no tiene datos cargados. Puede importar datos desde la sección de configuración.
+              </p>
+            </div>
+            <Button onClick={() => navigate('/configuration')}>
+              Ir a configuración
+            </Button>
+          </div>
+        </Card>
       </div>
     );
   }
@@ -90,28 +125,28 @@ const Dashboard = () => {
           value={stats.totalProjects.toString()}
           description="Proyectos activos de petróleo y gas"
           icon={<Briefcase className="h-4 w-4" />}
-          trend={{ value: 16, positive: true }}
+          trend={{ value: 0, positive: true }}
         />
         <StatCard
           title="Sistemas"
           value={stats.totalSystems.toString()}
           description="A través de todos los proyectos"
           icon={<Layers className="h-4 w-4" />}
-          trend={{ value: 8, positive: true }}
+          trend={{ value: 0, positive: true }}
         />
         <StatCard
           title="ITRs"
           value={stats.totalITRs.toString()}
           description="Total de registros de inspección"
           icon={<BarChart3 className="h-4 w-4" />}
-          trend={{ value: 5, positive: true }}
+          trend={{ value: 0, positive: true }}
         />
         <StatCard
           title="Tasa de Completado"
           value={`${stats.completionRate}%`}
           description="Promedio en todos los proyectos"
           icon={<AreaChart className="h-4 w-4" />}
-          trend={{ value: 12, positive: true }}
+          trend={{ value: 0, positive: true }}
         />
       </div>
 
