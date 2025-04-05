@@ -70,23 +70,23 @@ const Systems = () => {
   const columns = [
     {
       header: "System Name",
-      accessorKey: "name",
+      accessorKey: "name" as const,
     },
     {
       header: "Project",
-      accessorKey: "project",
+      accessorKey: "project" as const,
     },
     {
       header: "Subsystems",
-      accessorKey: "subsystems",
+      accessorKey: "subsystems" as const,
     },
     {
       header: "ITRs",
-      accessorKey: "itrs",
+      accessorKey: "itrs" as const,
     },
     {
       header: "Completion Rate",
-      accessorKey: "completionRate",
+      accessorKey: "completionRate" as const,
       cell: (system: System) => (
         <div className="flex items-center">
           <div className="w-full bg-secondary/10 rounded-full h-2.5 mr-2">

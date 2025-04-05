@@ -100,36 +100,36 @@ const ITRs = () => {
   const columns = [
     {
       header: "ITR Name",
-      accessorKey: "name",
+      accessorKey: "name" as const,
     },
     {
       header: "Project",
-      accessorKey: "project",
+      accessorKey: "project" as const,
     },
     {
       header: "System",
-      accessorKey: "system",
+      accessorKey: "system" as const,
     },
     {
       header: "Subsystem",
-      accessorKey: "subsystem",
+      accessorKey: "subsystem" as const,
     },
     {
       header: "Assigned To",
-      accessorKey: "assignedTo",
+      accessorKey: "assignedTo" as const,
     },
     {
       header: "Due Date",
-      accessorKey: "dueDate",
+      accessorKey: "dueDate" as const,
     },
     {
       header: "Status",
-      accessorKey: "status",
+      accessorKey: "status" as const,
       cell: (itr: ITR) => <StatusBadge status={itr.status} />,
     },
     {
       header: "Progress",
-      accessorKey: "progress",
+      accessorKey: "progress" as const,
       cell: (itr: ITR) => (
         <div className="w-full bg-secondary/10 rounded-full h-2.5">
           <div

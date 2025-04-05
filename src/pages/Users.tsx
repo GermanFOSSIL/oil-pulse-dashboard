@@ -71,15 +71,15 @@ const Users = () => {
   const columns = [
     {
       header: "Name",
-      accessorKey: "name",
+      accessorKey: "name" as const,
     },
     {
       header: "Email",
-      accessorKey: "email",
+      accessorKey: "email" as const,
     },
     {
       header: "Role",
-      accessorKey: "role",
+      accessorKey: "role" as const,
       cell: (user: User) => (
         <Badge variant={user.role === "Admin" ? "default" : "secondary"}>
           {user.role}
@@ -88,7 +88,7 @@ const Users = () => {
     },
     {
       header: "Status",
-      accessorKey: "status",
+      accessorKey: "status" as const,
       cell: (user: User) => (
         <Badge 
           variant={user.status === "Active" ? "outline" : "secondary"}
@@ -100,7 +100,7 @@ const Users = () => {
     },
     {
       header: "Last Active",
-      accessorKey: "lastActive",
+      accessorKey: "lastActive" as const,
     },
   ];
 

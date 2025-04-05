@@ -69,30 +69,30 @@ const Projects = () => {
   const columns = [
     {
       header: "Project Name",
-      accessorKey: "name",
+      accessorKey: "name" as const,
     },
     {
       header: "Location",
-      accessorKey: "location",
+      accessorKey: "location" as const,
     },
     {
       header: "Systems",
-      accessorKey: "systems",
+      accessorKey: "systems" as const,
     },
     {
       header: "ITRs",
-      accessorKey: "itrs",
+      accessorKey: "itrs" as const,
     },
     {
       header: "Status",
-      accessorKey: "status",
+      accessorKey: "status" as const,
       cell: (project: Project) => (
         <StatusBadge status={project.status} />
       ),
     },
     {
       header: "Progress",
-      accessorKey: "progress",
+      accessorKey: "progress" as const,
       cell: (project: Project) => (
         <div className="w-full bg-secondary/10 rounded-full h-2.5">
           <div

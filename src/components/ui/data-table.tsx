@@ -27,7 +27,7 @@ type SortDirection = "asc" | "desc" | null;
 
 interface Column<T> {
   header: string;
-  accessorKey: keyof T;
+  accessorKey: Extract<keyof T, string>;
   cell?: (item: T) => React.ReactNode;
   sortable?: boolean;
 }
