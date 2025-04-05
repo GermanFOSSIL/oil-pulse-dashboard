@@ -1,6 +1,9 @@
 import { supabase } from "@/integrations/supabase/client";
 import { Database } from "@/integrations/supabase/types";
 import { toast } from "@/hooks/use-toast";
+import { jsPDF } from 'jspdf';
+import autoTable from 'jspdf-autotable';
+import * as XLSX from 'xlsx';
 
 export type Project = {
   id: string;
@@ -779,67 +782,426 @@ export const getITRWithDetails = async (itrId: string): Promise<any> => {
 
 export const generateReport = async (reportType: string, projectId: string | null = null): Promise<string> => {
   try {
-    await new Promise(resolve => setTimeout(resolve, 1500));
+    console.log(`Generando reporte ${reportType} para el proyecto ${projectId || 'todos'}`);
     
-    return "https://example.com/reports/report_" + Date.now() + ".pdf";
+    let reportData: any = {};
+    let reportTitle = "Reporte General";
+    let fileName = `reporte_${Date.now()}.pdf`;
+    
+    let projectInfo = null;
+    if (projectId) {
+      const { data: project, error: projectError } = await supabase
+        .from('projects')
+        .select('*')
+        .eq('id', projectId)
+        .single();
+      
+      if (projectError) {
+        console.error("Error al obtener información del proyecto:", projectError);
+      } else {
+        projectInfo = project;
+        reportTitle = `Reporte: ${project.name}`;
+        fileName = `reporte_${project.name.replace(/\s+/g, '_').toLowerCase()}_${Date.now()}.pdf`;
+      }
+    }
+    
+    switch (reportType) {
+      case 'project_status': {
+        let systemsQuery = supabase.from('systems').select('*');
+        if (projectId) {
+          systemsQuery = systemsQuery.eq('project_id', projectId);
+        }
+        const { data: systems, error: systemsError } = await systemsQuery;
+        
+        if (systemsError) {
+          throw systemsError;
+        }
+        
+        let subsystemsQuery = supabase.from('subsystems').select('id');
+        if (systems.length > 0) {
+          subsystemsQuery = subsystemsQuery.in('system_id', systems.map(s => s.id));
+        }
+        const { data: subsystems, error: subsystemsError } = await subsystemsQuery;
+        
+        if (subsystemsError) {
+          throw subsystemsError;
+        }
+        
+        let itrsQuery = supabase.from('itrs').select('*');
+        if (subsystems.length > 0) {
+          itrsQuery = itrsQuery.in('subsystem_id', subsystems.map(s => s.id));
+        }
+        const { data: itrs, error: itrsError } = await itrsQuery;
+        
+        if (itrsError) {
+          throw itrsError;
+        }
+        
+        reportData = {
+          project: projectInfo,
+          systems: systems || [],
+          itrs: itrs || [],
+          summary: {
+            totalSystems: systems?.length || 0,
+            totalITRs: itrs?.length || 0,
+            completedITRs: itrs?.filter(itr => itr.status === 'complete').length || 0,
+            inProgressITRs: itrs?.filter(itr => itr.status === 'inprogress').length || 0,
+            delayedITRs: itrs?.filter(itr => itr.status === 'delayed').length || 0,
+          }
+        };
+        
+        break;
+      }
+      
+      case 'itrs': {
+        let itrsQuery = supabase.from('itrs').select('*, subsystems(name, system_id, systems:system_id(name, project_id, projects:project_id(name)))');
+        
+        if (projectId) {
+          const { data: systems } = await supabase
+            .from('systems')
+            .select('id')
+            .eq('project_id', projectId);
+          
+          if (systems && systems.length > 0) {
+            const systemIds = systems.map(s => s.id);
+            
+            const { data: subsystems } = await supabase
+              .from('subsystems')
+              .select('id')
+              .in('system_id', systemIds);
+            
+            if (subsystems && subsystems.length > 0) {
+              const subsystemIds = subsystems.map(s => s.id);
+              itrsQuery = itrsQuery.in('subsystem_id', subsystemIds);
+            } else {
+              reportData = { itrs: [] };
+              break;
+            }
+          } else {
+            reportData = { itrs: [] };
+            break;
+          }
+        }
+        
+        const { data: itrs, error: itrsError } = await itrsQuery;
+        
+        if (itrsError) {
+          throw itrsError;
+        }
+        
+        reportData = {
+          project: projectInfo,
+          itrs: itrs || [],
+          summary: {
+            totalITRs: itrs?.length || 0,
+            completedITRs: itrs?.filter(itr => itr.status === 'complete').length || 0,
+            inProgressITRs: itrs?.filter(itr => itr.status === 'inprogress').length || 0,
+            delayedITRs: itrs?.filter(itr => itr.status === 'delayed').length || 0,
+          }
+        };
+        
+        break;
+      }
+      
+      case 'tasks': {
+        let tasksQuery = supabase.from('tasks').select('*, subsystems(name, system_id, systems:system_id(name, project_id, projects:project_id(name)))');
+        
+        if (projectId) {
+          const { data: systems } = await supabase
+            .from('systems')
+            .select('id')
+            .eq('project_id', projectId);
+          
+          if (systems && systems.length > 0) {
+            const systemIds = systems.map(s => s.id);
+            
+            const { data: subsystems } = await supabase
+              .from('subsystems')
+              .select('id')
+              .in('system_id', systemIds);
+            
+            if (subsystems && subsystems.length > 0) {
+              const subsystemIds = subsystems.map(s => s.id);
+              tasksQuery = tasksQuery.in('subsystem_id', subsystemIds);
+            } else {
+              reportData = { tasks: [] };
+              break;
+            }
+          } else {
+            reportData = { tasks: [] };
+            break;
+          }
+        }
+        
+        const { data: tasks, error: tasksError } = await tasksQuery;
+        
+        if (tasksError) {
+          throw tasksError;
+        }
+        
+        reportData = {
+          project: projectInfo,
+          tasks: tasks || [],
+          summary: {
+            totalTasks: tasks?.length || 0,
+            completedTasks: tasks?.filter(task => task.status === 'complete').length || 0,
+            inProgressTasks: tasks?.filter(task => task.status === 'inprogress').length || 0,
+            pendingTasks: tasks?.filter(task => task.status === 'pending').length || 0,
+          }
+        };
+        
+        break;
+      }
+    }
+    
+    const doc = new jsPDF();
+    const pageWidth = doc.internal.pageSize.getWidth();
+    
+    doc.setFontSize(18);
+    doc.text(reportTitle, pageWidth / 2, 20, { align: 'center' });
+    
+    const currentDate = new Date().toLocaleDateString('es-ES', {
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric'
+    });
+    doc.setFontSize(10);
+    doc.text(`Fecha: ${currentDate}`, pageWidth / 2, 28, { align: 'center' });
+    
+    if (projectInfo) {
+      doc.setFontSize(12);
+      doc.text('Información del Proyecto', 14, 40);
+      
+      doc.setFontSize(10);
+      doc.text(`Nombre: ${projectInfo.name}`, 20, 48);
+      doc.text(`Ubicación: ${projectInfo.location || 'No especificada'}`, 20, 54);
+      doc.text(`Estado: ${translateStatus(projectInfo.status)}`, 20, 60);
+      doc.text(`Progreso: ${projectInfo.progress || 0}%`, 20, 66);
+    }
+    
+    let yPos = projectInfo ? 80 : 40;
+    
+    if (reportData.summary) {
+      doc.setFontSize(12);
+      doc.text('Resumen', 14, yPos);
+      yPos += 8;
+      
+      doc.setFontSize(10);
+      Object.entries(reportData.summary).forEach(([key, value]) => {
+        let label = key;
+        if (key === 'totalSystems') label = 'Total de Sistemas';
+        if (key === 'totalITRs') label = 'Total de ITRs';
+        if (key === 'totalTasks') label = 'Total de Tareas';
+        if (key === 'completedITRs') label = 'ITRs Completados';
+        if (key === 'inProgressITRs') label = 'ITRs En Progreso';
+        if (key === 'delayedITRs') label = 'ITRs Retrasados';
+        if (key === 'completedTasks') label = 'Tareas Completadas';
+        if (key === 'inProgressTasks') label = 'Tareas En Progreso';
+        if (key === 'pendingTasks') label = 'Tareas Pendientes';
+        
+        doc.text(`${label}: ${value}`, 20, yPos);
+        yPos += 6;
+      });
+      
+      yPos += 10;
+    }
+    
+    if (reportType === 'project_status' && reportData.systems && reportData.systems.length > 0) {
+      const systemsTableData = reportData.systems.map((system: any) => [
+        system.name,
+        `${system.completion_rate || 0}%`
+      ]);
+      
+      autoTable(doc, {
+        startY: yPos,
+        head: [['Sistema', 'Tasa de Completado']],
+        body: systemsTableData,
+        headStyles: { fillColor: [41, 128, 185] },
+        margin: { top: 15 }
+      });
+      
+      yPos = (doc as any).lastAutoTable.finalY + 15;
+    }
+    
+    if ((reportType === 'project_status' || reportType === 'itrs') && reportData.itrs && reportData.itrs.length > 0) {
+      const itrsTableData = reportData.itrs.map((itr: any) => {
+        let subsystemName = 'No disponible';
+        let systemName = 'No disponible';
+        
+        if (itr.subsystems) {
+          subsystemName = itr.subsystems.name;
+          if (itr.subsystems.systems) {
+            systemName = itr.subsystems.systems.name;
+          }
+        }
+        
+        return [
+          itr.name,
+          subsystemName,
+          systemName,
+          translateStatus(itr.status),
+          `${itr.progress || 0}%`,
+          itr.due_date ? new Date(itr.due_date).toLocaleDateString('es-ES') : 'No definida'
+        ];
+      });
+      
+      autoTable(doc, {
+        startY: yPos,
+        head: [['ITR', 'Subsistema', 'Sistema', 'Estado', 'Progreso', 'Fecha Límite']],
+        body: itrsTableData,
+        headStyles: { fillColor: [41, 128, 185] },
+        margin: { top: 15 }
+      });
+      
+      yPos = (doc as any).lastAutoTable.finalY + 15;
+    }
+    
+    if (reportType === 'tasks' && reportData.tasks && reportData.tasks.length > 0) {
+      const tasksTableData = reportData.tasks.map((task: any) => {
+        let subsystemName = 'No disponible';
+        let systemName = 'No disponible';
+        
+        if (task.subsystems) {
+          subsystemName = task.subsystems.name;
+          if (task.subsystems.systems) {
+            systemName = task.subsystems.systems.name;
+          }
+        }
+        
+        return [
+          task.name,
+          subsystemName,
+          systemName,
+          translateStatus(task.status),
+          task.description || 'Sin descripción'
+        ];
+      });
+      
+      autoTable(doc, {
+        startY: yPos,
+        head: [['Tarea', 'Subsistema', 'Sistema', 'Estado', 'Descripción']],
+        body: tasksTableData,
+        headStyles: { fillColor: [41, 128, 185] },
+        margin: { top: 15 }
+      });
+    }
+    
+    const pdfBlob = doc.output('blob');
+    const pdfUrl = URL.createObjectURL(pdfBlob);
+    
+    console.log("Reporte generado correctamente:", pdfUrl);
+    
+    return pdfUrl;
   } catch (error) {
     console.error("Error al generar reporte:", error);
     throw error;
   }
 };
 
-export const generateImportTemplate = (): ArrayBuffer => {
-  const XLSX = require('xlsx');
-  
-  const templateData = [
-    [
-      "project_name", "project_location", "project_status", "project_progress", 
-      "system_name", "system_completion_rate", "system_project_id",
-      "subsystem_name", "subsystem_completion_rate", "subsystem_system_id", 
-      "task_name", "task_description", "task_status", "task_subsystem_id",
-      "itr_name", "itr_status", "itr_progress", "itr_due_date", "itr_assigned_to", "itr_subsystem_id",
-      "user_email", "user_full_name", "user_role"
-    ],
-    [
-      "Proyecto Ejemplo", "Ubicación Ejemplo", "inprogress", 50,
-      "Sistema Ejemplo", 60, "",
-      "Subsistema Ejemplo", 70, "",
-      "Tarea Ejemplo", "Descripción de tarea", "pending", "",
-      "ITR Ejemplo", "inprogress", 40, "2025-01-15", "responsable@ejemplo.com", "",
-      "usuario@ejemplo.com", "Nombre Completo", "user"
-    ]
-  ];
-  
-  const ws = XLSX.utils.aoa_to_sheet(templateData);
-  
-  ws.A1.c = [{ a: "Nombre del proyecto", t: { color: { rgb: "FF0000" } } }];
-  ws.B1.c = [{ a: "Ubicación del proyecto", t: { color: { rgb: "FF0000" } } }];
-  ws.C1.c = [{ a: "Estado: complete, inprogress, delayed", t: { color: { rgb: "FF0000" } } }];
-  ws.D1.c = [{ a: "Progreso: 0-100", t: { color: { rgb: "FF0000" } } }];
-  ws.E1.c = [{ a: "Nombre del sistema", t: { color: { rgb: "FF0000" } } }];
-  ws.F1.c = [{ a: "Tasa de completado del sistema: 0-100", t: { color: { rgb: "FF0000" } } }];
-  ws.G1.c = [{ a: "ID del proyecto (se puede dejar vacío y se relacionará automáticamente)", t: { color: { rgb: "FF0000" } } }];
-  ws.H1.c = [{ a: "Nombre del subsistema", t: { color: { rgb: "FF0000" } } }];
-  ws.I1.c = [{ a: "Tasa de completado del subsistema: 0-100", t: { color: { rgb: "FF0000" } } }];
-  ws.J1.c = [{ a: "ID del sistema (se puede dejar vacío y se relacionará automáticamente)", t: { color: { rgb: "FF0000" } } }];
-  ws.K1.c = [{ a: "Nombre de la tarea", t: { color: { rgb: "FF0000" } } }];
-  ws.L1.c = [{ a: "Descripción de la tarea", t: { color: { rgb: "FF0000" } } }];
-  ws.M1.c = [{ a: "Estado de tarea: pending, inprogress, complete", t: { color: { rgb: "FF0000" } } }];
-  ws.N1.c = [{ a: "ID del subsistema (se puede dejar vacío y se relacionará automáticamente)", t: { color: { rgb: "FF0000" } } }];
-  ws.O1.c = [{ a: "Nombre del ITR", t: { color: { rgb: "FF0000" } } }];
-  ws.P1.c = [{ a: "Estado de ITR: inprogress, complete, delayed", t: { color: { rgb: "FF0000" } } }];
-  ws.Q1.c = [{ a: "Progreso del ITR: 0-100", t: { color: { rgb: "FF0000" } } }];
-  ws.R1.c = [{ a: "Fecha límite del ITR (formato YYYY-MM-DD)", t: { color: { rgb: "FF0000" } } }];
-  ws.S1.c = [{ a: "Email del responsable del ITR", t: { color: { rgb: "FF0000" } } }];
-  ws.T1.c = [{ a: "ID del subsistema (se puede dejar vacío y se relacionará automáticamente)", t: { color: { rgb: "FF0000" } } }];
-  ws.U1.c = [{ a: "Email del usuario", t: { color: { rgb: "FF0000" } } }];
-  ws.V1.c = [{ a: "Nombre completo del usuario", t: { color: { rgb: "FF0000" } } }];
-  ws.W1.c = [{ a: "Rol: admin, user, tecnico", t: { color: { rgb: "FF0000" } } }];
-  
-  const wb = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(wb, ws, "Datos de Importación");
-  
-  return XLSX.write(wb, { type: "array", bookType: "xlsx" });
+export const generateImportTemplate = async (): Promise<ArrayBuffer> => {
+  try {
+    console.log("Generando plantilla de importación...");
+    
+    const templateData = [
+      [
+        "project_name", "project_location", "project_status", "project_progress", 
+        "system_name", "system_completion_rate", "system_project_id",
+        "subsystem_name", "subsystem_completion_rate", "subsystem_system_id", 
+        "task_name", "task_description", "task_status", "task_subsystem_id",
+        "itr_name", "itr_status", "itr_progress", "itr_due_date", "itr_assigned_to", "itr_subsystem_id",
+        "user_email", "user_full_name", "user_role"
+      ],
+      [
+        "Proyecto Ejemplo", "Ubicación Ejemplo", "inprogress", 50,
+        "Sistema Ejemplo", 60, "",
+        "Subsistema Ejemplo", 70, "",
+        "Tarea Ejemplo", "Descripción de tarea", "pending", "",
+        "ITR Ejemplo", "inprogress", 40, "2025-01-15", "responsable@ejemplo.com", "",
+        "usuario@ejemplo.com", "Nombre Completo", "user"
+      ]
+    ];
+    
+    const wb = XLSX.utils.book_new();
+    const ws = XLSX.utils.aoa_to_sheet(templateData);
+    
+    if (!ws.A1.c) ws.A1.c = [];
+    ws.A1.c.push({a: "Nombre del proyecto", t: {color: {rgb: "FF0000"}}});
+    
+    if (!ws.B1.c) ws.B1.c = [];
+    ws.B1.c.push({a: "Ubicación del proyecto", t: {color: {rgb: "FF0000"}}});
+    
+    if (!ws.C1.c) ws.C1.c = [];
+    ws.C1.c.push({a: "Estado: complete, inprogress, delayed", t: {color: {rgb: "FF0000"}}});
+    
+    if (!ws.D1.c) ws.D1.c = [];
+    ws.D1.c.push({a: "Progreso: 0-100", t: {color: {rgb: "FF0000"}}});
+    
+    if (!ws.E1.c) ws.E1.c = [];
+    ws.E1.c.push({a: "Nombre del sistema", t: {color: {rgb: "FF0000"}}});
+    
+    if (!ws.F1.c) ws.F1.c = [];
+    ws.F1.c.push({a: "Tasa de completado del sistema: 0-100", t: {color: {rgb: "FF0000"}}});
+    
+    if (!ws.G1.c) ws.G1.c = [];
+    ws.G1.c.push({a: "ID del proyecto (se puede dejar vacío y se relacionará automáticamente)", t: {color: {rgb: "FF0000"}}});
+    
+    if (!ws.H1.c) ws.H1.c = [];
+    ws.H1.c.push({a: "Nombre del subsistema", t: {color: {rgb: "FF0000"}}});
+    
+    if (!ws.I1.c) ws.I1.c = [];
+    ws.I1.c.push({a: "Tasa de completado del subsistema: 0-100", t: {color: {rgb: "FF0000"}}});
+    
+    if (!ws.J1.c) ws.J1.c = [];
+    ws.J1.c.push({a: "ID del sistema (se puede dejar vacío y se relacionará automáticamente)", t: {color: {rgb: "FF0000"}}});
+    
+    if (!ws.K1.c) ws.K1.c = [];
+    ws.K1.c.push({a: "Nombre de la tarea", t: {color: {rgb: "FF0000"}}});
+    
+    if (!ws.L1.c) ws.L1.c = [];
+    ws.L1.c.push({a: "Descripción de la tarea", t: {color: {rgb: "FF0000"}}});
+    
+    if (!ws.M1.c) ws.M1.c = [];
+    ws.M1.c.push({a: "Estado de tarea: pending, inprogress, complete", t: {color: {rgb: "FF0000"}}});
+    
+    if (!ws.N1.c) ws.N1.c = [];
+    ws.N1.c.push({a: "ID del subsistema (se puede dejar vacío y se relacionará automáticamente)", t: {color: {rgb: "FF0000"}}});
+    
+    if (!ws.O1.c) ws.O1.c = [];
+    ws.O1.c.push({a: "Nombre del ITR", t: {color: {rgb: "FF0000"}}});
+    
+    if (!ws.P1.c) ws.P1.c = [];
+    ws.P1.c.push({a: "Estado de ITR: inprogress, complete, delayed", t: {color: {rgb: "FF0000"}}});
+    
+    if (!ws.Q1.c) ws.Q1.c = [];
+    ws.Q1.c.push({a: "Progreso del ITR: 0-100", t: {color: {rgb: "FF0000"}}});
+    
+    if (!ws.R1.c) ws.R1.c = [];
+    ws.R1.c.push({a: "Fecha límite del ITR (formato YYYY-MM-DD)", t: {color: {rgb: "FF0000"}}});
+    
+    if (!ws.S1.c) ws.S1.c = [];
+    ws.S1.c.push({a: "Email del responsable del ITR", t: {color: {rgb: "FF0000"}}});
+    
+    if (!ws.T1.c) ws.T1.c = [];
+    ws.T1.c.push({a: "ID del subsistema (se puede dejar vacío y se relacionará automáticamente)", t: {color: {rgb: "FF0000"}}});
+    
+    if (!ws.U1.c) ws.U1.c = [];
+    ws.U1.c.push({a: "Email del usuario", t: {color: {rgb: "FF0000"}}});
+    
+    if (!ws.V1.c) ws.V1.c = [];
+    ws.V1.c.push({a: "Nombre completo del usuario", t: {color: {rgb: "FF0000"}}});
+    
+    if (!ws.W1.c) ws.W1.c = [];
+    ws.W1.c.push({a: "Rol: admin, user, tecnico", t: {color: {rgb: "FF0000"}}});
+    
+    XLSX.utils.book_append_sheet(wb, ws, "Datos de Importación");
+    
+    console.log("Plantilla generada correctamente");
+    
+    return XLSX.write(wb, { type: "array", bookType: "xlsx" });
+  } catch (error) {
+    console.error("Error al generar la plantilla de importación:", error);
+    throw error;
+  }
 };
 
 export const importDataFromExcel = async (buffer: ArrayBuffer): Promise<{
@@ -851,7 +1213,7 @@ export const importDataFromExcel = async (buffer: ArrayBuffer): Promise<{
   users: number;
 }> => {
   try {
-    const XLSX = require('xlsx');
+    console.log("Importando datos desde Excel...");
     const workbook = XLSX.read(buffer, { type: 'array' });
     
     if (workbook.SheetNames.length === 0) {
@@ -861,6 +1223,12 @@ export const importDataFromExcel = async (buffer: ArrayBuffer): Promise<{
     const sheetName = workbook.SheetNames[0];
     const sheet = workbook.Sheets[sheetName];
     const data = XLSX.utils.sheet_to_json(sheet);
+    
+    if (data.length === 0) {
+      throw new Error("No hay datos en la plantilla para importar");
+    }
+    
+    console.log(`Se encontraron ${data.length} filas de datos para importar`);
     
     const stats = {
       projects: 0,
@@ -885,10 +1253,15 @@ export const importDataFromExcel = async (buffer: ArrayBuffer): Promise<{
               .from('projects')
               .select('id')
               .eq('name', projectName);
-            let { data: existingProjects } = await projectQuery;
+            let { data: existingProjects, error: projectQueryError } = await projectQuery;
+            
+            if (projectQueryError) {
+              console.error("Error al consultar proyectos:", projectQueryError);
+              continue;
+            }
             
             if (!existingProjects || existingProjects.length === 0) {
-              const { data: newProject, error } = await supabase
+              const { data: newProject, error: insertError } = await supabase
                 .from('projects')
                 .insert({
                   name: projectName,
@@ -899,12 +1272,17 @@ export const importDataFromExcel = async (buffer: ArrayBuffer): Promise<{
                 .select('id')
                 .single();
               
-              if (error) throw error;
+              if (insertError) {
+                console.error("Error al insertar proyecto:", insertError);
+                continue;
+              }
               
               projectMap.set(projectName, newProject.id);
               stats.projects++;
+              console.log(`Proyecto creado: ${projectName} (${newProject.id})`);
             } else {
               projectMap.set(projectName, existingProjects[0].id);
+              console.log(`Proyecto existente encontrado: ${projectName} (${existingProjects[0].id})`);
             }
           }
           
@@ -920,10 +1298,15 @@ export const importDataFromExcel = async (buffer: ArrayBuffer): Promise<{
                 .select('id')
                 .eq('name', systemName)
                 .eq('project_id', projectId);
-              let { data: existingSystems } = await systemQuery;
+              let { data: existingSystems, error: systemQueryError } = await systemQuery;
+              
+              if (systemQueryError) {
+                console.error("Error al consultar sistemas:", systemQueryError);
+                continue;
+              }
               
               if (!existingSystems || existingSystems.length === 0) {
-                const { data: newSystem, error } = await supabase
+                const { data: newSystem, error: insertError } = await supabase
                   .from('systems')
                   .insert({
                     name: systemName,
@@ -933,12 +1316,17 @@ export const importDataFromExcel = async (buffer: ArrayBuffer): Promise<{
                   .select('id')
                   .single();
                 
-                if (error) throw error;
+                if (insertError) {
+                  console.error("Error al insertar sistema:", insertError);
+                  continue;
+                }
                 
                 systemMap.set(systemKey, newSystem.id);
                 stats.systems++;
+                console.log(`Sistema creado: ${systemName} (${newSystem.id})`);
               } else {
                 systemMap.set(systemKey, existingSystems[0].id);
+                console.log(`Sistema existente encontrado: ${systemName} (${existingSystems[0].id})`);
               }
             }
             
@@ -954,10 +1342,15 @@ export const importDataFromExcel = async (buffer: ArrayBuffer): Promise<{
                   .select('id')
                   .eq('name', subsystemName)
                   .eq('system_id', systemId);
-                let { data: existingSubsystems } = await subsystemQuery;
+                let { data: existingSubsystems, error: subsystemQueryError } = await subsystemQuery;
+                
+                if (subsystemQueryError) {
+                  console.error("Error al consultar subsistemas:", subsystemQueryError);
+                  continue;
+                }
                 
                 if (!existingSubsystems || existingSubsystems.length === 0) {
-                  const { data: newSubsystem, error } = await supabase
+                  const { data: newSubsystem, error: insertError } = await supabase
                     .from('subsystems')
                     .insert({
                       name: subsystemName,
@@ -967,60 +1360,89 @@ export const importDataFromExcel = async (buffer: ArrayBuffer): Promise<{
                     .select('id')
                     .single();
                   
-                  if (error) throw error;
+                  if (insertError) {
+                    console.error("Error al insertar subsistema:", insertError);
+                    continue;
+                  }
                   
                   subsystemMap.set(subsystemKey, newSubsystem.id);
                   stats.subsystems++;
+                  console.log(`Subsistema creado: ${subsystemName} (${newSubsystem.id})`);
                 } else {
                   subsystemMap.set(subsystemKey, existingSubsystems[0].id);
+                  console.log(`Subsistema existente encontrado: ${subsystemName} (${existingSubsystems[0].id})`);
                 }
               }
               
               const subsystemId = subsystemMap.get(subsystemKey);
               
               if (row.task_name && subsystemId) {
-                await createTask({
-                  name: row.task_name.toString(),
-                  description: row.task_description || null,
-                  subsystem_id: row.task_subsystem_id || subsystemId,
-                  status: row.task_status || 'pending'
-                });
+                const taskName = row.task_name.toString();
+                const { data: newTask, error: taskError } = await supabase
+                  .from('tasks')
+                  .insert({
+                    name: taskName,
+                    description: row.task_description || null,
+                    subsystem_id: row.task_subsystem_id || subsystemId,
+                    status: row.task_status || 'pending'
+                  })
+                  .select('id')
+                  .single();
+                
+                if (taskError) {
+                  console.error("Error al insertar tarea:", taskError);
+                  continue;
+                }
                 
                 stats.tasks++;
+                console.log(`Tarea creada: ${taskName} (${newTask.id})`);
               }
               
               if (row.itr_name && subsystemId) {
-                await createITR({
-                  name: row.itr_name.toString(),
-                  subsystem_id: row.itr_subsystem_id || subsystemId,
-                  status: row.itr_status || 'inprogress',
-                  progress: row.itr_progress || 0,
-                  due_date: row.itr_due_date || null,
-                  assigned_to: row.itr_assigned_to || null
-                });
+                const itrName = row.itr_name.toString();
+                const { data: newITR, error: itrError } = await supabase
+                  .from('itrs')
+                  .insert({
+                    name: itrName,
+                    subsystem_id: row.itr_subsystem_id || subsystemId,
+                    status: row.itr_status || 'inprogress',
+                    progress: row.itr_progress || 0,
+                    due_date: row.itr_due_date || null,
+                    assigned_to: row.itr_assigned_to || null
+                  })
+                  .select('id')
+                  .single();
+                
+                if (itrError) {
+                  console.error("Error al insertar ITR:", itrError);
+                  continue;
+                }
                 
                 stats.itrs++;
+                console.log(`ITR creado: ${itrName} (${newITR.id})`);
               }
             }
           }
           
           if (row.user_email && row.user_full_name) {
-            let { data: existingProfiles } = await supabase
+            const userName = row.user_full_name.toString();
+            const { data: newUser, error: userError } = await supabase
               .from('profiles')
+              .insert({
+                id: crypto.randomUUID(),
+                full_name: userName,
+                role: row.user_role || 'user'
+              })
               .select('id')
-              .eq('full_name', row.user_full_name);
+              .single();
             
-            if (!existingProfiles || existingProfiles.length === 0) {
-              const { error } = await supabase
-                .from('profiles')
-                .insert({
-                  id: crypto.randomUUID(),
-                  full_name: row.user_full_name,
-                  role: row.user_role || 'user'
-                });
-              
-              if (!error) stats.users++;
+            if (userError) {
+              console.error("Error al insertar usuario:", userError);
+              continue;
             }
+            
+            stats.users++;
+            console.log(`Usuario creado: ${userName} (${newUser.id})`);
           }
         }
       } catch (error) {
@@ -1028,9 +1450,10 @@ export const importDataFromExcel = async (buffer: ArrayBuffer): Promise<{
       }
     }
     
+    console.log("Importación completada con éxito:", stats);
     return stats;
   } catch (error) {
-    console.error("Error importando datos:", error);
+    console.error("Error en la importación de datos:", error);
     throw error;
   }
 };
@@ -1041,20 +1464,26 @@ export const updateApplicationLanguage = () => {
 
 export const getUserProfiles = async (): Promise<Profile[]> => {
   try {
+    console.log("Obteniendo perfiles de usuario...");
     const { data, error } = await supabase
       .from('profiles')
       .select('*');
       
-    if (error) throw error;
+    if (error) {
+      console.error("Error obteniendo perfiles de usuario:", error);
+      throw error;
+    }
+    
     return data || [];
   } catch (error) {
-    console.error("Error obteniendo perfiles de usuario:", error);
+    console.error("Error en getUserProfiles:", error);
     throw error;
   }
 };
 
 export const createUserProfile = async (profile: Omit<Profile, "id" | "created_at" | "updated_at">): Promise<Profile> => {
   try {
+    console.log("Creando perfil de usuario:", profile);
     const { data, error } = await supabase
       .from('profiles')
       .insert({
@@ -1064,10 +1493,15 @@ export const createUserProfile = async (profile: Omit<Profile, "id" | "created_a
       .select()
       .single();
       
-    if (error) throw error;
+    if (error) {
+      console.error("Error creando perfil de usuario:", error);
+      throw error;
+    }
+    
+    console.log("Perfil de usuario creado correctamente:", data);
     return data;
   } catch (error) {
-    console.error("Error creando perfil de usuario:", error);
+    console.error("Error en createUserProfile:", error);
     throw error;
   }
 };

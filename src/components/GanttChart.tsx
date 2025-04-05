@@ -124,7 +124,13 @@ export const GanttChart: React.FC<GanttProps> = ({ data }) => {
         target_end: "Fin objetivo",
         task_time: "Tiempo de tarea",
         task_baseline: "Línea base",
-        scheduling_mode: "Modo de planificación"
+        scheduling_mode: "Modo de planificación",
+        
+        // Propiedades adicionales faltantes según el nuevo error
+        mso: "Debe comenzar en",
+        mfo: "Debe finalizar en",
+        resources_filter_placeholder: "Escriba para filtrar",
+        resources_filter_label: "Ocultar no asignados"
       };
 
       // Traducción del resto de elementos

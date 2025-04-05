@@ -162,6 +162,7 @@ const Users = () => {
     
     try {
       const profiles = await getUserProfiles();
+      console.log("Perfiles obtenidos:", profiles);
       setUsers(profiles);
     } catch (error: any) {
       console.error("Error fetching users:", error);
@@ -223,12 +224,13 @@ const Users = () => {
   ];
 
   const handleEditUser = (user: Profile) => {
+    console.log("Editando usuario:", user);
     setSelectedUser(user);
     setShowModal(true);
   };
 
   const handleDeleteUser = async (user: Profile) => {
-    // En una implementación completa podríamos desactivar el usuario en lugar de eliminarlo
+    // Actualmente no implementamos eliminación verdadera de usuarios por seguridad
     toast({
       title: "Funcionalidad limitada",
       description: "La eliminación de usuarios se implementará en una versión futura",

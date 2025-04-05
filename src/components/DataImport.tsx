@@ -22,10 +22,16 @@ export function DataImport() {
   const [importStats, setImportStats] = useState<ImportStats | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  const downloadTemplate = () => {
+  const downloadTemplate = async () => {
     try {
+      setError(null);
+      toast({
+        title: "Generando plantilla",
+        description: "Preparando plantilla de importación...",
+      });
+      
       // Generar el template usando la función del servicio
-      const buffer = generateImportTemplate();
+      const buffer = await generateImportTemplate();
       
       // Convertir a Blob
       const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
@@ -65,6 +71,11 @@ export function DataImport() {
       setImporting(true);
       setError(null);
       setImportStats(null);
+      
+      toast({
+        title: "Importando datos",
+        description: "Procesando archivo, por favor espere...",
+      });
       
       const reader = new FileReader();
       
@@ -139,7 +150,7 @@ export function DataImport() {
       </CardHeader>
       <CardContent className="space-y-4">
         <div className="flex flex-col sm:flex-row gap-4 justify-between">
-          <Button variant="outline" onClick={downloadTemplate}>
+          <Button variant="outline" onClick={downloadTemplate} disabled={importing}>
             <Download className="mr-2 h-4 w-4" />
             Descargar plantilla Excel
           </Button>
