@@ -1,15 +1,12 @@
 
-import { ReactNode, useState } from "react";
+import { useState } from "react";
+import { Outlet } from "react-router-dom";
 import Sidebar from "./Sidebar";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { Button } from "@/components/ui/button";
 import { Menu } from "lucide-react";
 
-type MainLayoutProps = {
-  children: ReactNode;
-};
-
-const MainLayout = ({ children }: MainLayoutProps) => {
+const MainLayout = () => {
   const isMobile = useIsMobile();
   const [sidebarOpen, setSidebarOpen] = useState(!isMobile);
 
@@ -30,7 +27,9 @@ const MainLayout = ({ children }: MainLayoutProps) => {
           </div>
         )}
         <div className="flex-1 overflow-auto">
-          <main className="p-4 md:p-6">{children}</main>
+          <main className="p-4 md:p-6">
+            <Outlet />
+          </main>
         </div>
       </div>
     </div>
