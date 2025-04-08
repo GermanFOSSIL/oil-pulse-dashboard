@@ -1,5 +1,5 @@
 
-import { Suspense, lazy } from "react";
+import { Suspense } from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import TestPackList from "@/components/testpacks/TestPackList";
 import TestPackActivity from "@/components/testpacks/TestPackActivity";
@@ -74,7 +74,7 @@ const TestPacks = () => {
           
           <TabsContent value="list" className="space-y-4">
             <TestPackList 
-              testPacks={testPacks}
+              testPacks={testPacks || []}
               isLoading={isLoadingTestPacks}
               onTagRelease={handleTagRelease}
               userRole={userRole}
@@ -93,7 +93,13 @@ const TestPacks = () => {
                   <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
                 </div>
               ) : (
-                <TestPackStats stats={stats} />
+                <TestPackStats stats={stats || {
+                  testPacks: { total: 0, completed: 0, progress: 0 },
+                  tags: { total: 0, released: 0, progress: 0 },
+                  systems: [],
+                  itrs: [],
+                  subsystems: []
+                }} />
               )}
             </Suspense>
           </TabsContent>

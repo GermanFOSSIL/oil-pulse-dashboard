@@ -17,7 +17,8 @@ import {
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { getSystemsWithSubsystems, getAvailableITRs } from "@/services/systemService";
+import { getProjectsHierarchy } from "@/services/systemService";
+import { getAvailableITRs } from "@/services/systemService";
 
 interface TestPackFormDialogProps {
   open: boolean;
@@ -38,12 +39,13 @@ type FormValues = z.infer<typeof formSchema>;
 
 const TestPackFormDialog = ({ open, onOpenChange, testPack, onSuccess }: TestPackFormDialogProps) => {
   const { toast } = useToast();
+  const [projects, setProjects] = useState<any[]>([]);
   const [systems, setSystems] = useState<any[]>([]);
   const [subsystems, setSubsystems] = useState<any[]>([]);
   const [itrs, setItrs] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
-  const [selectedSystem, setSelectedSystem] = useState<string | null>(null);
-  const [selectedSubsystem, setSelectedSubsystem] = useState<string | null>(null);
+  const [selectedSystemId, setSelectedSystemId] = useState<string | null>(null);
+  const [selectedSubsystemId, setSelectedSubsystemId] = useState<string | null>(null);
 
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
@@ -56,47 +58,70 @@ const TestPackFormDialog = ({ open, onOpenChange, testPack, onSuccess }: TestPac
     }
   });
 
-  // Load systems on component mount
+  // Load projects and systems on component mount
   useEffect(() => {
-    const loadSystemData = async () => {
+    const loadProjectData = async () => {
       try {
-        const systemsData = await getSystemsWithSubsystems();
-        setSystems(systemsData);
+        setLoading(true);
+        const data = await getProjectsHierarchy();
+        console.log("Projects hierarchy loaded:", data);
+        setProjects(data || []);
+        
+        // Extract all systems from projects
+        const allSystems: any[] = [];
+        data.forEach((project: any) => {
+          if (project.systems && Array.isArray(project.systems)) {
+            project.systems.forEach((system: any) => {
+              allSystems.push({
+                ...system,
+                projectName: project.name
+              });
+            });
+          }
+        });
+        
+        setSystems(allSystems);
       } catch (error) {
-        console.error("Error loading systems:", error);
+        console.error("Error loading project data:", error);
         toast({
           title: "Error",
-          description: "No se pudieron cargar los sistemas",
+          description: "No se pudieron cargar los datos del proyecto",
           variant: "destructive"
         });
+      } finally {
+        setLoading(false);
       }
     };
 
-    loadSystemData();
+    loadProjectData();
   }, [toast]);
 
   // Update subsystems when system changes
   useEffect(() => {
-    if (selectedSystem) {
-      const system = systems.find(s => s.id === selectedSystem);
-      if (system && system.subsystems) {
+    if (selectedSystemId) {
+      const system = systems.find(s => s.id === selectedSystemId);
+      if (system && system.subsystems && Array.isArray(system.subsystems)) {
         setSubsystems(system.subsystems);
+        console.log("Subsystems updated:", system.subsystems);
       } else {
         setSubsystems([]);
+        console.log("No subsystems found for system:", selectedSystemId);
       }
       form.setValue("subsistema", "");
-      setSelectedSubsystem(null);
+      setSelectedSubsystemId(null);
       setItrs([]);
     }
-  }, [selectedSystem, systems, form]);
+  }, [selectedSystemId, systems, form]);
 
   // Update ITRs when subsystem changes
   useEffect(() => {
     const loadITRs = async () => {
-      if (selectedSubsystem) {
+      if (selectedSubsystemId) {
         try {
-          const itrsData = await getAvailableITRs(selectedSubsystem);
-          setItrs(itrsData);
+          setLoading(true);
+          const itrsData = await getAvailableITRs(selectedSubsystemId);
+          console.log("ITRs loaded:", itrsData);
+          setItrs(itrsData || []);
         } catch (error) {
           console.error("Error loading ITRs:", error);
           toast({
@@ -104,38 +129,52 @@ const TestPackFormDialog = ({ open, onOpenChange, testPack, onSuccess }: TestPac
             description: "No se pudieron cargar los ITRs",
             variant: "destructive"
           });
+          setItrs([]);
+        } finally {
+          setLoading(false);
         }
       }
     };
 
     loadITRs();
-  }, [selectedSubsystem, toast]);
+  }, [selectedSubsystemId, toast]);
 
   // Set form values if editing
   useEffect(() => {
     if (testPack) {
+      const systemId = testPack.sistema;
+      const subsystemId = testPack.subsistema;
+      
       form.reset({
-        sistema: testPack.sistema,
-        subsistema: testPack.subsistema,
+        sistema: systemId,
+        subsistema: subsystemId,
         nombre_paquete: testPack.nombre_paquete,
         itr_asociado: testPack.itr_asociado,
         tagsCount: 10
       });
       
       // Set selected values for dropdowns
-      setSelectedSystem(testPack.sistema);
-      setSelectedSubsystem(testPack.subsistema);
+      setSelectedSystemId(systemId);
+      setSelectedSubsystemId(subsystemId);
     }
   }, [testPack, form]);
 
   const onSubmit = async (values: FormValues) => {
     setLoading(true);
     try {
+      console.log("Form values:", values);
+      
+      // Get system and subsystem names from their IDs
+      const system = systems.find(s => s.id === values.sistema);
+      const subsystem = subsystems.find(s => s.id === values.subsistema);
+      const systemName = system ? system.name : "Sistema desconocido";
+      const subsystemName = subsystem ? subsystem.name : "Subsistema desconocido";
+      
       if (testPack) {
         // Update existing test pack
         await updateTestPack(testPack.id, {
-          sistema: values.sistema,
-          subsistema: values.subsistema,
+          sistema: systemName,
+          subsistema: subsystemName,
           nombre_paquete: values.nombre_paquete,
           itr_asociado: values.itr_asociado,
           estado: testPack.estado
@@ -145,13 +184,13 @@ const TestPackFormDialog = ({ open, onOpenChange, testPack, onSuccess }: TestPac
           description: "El Test Pack ha sido actualizado correctamente"
         });
       } else {
-        // Create new test pack - add the required estado property
+        // Create new test pack
         await createTestPack({
-          sistema: values.sistema,
-          subsistema: values.subsistema,
+          sistema: systemName,
+          subsistema: subsystemName,
           nombre_paquete: values.nombre_paquete,
           itr_asociado: values.itr_asociado,
-          estado: 'pendiente' // Adding the required estado property
+          estado: 'pendiente'
         }, values.tagsCount);
         toast({
           title: "Test Pack creado",
@@ -169,6 +208,11 @@ const TestPackFormDialog = ({ open, onOpenChange, testPack, onSuccess }: TestPac
     } finally {
       setLoading(false);
     }
+  };
+
+  const getSystemLabel = (systemId: string) => {
+    const system = systems.find(s => s.id === systemId);
+    return system ? `${system.name} (${system.projectName || 'Sin proyecto'})` : "Sistema";
   };
 
   return (
@@ -190,7 +234,7 @@ const TestPackFormDialog = ({ open, onOpenChange, testPack, onSuccess }: TestPac
                     disabled={loading}
                     onValueChange={(value) => {
                       field.onChange(value);
-                      setSelectedSystem(value);
+                      setSelectedSystemId(value);
                     }}
                     value={field.value}
                   >
@@ -202,7 +246,7 @@ const TestPackFormDialog = ({ open, onOpenChange, testPack, onSuccess }: TestPac
                     <SelectContent>
                       {systems.map((system) => (
                         <SelectItem key={system.id} value={system.id}>
-                          {system.name}
+                          {system.name} ({system.projectName || 'Sin proyecto'})
                         </SelectItem>
                       ))}
                     </SelectContent>
@@ -219,16 +263,16 @@ const TestPackFormDialog = ({ open, onOpenChange, testPack, onSuccess }: TestPac
                 <FormItem>
                   <FormLabel>Subsistema</FormLabel>
                   <Select
-                    disabled={loading || !selectedSystem}
+                    disabled={loading || !selectedSystemId}
                     onValueChange={(value) => {
                       field.onChange(value);
-                      setSelectedSubsystem(value);
+                      setSelectedSubsystemId(value);
                     }}
                     value={field.value}
                   >
                     <FormControl>
                       <SelectTrigger>
-                        <SelectValue placeholder={selectedSystem ? "Seleccionar subsistema" : "Primero seleccione un sistema"} />
+                        <SelectValue placeholder={selectedSystemId ? "Seleccionar subsistema" : "Primero seleccione un sistema"} />
                       </SelectTrigger>
                     </FormControl>
                     <SelectContent>
@@ -237,6 +281,11 @@ const TestPackFormDialog = ({ open, onOpenChange, testPack, onSuccess }: TestPac
                           {subsystem.name}
                         </SelectItem>
                       ))}
+                      {subsystems.length === 0 && selectedSystemId && (
+                        <SelectItem value="no-subsystems" disabled>
+                          No hay subsistemas disponibles
+                        </SelectItem>
+                      )}
                     </SelectContent>
                   </Select>
                   <FormMessage />
@@ -251,24 +300,26 @@ const TestPackFormDialog = ({ open, onOpenChange, testPack, onSuccess }: TestPac
                 <FormItem>
                   <FormLabel>ITR Asociado</FormLabel>
                   <Select
-                    disabled={loading || !selectedSubsystem}
+                    disabled={loading || !selectedSubsystemId}
                     onValueChange={field.onChange}
                     value={field.value}
                   >
                     <FormControl>
                       <SelectTrigger>
-                        <SelectValue placeholder={selectedSubsystem ? "Seleccionar ITR" : "Primero seleccione un subsistema"} />
+                        <SelectValue placeholder={selectedSubsystemId ? "Seleccionar ITR" : "Primero seleccione un subsistema"} />
                       </SelectTrigger>
                     </FormControl>
                     <SelectContent>
                       {itrs.length > 0 ? (
                         itrs.map((itr) => (
                           <SelectItem key={itr.id} value={itr.id}>
-                            {itr.name} ({itr.quantity} TAGs)
+                            {itr.name} ({itr.quantity || 0} TAGs)
                           </SelectItem>
                         ))
-                      ) : (
+                      ) : selectedSubsystemId ? (
                         <SelectItem value="no-itrs" disabled>No hay ITRs disponibles</SelectItem>
+                      ) : (
+                        <SelectItem value="select-subsystem-first" disabled>Seleccione un subsistema primero</SelectItem>
                       )}
                     </SelectContent>
                   </Select>

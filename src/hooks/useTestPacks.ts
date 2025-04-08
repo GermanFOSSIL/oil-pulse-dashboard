@@ -1,5 +1,5 @@
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
 import { 
@@ -48,7 +48,7 @@ export const useTestPacks = () => {
     const loadProjectData = async () => {
       try {
         const data = await getProjectsHierarchy();
-        setProjectsData(data);
+        setProjectsData(data || []);
       } catch (error) {
         console.error("Error loading project hierarchy:", error);
         toast({
@@ -63,31 +63,76 @@ export const useTestPacks = () => {
     getUserRole().then(role => setUserRole(role));
   }, [toast]);
 
+  // Function to fetch test packs with error handling
+  const fetchTestPacks = async () => {
+    try {
+      const data = await getTestPacks();
+      console.log("Test packs fetched:", data);
+      return data || [];
+    } catch (error) {
+      console.error("Error fetching test packs:", error);
+      toast({
+        title: "Error",
+        description: "No se pudieron cargar los test packs",
+        variant: "destructive"
+      });
+      return [];
+    }
+  };
+
+  // Function to fetch stats with error handling
+  const fetchStats = async () => {
+    try {
+      const data = await getTestPacksStats();
+      console.log("Test pack stats fetched:", data);
+      return data || {
+        testPacks: { total: 0, completed: 0, progress: 0 },
+        tags: { total: 0, released: 0, progress: 0 },
+        systems: [],
+        itrs: [],
+        subsystems: []
+      };
+    } catch (error) {
+      console.error("Error fetching test pack stats:", error);
+      toast({
+        title: "Error",
+        description: "No se pudieron cargar las estadísticas",
+        variant: "destructive"
+      });
+      return {
+        testPacks: { total: 0, completed: 0, progress: 0 },
+        tags: { total: 0, released: 0, progress: 0 },
+        systems: [],
+        itrs: [],
+        subsystems: []
+      };
+    }
+  };
+
   // Queries for test packs data
   const { 
     data: testPacks, 
     isLoading: isLoadingTestPacks, 
-    refetch: refetchTestPacks,
-    error: testPacksError
+    refetch: refetchTestPacks
   } = useQuery({
     queryKey: ['testPacks'],
-    queryFn: getTestPacks,
+    queryFn: fetchTestPacks,
     retry: 3,
-    retryDelay: 1000
+    retryDelay: 1000,
+    staleTime: 30000 // 30 seconds
   });
 
   const { 
     data: stats, 
     isLoading: isLoadingStats,
-    error: statsError,
     refetch: refetchStats
   } = useQuery({
     queryKey: ['testPacksStats'],
-    queryFn: getTestPacksStats,
+    queryFn: fetchStats,
     enabled: selectedTab === 'dashboard',
     retry: 3,
     retryDelay: 1000,
-    staleTime: 60000 // 1 minute
+    staleTime: 30000 // 30 seconds
   });
 
   // Refetch stats when tab changes to dashboard
@@ -96,17 +141,6 @@ export const useTestPacks = () => {
       refetchStats();
     }
   }, [selectedTab, refetchStats]);
-
-  // Log errors for debugging
-  useEffect(() => {
-    if (testPacksError) {
-      console.error("Error fetching test packs:", testPacksError);
-    }
-    
-    if (statsError) {
-      console.error("Error fetching stats:", statsError);
-    }
-  }, [testPacksError, statsError]);
 
   // Mutation for updating tags
   const updateTagMutation = useMutation({
@@ -135,11 +169,11 @@ export const useTestPacks = () => {
   });
 
   // Handler functions
-  const handleTagRelease = (tagId: string) => {
+  const handleTagRelease = useCallback((tagId: string) => {
     updateTagMutation.mutate(tagId);
-  };
+  }, [updateTagMutation]);
 
-  const handleDownloadTemplate = () => {
+  const handleDownloadTemplate = useCallback(() => {
     try {
       const excelBuffer = generateImportTemplate();
       const blob = new Blob([excelBuffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
@@ -164,9 +198,9 @@ export const useTestPacks = () => {
         variant: "destructive"
       });
     }
-  };
+  }, [toast]);
 
-  const handleExportData = async () => {
+  const handleExportData = useCallback(async () => {
     try {
       const excelBuffer = await exportToExcel();
       const blob = new Blob([excelBuffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
@@ -191,29 +225,39 @@ export const useTestPacks = () => {
         variant: "destructive"
       });
     }
-  };
+  }, [toast]);
 
-  const openNewTestPackForm = () => {
+  const openNewTestPackForm = useCallback(() => {
     setSelectedTestPack(null);
     setShowFormDialog(true);
-  };
+  }, []);
 
-  const openImportDialog = () => {
+  const openImportDialog = useCallback(() => {
     setShowImportDialog(true);
-  };
+  }, []);
 
-  const handleFormSuccess = () => {
+  const handleFormSuccess = useCallback(() => {
     refetchTestPacks();
     queryClient.invalidateQueries({ queryKey: ['testPacksStats'] });
     setSelectedTestPack(null);
     setShowFormDialog(false);
-  };
+    
+    toast({
+      title: "Éxito",
+      description: "Operación completada correctamente."
+    });
+  }, [refetchTestPacks, queryClient, toast]);
 
-  const handleImportSuccess = () => {
+  const handleImportSuccess = useCallback(() => {
     setShowImportDialog(false);
     refetchTestPacks();
     queryClient.invalidateQueries({ queryKey: ['testPacksStats'] });
-  };
+    
+    toast({
+      title: "Importación exitosa",
+      description: "Los datos han sido importados correctamente."
+    });
+  }, [refetchTestPacks, queryClient, toast]);
 
   return {
     // State

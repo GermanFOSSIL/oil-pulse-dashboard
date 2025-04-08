@@ -40,12 +40,12 @@ const TestPackStats = ({ stats }: TestPackStatsProps) => {
   const testPacksData = [
     { name: 'Completados', value: testPacksCompleted },
     { name: 'Pendientes', value: testPacksTotal - testPacksCompleted }
-  ];
+  ].filter(item => item.value > 0);
   
   const tagsData = [
     { name: 'Liberados', value: tagsReleased },
     { name: 'Pendientes', value: tagsTotal - tagsReleased }
-  ];
+  ].filter(item => item.value > 0);
   
   // Progress bars for systems with safe access
   const systemsProgress = (stats.systems || []).sort((a: any, b: any) => (b.progress || 0) - (a.progress || 0));
@@ -55,6 +55,25 @@ const TestPackStats = ({ stats }: TestPackStatsProps) => {
 
   // Subsystems with safe access
   const subsystems = (stats.subsystems || []);
+
+  // If there's no data at all, show a no data state
+  if (testPacksTotal === 0 && tagsTotal === 0 && systemsProgress.length === 0 && itrsProgress.length === 0) {
+    return (
+      <div className="grid grid-cols-1 gap-6">
+        <Card>
+          <CardHeader>
+            <CardTitle>No hay datos disponibles</CardTitle>
+            <CardDescription>Aún no hay Test Packs o ITRs en el sistema</CardDescription>
+          </CardHeader>
+          <CardContent className="h-64 flex items-center justify-center">
+            <p className="text-muted-foreground text-center">
+              Cree Test Packs para comenzar a ver estadísticas aquí
+            </p>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -87,26 +106,32 @@ const TestPackStats = ({ stats }: TestPackStatsProps) => {
               </div>
               
               <div className="h-[180px] mt-4">
-                <ResponsiveContainer width="100%" height="100%">
-                  <PieChart>
-                    <Pie
-                      data={testPacksData}
-                      cx="50%"
-                      cy="50%"
-                      labelLine={false}
-                      outerRadius={80}
-                      fill="#8884d8"
-                      dataKey="value"
-                      nameKey="name"
-                      label={({ name, percent }) => `${name}: ${(percent * 100).toFixed(0)}%`}
-                    >
-                      {testPacksData.map((entry, index) => (
-                        <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                      ))}
-                    </Pie>
-                    <Tooltip />
-                  </PieChart>
-                </ResponsiveContainer>
+                {testPacksData.length > 0 ? (
+                  <ResponsiveContainer width="100%" height="100%">
+                    <PieChart>
+                      <Pie
+                        data={testPacksData}
+                        cx="50%"
+                        cy="50%"
+                        labelLine={false}
+                        outerRadius={80}
+                        fill="#8884d8"
+                        dataKey="value"
+                        nameKey="name"
+                        label={({ name, percent }) => `${name}: ${(percent * 100).toFixed(0)}%`}
+                      >
+                        {testPacksData.map((entry, index) => (
+                          <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                        ))}
+                      </Pie>
+                      <Tooltip />
+                    </PieChart>
+                  </ResponsiveContainer>
+                ) : (
+                  <div className="h-full flex items-center justify-center">
+                    <p className="text-sm text-muted-foreground">No hay datos para mostrar</p>
+                  </div>
+                )}
               </div>
             </div>
             
@@ -132,26 +157,32 @@ const TestPackStats = ({ stats }: TestPackStatsProps) => {
               </div>
               
               <div className="h-[180px] mt-4">
-                <ResponsiveContainer width="100%" height="100%">
-                  <PieChart>
-                    <Pie
-                      data={tagsData}
-                      cx="50%"
-                      cy="50%"
-                      labelLine={false}
-                      outerRadius={80}
-                      fill="#8884d8"
-                      dataKey="value"
-                      nameKey="name"
-                      label={({ name, percent }) => `${name}: ${(percent * 100).toFixed(0)}%`}
-                    >
-                      {tagsData.map((entry, index) => (
-                        <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                      ))}
-                    </Pie>
-                    <Tooltip />
-                  </PieChart>
-                </ResponsiveContainer>
+                {tagsData.length > 0 ? (
+                  <ResponsiveContainer width="100%" height="100%">
+                    <PieChart>
+                      <Pie
+                        data={tagsData}
+                        cx="50%"
+                        cy="50%"
+                        labelLine={false}
+                        outerRadius={80}
+                        fill="#8884d8"
+                        dataKey="value"
+                        nameKey="name"
+                        label={({ name, percent }) => `${name}: ${(percent * 100).toFixed(0)}%`}
+                      >
+                        {tagsData.map((entry, index) => (
+                          <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                        ))}
+                      </Pie>
+                      <Tooltip />
+                    </PieChart>
+                  </ResponsiveContainer>
+                ) : (
+                  <div className="h-full flex items-center justify-center">
+                    <p className="text-sm text-muted-foreground">No hay datos para mostrar</p>
+                  </div>
+                )}
               </div>
             </div>
           </div>
@@ -169,7 +200,7 @@ const TestPackStats = ({ stats }: TestPackStatsProps) => {
               systemsProgress.map((system: any, index: number) => (
                 <div key={index}>
                   <div className="flex justify-between items-center mb-2">
-                    <h3 className="font-medium">{system.name}</h3>
+                    <h3 className="font-medium">{system.name || "Sin nombre"}</h3>
                     <span>{system.progress || 0}%</span>
                   </div>
                   <Progress value={system.progress || 0} className="h-2 mb-1" />
@@ -198,7 +229,7 @@ const TestPackStats = ({ stats }: TestPackStatsProps) => {
               itrsProgress.map((itr: any, index: number) => (
                 <div key={index}>
                   <div className="flex justify-between items-center mb-2">
-                    <h3 className="font-medium">{itr.name}</h3>
+                    <h3 className="font-medium">{itr.name || "Sin nombre"}</h3>
                     <span>{itr.progress || 0}%</span>
                   </div>
                   <Progress value={itr.progress || 0} className="h-2 mb-1" />
