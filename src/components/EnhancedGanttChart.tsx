@@ -16,6 +16,7 @@ import * as XLSX from 'xlsx';
 import { jsPDF } from 'jspdf';
 import 'jspdf-autotable';
 import html2canvas from 'html2canvas';
+import { useToast } from "@/hooks/use-toast";
 
 interface GanttItem {
   id: string;
@@ -40,6 +41,8 @@ export const EnhancedGanttChart: React.FC<EnhancedGanttProps> = ({ data }) => {
   const [viewMode, setViewMode] = useState<string>("month");
   const [initialized, setInitialized] = useState(false);
   const todayMarkerRef = useRef<HTMLDivElement | null>(null);
+  const { toast } = useToast();
+  const [exporting, setExporting] = useState(false);
 
   const goToPreviousMonth = () => {
     setCurrentDate(prevDate => subMonths(prevDate, 1));
@@ -82,14 +85,30 @@ export const EnhancedGanttChart: React.FC<EnhancedGanttProps> = ({ data }) => {
       XLSX.utils.book_append_sheet(wb, ws, "Cronograma");
       
       XLSX.writeFile(wb, `Cronograma_${format(new Date(), 'yyyyMMdd')}.xlsx`);
+      
+      toast({
+        title: "Exportación exitosa",
+        description: "El archivo Excel ha sido generado correctamente"
+      });
     } catch (error) {
       console.error("Error exporting data to Excel:", error);
+      toast({
+        title: "Error de exportación",
+        description: "No se pudo exportar a Excel. Inténtelo de nuevo.",
+        variant: "destructive"
+      });
     }
   };
 
   const exportToPDF = async () => {
     try {
       if (!ganttChartRef.current) return;
+      
+      setExporting(true);
+      toast({
+        title: "Exportando a PDF",
+        description: "Generando PDF de alta resolución. Esto puede tardar unos segundos..."
+      });
 
       const pdf = new jsPDF({
         orientation: 'landscape',
@@ -97,21 +116,39 @@ export const EnhancedGanttChart: React.FC<EnhancedGanttProps> = ({ data }) => {
         format: 'a3'
       });
 
-      const ganttContainer = ganttChartRef.current;
+      const ganttContainer = containerRef.current;
+      if (!ganttContainer) {
+        setExporting(false);
+        return;
+      }
       
       const canvas = await html2canvas(ganttContainer, {
-        scale: 2,
+        scale: 3,
         logging: false,
         useCORS: true,
         allowTaint: true,
-        backgroundColor: '#ffffff'
+        backgroundColor: '#ffffff',
+        x: 0,
+        y: 0,
+        scrollX: 0,
+        scrollY: 0,
+        windowWidth: document.documentElement.offsetWidth,
+        windowHeight: document.documentElement.offsetHeight
       });
       
-      const imgData = canvas.toDataURL('image/jpeg', 0.95);
+      const imgData = canvas.toDataURL('image/jpeg', 1.0);
       
-      pdf.setFontSize(16);
+      pdf.setProperties({
+        title: 'Cronograma de ITRs',
+        subject: 'Cronograma detallado del proyecto',
+        author: 'Sistema de Gestión de Proyectos',
+        keywords: 'cronograma, ITR, gantt',
+        creator: 'Sistema de Gestión'
+      });
+      
+      pdf.setFontSize(18);
       pdf.text('Cronograma de ITRs', 20, 15);
-      pdf.setFontSize(10);
+      pdf.setFontSize(12);
       pdf.text(`Fecha de exportación: ${format(new Date(), 'dd/MM/yyyy')}`, 20, 22);
       
       const pdfWidth = pdf.internal.pageSize.getWidth();
@@ -128,8 +165,20 @@ export const EnhancedGanttChart: React.FC<EnhancedGanttProps> = ({ data }) => {
       pdf.addImage(imgData, 'JPEG', imgX, imgY, imgWidth * ratio, imgHeight * ratio);
       
       pdf.save(`Cronograma_ITRs_${format(new Date(), 'yyyyMMdd')}.pdf`);
+      
+      setExporting(false);
+      toast({
+        title: "PDF generado correctamente",
+        description: "El cronograma ha sido exportado con éxito en alta resolución"
+      });
     } catch (error) {
       console.error("Error exporting to PDF:", error);
+      setExporting(false);
+      toast({
+        title: "Error al exportar",
+        description: "No se pudo generar el PDF. Inténtelo de nuevo.",
+        variant: "destructive"
+      });
     }
   };
 
@@ -479,13 +528,13 @@ export const EnhancedGanttChart: React.FC<EnhancedGanttProps> = ({ data }) => {
           <Button variant="outline" size="icon">
             <Search className="h-4 w-4" />
           </Button>
-          <Button variant="outline" onClick={exportToExcel}>
+          <Button variant="outline" onClick={exportToExcel} disabled={exporting}>
             <Download className="h-4 w-4 mr-2" />
             Excel
           </Button>
-          <Button variant="outline" onClick={exportToPDF}>
+          <Button variant="outline" onClick={exportToPDF} disabled={exporting}>
             <FileText className="h-4 w-4 mr-2" />
-            PDF
+            {exporting ? "Exportando..." : "PDF"}
           </Button>
         </div>
       </div>
