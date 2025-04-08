@@ -82,9 +82,9 @@ const Auth = () => {
       <Card className="w-full max-w-md">
         <Tabs defaultValue="signin">
           <CardHeader>
-            <CardTitle className="text-2xl text-center">OilPulse</CardTitle>
+            <CardTitle className="text-2xl text-center">FOSSIL Energies</CardTitle>
             <CardDescription className="text-center">
-              Gestión de proyectos para la industria petrolera
+              Gestión de proyectos para la industria de Oil & Gas
             </CardDescription>
             <TabsList className="grid w-full grid-cols-2 mt-4">
               <TabsTrigger value="signin">Iniciar Sesión</TabsTrigger>

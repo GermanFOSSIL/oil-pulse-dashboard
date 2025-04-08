@@ -50,7 +50,7 @@ const MainLayout = () => {
               <Menu className="h-5 w-5" />
             </Button>
           ) : (
-            <div />
+            <div className="font-medium">FOSSIL Energies - Oil & Gas Management</div>
           )}
           
           <Button 

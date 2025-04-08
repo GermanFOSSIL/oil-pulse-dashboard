@@ -19,6 +19,7 @@ import { Button } from "@/components/ui/button";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { useAuth } from "@/contexts/AuthContext";
 import { getUserPermissions } from "@/services/userService";
+import { LogoutButton } from "@/components/ui/logout-button";
 
 type NavItem = {
   label: string;
@@ -137,7 +138,7 @@ const Sidebar = ({ isOpen }: SidebarProps) => {
         <div className="flex items-center justify-between p-4 border-b border-sidebar-border">
           <div className="flex items-center">
             <BarChart3 className="w-6 h-6 mr-2 text-sidebar-primary" />
-            <h1 className="text-xl font-semibold">OilPulse</h1>
+            <h1 className="text-xl font-semibold">FOSSIL Energies</h1>
           </div>
           {isMobile && (
             <Button variant="ghost" size="icon" onClick={closeSidebar}>
@@ -182,14 +183,17 @@ const Sidebar = ({ isOpen }: SidebarProps) => {
         </ScrollArea>
 
         <div className="p-4 border-t border-sidebar-border">
-          <div className="flex items-center">
-            <div className="w-8 h-8 rounded-full bg-sidebar-accent flex items-center justify-center text-sidebar-primary font-semibold">
-              OP
+          <div className="flex flex-col space-y-3">
+            <div className="flex items-center">
+              <div className="w-8 h-8 rounded-full bg-sidebar-accent flex items-center justify-center text-sidebar-primary font-semibold">
+                FE
+              </div>
+              <div className="ml-3">
+                <p className="text-sm font-medium">FOSSIL Energies</p>
+                <p className="text-xs text-sidebar-foreground/70">Oil & Gas Management</p>
+              </div>
             </div>
-            <div className="ml-3">
-              <p className="text-sm font-medium">OilPulse Admin</p>
-              <p className="text-xs text-sidebar-foreground/70">Admin</p>
-            </div>
+            <LogoutButton />
           </div>
         </div>
       </div>
