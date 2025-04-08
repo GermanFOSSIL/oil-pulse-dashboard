@@ -1,21 +1,28 @@
 
-import { createITR, getITRs, getSubsystems, getSystemsByProjectId, System, Subsystem, ITR } from "@/services/supabaseService";
+import { getITRs, getSubsystems, getSystemsByProjectId, ITR, Subsystem, System } from "@/services/supabaseService";
 import { ITRWithDetails } from "@/types/itr-types";
+import { createITR } from "@/services/itrDataService";
 import { supabase } from "@/integrations/supabase/client";
 
 export const fetchITRsWithDetails = async (selectedProjectId: string | null): Promise<ITRWithDetails[]> => {
   try {
+    console.log(`Fetching ITRs with details for project: ${selectedProjectId || 'todos'}`);
+    
     const subsystemsData = await getSubsystems();
+    console.log(`Total subsystems in the database: ${subsystemsData.length}`);
     
     if (selectedProjectId) {
       const systemsData = await getSystemsByProjectId(selectedProjectId);
+      console.log(`Systems for project ${selectedProjectId}: ${systemsData.length}`);
       
       const systemIds = systemsData.map(system => system.id);
       const filteredSubsystems = subsystemsData.filter(
         subsystem => systemIds.includes(subsystem.system_id)
       );
+      console.log(`Filtered subsystems for this project: ${filteredSubsystems.length}`);
       
       const itrsData = await getITRs();
+      console.log(`Total ITRs in the database: ${itrsData.length}`);
       
       const enrichedITRs = itrsData
         .filter(itr => {
@@ -29,22 +36,27 @@ export const fetchITRsWithDetails = async (selectedProjectId: string | null): Pr
             ...itr,
             subsystemName: relatedSubsystem?.name || 'Subsistema Desconocido',
             systemName: relatedSystem?.name || 'Sistema Desconocido',
+            projectName: selectedProjectId ? 'Proyecto actual' : 'Desconocido'
           };
         });
       
+      console.log(`Enriched ITRs for this project: ${enrichedITRs.length}`);
       return enrichedITRs;
     } else {
       const itrsData = await getITRs();
+      console.log(`Total ITRs in the database: ${itrsData.length}`);
       
       const enrichedITRs = itrsData.map(itr => {
         const relatedSubsystem = subsystemsData.find(sub => sub.id === itr.subsystem_id);
         
         return {
           ...itr,
-          subsystemName: relatedSubsystem?.name || 'Subsistema Desconocido'
+          subsystemName: relatedSubsystem?.name || 'Subsistema Desconocido',
+          systemName: 'No filtrado por proyecto'
         };
       });
       
+      console.log(`Enriched ITRs (all projects): ${enrichedITRs.length}`);
       return enrichedITRs;
     }
   } catch (error) {
@@ -86,6 +98,7 @@ export const createTestITRs = async (): Promise<{ success: boolean; message: str
     
     // Crear 4 ITRs de prueba
     const itrPromises = [];
+    const createdITRs = [];
     
     for (let i = 1; i <= 4; i++) {
       const startDate = new Date();
@@ -109,14 +122,20 @@ export const createTestITRs = async (): Promise<{ success: boolean; message: str
       };
       
       console.log(`Creando ITR ${i}:`, itrData);
-      itrPromises.push(createITR(itrData));
+      
+      try {
+        const newITR = await createITR(itrData);
+        console.log(`ITR ${i} creado con éxito:`, newITR);
+        createdITRs.push(newITR);
+      } catch (err) {
+        console.error(`Error al crear ITR ${i}:`, err);
+      }
     }
     
-    const results = await Promise.all(itrPromises);
-    console.log("ITRs de prueba creados:", results);
+    console.log(`Se crearon ${createdITRs.length} ITRs de prueba correctamente`);
     
     // Verificar que los ITRs se crearon correctamente
-    const { data: createdITRs, error: verifyError } = await supabase
+    const { data: verifyITRs, error: verifyError } = await supabase
       .from('itrs')
       .select('*')
       .eq('subsystem_id', subsystemId)
@@ -126,19 +145,19 @@ export const createTestITRs = async (): Promise<{ success: boolean; message: str
     if (verifyError) {
       console.error("Error al verificar ITRs creados:", verifyError);
     } else {
-      console.log(`Verificación: Se encontraron ${createdITRs.length} ITRs recientes para el subsistema`);
+      console.log(`Verificación: Se encontraron ${verifyITRs.length} ITRs recientes para el subsistema`);
     }
     
     return { 
       success: true, 
-      message: "4 ITRs de prueba creados correctamente", 
-      data: results 
+      message: `${createdITRs.length} ITRs de prueba creados correctamente`, 
+      data: createdITRs 
     };
   } catch (error) {
     console.error("Error al crear ITRs de prueba:", error);
     return { 
       success: false, 
-      message: `Error al crear ITRs de prueba: ${error}`, 
+      message: `Error al crear ITRs de prueba: ${error instanceof Error ? error.message : error}`, 
     };
   }
 };

@@ -1,13 +1,13 @@
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
-import { ITR, Subsystem, createITR, updateITR } from "@/services/supabaseService";
-import { supabase } from "@/integrations/supabase/client";
+import { ITR, Subsystem } from "@/services/types";
+import { createITR, updateITR } from "@/services/itrDataService";
 
 interface ITRFormModalProps {
   open: boolean;
@@ -28,16 +28,42 @@ export const ITRFormModal = ({
   const { toast } = useToast();
   
   const [formData, setFormData] = useState({
-    name: itr?.name || "",
-    subsystem_id: itr?.subsystem_id || "",
-    status: itr?.status || "inprogress",
-    progress: itr?.progress || 0,
-    assigned_to: itr?.assigned_to || "",
-    start_date: itr?.start_date ? new Date(itr.start_date).toISOString().split('T')[0] : "",
-    end_date: itr?.end_date ? new Date(itr.end_date).toISOString().split('T')[0] : ""
+    name: "",
+    subsystem_id: "",
+    status: "inprogress" as "inprogress" | "complete" | "delayed",
+    progress: 0,
+    assigned_to: "",
+    start_date: "",
+    end_date: ""
   });
   
   const [loading, setLoading] = useState(false);
+  
+  // Initialize form data when the modal opens or when the ITR changes
+  useEffect(() => {
+    if (itr) {
+      setFormData({
+        name: itr.name || "",
+        subsystem_id: itr.subsystem_id || "",
+        status: itr.status || "inprogress",
+        progress: itr.progress || 0,
+        assigned_to: itr.assigned_to || "",
+        start_date: itr.start_date ? new Date(itr.start_date).toISOString().split('T')[0] : "",
+        end_date: itr.end_date ? new Date(itr.end_date).toISOString().split('T')[0] : ""
+      });
+    } else {
+      // Reset form for new ITR
+      setFormData({
+        name: "",
+        subsystem_id: subsystems.length > 0 ? subsystems[0].id : "",
+        status: "inprogress",
+        progress: 0,
+        assigned_to: "",
+        start_date: "",
+        end_date: ""
+      });
+    }
+  }, [itr, subsystems]);
   
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
@@ -48,15 +74,32 @@ export const ITRFormModal = ({
     setFormData(prev => ({ ...prev, [name]: value }));
   };
   
+  const validateForm = () => {
+    if (!formData.name.trim()) {
+      toast({
+        title: "Nombre requerido",
+        description: "Por favor ingrese un nombre para el ITR",
+        variant: "destructive"
+      });
+      return false;
+    }
+    
+    if (!formData.subsystem_id) {
+      toast({
+        title: "Subsistema requerido",
+        description: "Por favor seleccione un subsistema",
+        variant: "destructive"
+      });
+      return false;
+    }
+    
+    return true;
+  };
+  
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!formData.name || !formData.subsystem_id) {
-      toast({
-        title: "Campos requeridos",
-        description: "Por favor complete todos los campos obligatorios",
-        variant: "destructive"
-      });
+    if (!validateForm()) {
       return;
     }
     
@@ -70,26 +113,8 @@ export const ITRFormModal = ({
         assigned_to: formData.assigned_to || null
       });
       
-      // Verificar que el subsystem_id existe en la base de datos
-      const { data: subsystemCheck, error: subsystemError } = await supabase
-        .from('subsystems')
-        .select('id, name')
-        .eq('id', formData.subsystem_id)
-        .maybeSingle();
-        
-      if (subsystemError) {
-        console.error("Error al verificar el subsistema:", subsystemError);
-        throw new Error("Error al verificar el subsistema");
-      }
-      
-      if (!subsystemCheck) {
-        console.error("Subsistema no encontrado:", formData.subsystem_id);
-        throw new Error("Subsistema no encontrado");
-      }
-      
-      console.log("Subsistema verificado:", subsystemCheck.name);
-      
       if (isEditMode && itr) {
+        console.log("Actualizando ITR con ID:", itr.id);
         const updatedITR = await updateITR(itr.id, {
           ...formData,
           progress: Number(formData.progress),
@@ -103,6 +128,7 @@ export const ITRFormModal = ({
           description: "El ITR ha sido actualizado correctamente"
         });
       } else {
+        console.log("Creando nuevo ITR");
         const newITR = await createITR({
           ...formData,
           progress: Number(formData.progress),
@@ -118,7 +144,7 @@ export const ITRFormModal = ({
       }
       
       onSuccess();
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error al guardar ITR:", error);
       toast({
         title: "Error",
@@ -211,7 +237,7 @@ export const ITRFormModal = ({
             <Label htmlFor="status">Estado</Label>
             <Select
               value={formData.status}
-              onValueChange={(value) => handleSelectChange("status", value)}
+              onValueChange={(value) => handleSelectChange("status", value as "inprogress" | "complete" | "delayed")}
             >
               <SelectTrigger id="status">
                 <SelectValue placeholder="Seleccionar estado" />

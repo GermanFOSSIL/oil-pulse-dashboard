@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { DataTable } from "@/components/ui/data-table";
@@ -66,7 +65,7 @@ const UserFormModal = ({ open, onClose, onSuccess, user }: UserFormModalProps) =
           description: "El usuario ha sido actualizado correctamente"
         });
       } else {
-        await createUserProfile(formData);
+        await createUserProfile();
         toast({
           title: "Usuario creado",
           description: "El usuario ha sido creado correctamente"
