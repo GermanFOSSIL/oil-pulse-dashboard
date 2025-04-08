@@ -36,6 +36,7 @@ export const EnhancedGanttChart: React.FC<EnhancedGanttProps> = ({ data }) => {
   const [currentDate, setCurrentDate] = useState(new Date());
   const [viewMode, setViewMode] = useState<string>("month");
   const [initialized, setInitialized] = useState(false);
+  const todayMarkerRef = useRef<HTMLDivElement | null>(null);
 
   const goToPreviousMonth = () => {
     setCurrentDate(prevDate => subMonths(prevDate, 1));
@@ -47,6 +48,32 @@ export const EnhancedGanttChart: React.FC<EnhancedGanttProps> = ({ data }) => {
 
   const goToToday = () => {
     setCurrentDate(new Date());
+  };
+
+  // Function to add today marker
+  const updateTodayMarker = () => {
+    if (!containerRef.current) return;
+    
+    // Remove existing marker if any
+    if (todayMarkerRef.current) {
+      todayMarkerRef.current.remove();
+    }
+    
+    const today = new Date();
+    const todayPos = gantt.posFromDate(today);
+    
+    if (isNaN(todayPos)) return; // Skip if position is not valid
+    
+    const line = document.createElement('div');
+    line.className = 'today-line';
+    line.style.left = todayPos + 'px';
+    
+    // Get the task area to append the marker
+    const taskArea = containerRef.current.querySelector('.gantt_task');
+    if (taskArea) {
+      taskArea.appendChild(line);
+      todayMarkerRef.current = line;
+    }
   };
 
   useEffect(() => {
@@ -283,29 +310,21 @@ export const EnhancedGanttChart: React.FC<EnhancedGanttProps> = ({ data }) => {
       gantt.init(containerRef.current);
       setInitialized(true);
       
-      // Agregar línea de "hoy"
-      const addTodayMarker = () => {
-        gantt.addTaskLayer(function(task) {
-          if (!gantt.$today_marker) {
-            const today = new Date();
-            const todayPos = gantt.posFromDate(today);
-            const line = document.createElement('div');
-            line.className = 'today-line';
-            line.style.left = todayPos + 'px';
-            
-            gantt.$today_marker = line;
-            return line;
-          }
-          return null;
-        });
-      };
-      
-      addTodayMarker();
+      // Register event listener for rendering complete to add today marker
+      gantt.attachEvent("onGanttRender", updateTodayMarker);
       
       return () => {
         // Limpiar
         styleElement.remove();
         gantt.clearAll();
+        
+        // Detach event listeners
+        gantt.detachEvent("onGanttRender");
+        
+        // Remove today marker if exists
+        if (todayMarkerRef.current) {
+          todayMarkerRef.current.remove();
+        }
       };
     }
   }, [initialized]);
@@ -360,6 +379,9 @@ export const EnhancedGanttChart: React.FC<EnhancedGanttProps> = ({ data }) => {
       
       // Ajustar la vista completa si es necesario
       gantt.render();
+      
+      // Update today marker after data is loaded
+      setTimeout(updateTodayMarker, 100);
     }
   }, [data, currentDate, viewMode, initialized]);
   
