@@ -26,12 +26,22 @@ export const DatabaseActivityTimeline = () => {
     const fetchActivities = async () => {
       try {
         setLoading(true);
-        // We need to use a custom query since db_activity_log is not in the type definition
+        // Use a raw query instead of the typed query builder
         const { data, error } = await supabase
-          .from('db_activity_log')
-          .select('*')
-          .order('created_at', { ascending: false })
-          .limit(10);
+          .rpc('get_recent_activity', { limit_count: 10 })
+          .then(result => {
+            if (result.error) throw result.error;
+            return { data: result.data, error: null };
+          })
+          .catch(error => {
+            console.error('Error in RPC call:', error);
+            // Fallback to direct query if RPC doesn't exist
+            return supabase
+              .from('db_activity_log')
+              .select('*')
+              .order('created_at', { ascending: false })
+              .limit(10);
+          });
 
         if (error) {
           console.error('Error fetching database activities:', error);
@@ -39,7 +49,7 @@ export const DatabaseActivityTimeline = () => {
         }
 
         // Enrich with user names
-        const enrichedActivities = await Promise.all((data || []).map(async (activity: DatabaseActivity) => {
+        const enrichedActivities = await Promise.all((data || []).map(async (activity: any) => {
           if (activity.user_id) {
             try {
               const profile = await getUserProfile(activity.user_id);

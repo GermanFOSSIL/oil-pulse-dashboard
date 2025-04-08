@@ -1,3 +1,4 @@
+
 import { supabase } from "@/integrations/supabase/client";
 import { BulkUserData } from "@/services/types";
 
@@ -14,7 +15,8 @@ export const AVAILABLE_PERMISSIONS = [
   "database"
 ];
 
-export interface Profile {
+// Use a different name to avoid conflict with the Profile in types.ts
+export interface UserProfile {
   id: string;
   full_name?: string;
   avatar_url?: string;
@@ -24,7 +26,7 @@ export interface Profile {
   updated_at?: string;
 }
 
-export const getUserProfile = async (userId: string): Promise<Profile | null> => {
+export const getUserProfile = async (userId: string): Promise<UserProfile | null> => {
   const { data, error } = await supabase
     .from('profiles')
     .select('*')
@@ -36,10 +38,10 @@ export const getUserProfile = async (userId: string): Promise<Profile | null> =>
     throw error;
   }
 
-  return data as unknown as Profile;
+  return data as unknown as UserProfile;
 };
 
-export const getUserProfiles = async (): Promise<Profile[]> => {
+export const getUserProfiles = async (): Promise<UserProfile[]> => {
   const { data, error } = await supabase
     .from('profiles')
     .select('*');
@@ -49,10 +51,10 @@ export const getUserProfiles = async (): Promise<Profile[]> => {
     throw error;
   }
 
-  return data as unknown as Profile[];
+  return data as unknown as UserProfile[];
 };
 
-export const updateUserProfile = async (userId: string, updates: Partial<Profile>): Promise<Profile> => {
+export const updateUserProfile = async (userId: string, updates: Partial<UserProfile>): Promise<UserProfile> => {
   const { data, error } = await supabase
     .from('profiles')
     .update(updates)
@@ -65,7 +67,7 @@ export const updateUserProfile = async (userId: string, updates: Partial<Profile
     throw error;
   }
 
-  return data as unknown as Profile;
+  return data as unknown as UserProfile;
 };
 
 export const getUserPermissions = async (userId: string): Promise<string[]> => {

@@ -3,12 +3,18 @@
 // to maintain backward compatibility with existing code
 
 export * from './types';
+// Import and re-export from userService without the Profile interface
+import { AVAILABLE_PERMISSIONS, getUserPermissions, getUserProfiles as getUserProfilesList, updateUserProfile, bulkCreateUsers } from './userService';
+export { AVAILABLE_PERMISSIONS, getUserPermissions, updateUserProfile, bulkCreateUsers };
+
+// Rename the function to avoid naming collision
+export const getUserProfiles = getUserProfilesList;
+
 export * from './projectService';
 export * from './systemService';
 export * from './subsystemService';
 export * from './itrDataService';
 export * from './taskService';
-export * from './userService';
 export * from './reportService';
 export * from './dashboardService';
 
