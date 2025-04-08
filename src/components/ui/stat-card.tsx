@@ -11,6 +11,7 @@ interface StatCardProps {
     value: number;
     positive: boolean;
   };
+  variant?: string;
   className?: string;
 }
 
@@ -20,6 +21,7 @@ export function StatCard({
   description,
   icon,
   trend,
+  variant,
   className,
 }: StatCardProps) {
   return (

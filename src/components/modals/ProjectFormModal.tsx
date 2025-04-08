@@ -1,81 +1,80 @@
 import { useState } from "react";
-import { z } from "zod";
-import { useForm } from "react-hook-form";
-import { zodResolver } from "@hookform/resolvers/zod";
-import { 
-  Dialog, 
-  DialogContent, 
-  DialogHeader, 
-  DialogTitle, 
-  DialogFooter 
-} from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import {
-  Form,
-  FormControl,
-  FormField,
-  FormItem,
-  FormLabel,
-  FormMessage,
-} from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Label } from "@/components/ui/label";
+import { useToast } from "@/hooks/use-toast";
 import { Project, createProject, updateProject } from "@/services/supabaseService";
-
-const formSchema = z.object({
-  name: z.string().min(3, "El nombre debe tener al menos 3 caracteres"),
-  location: z.string().optional(),
-  status: z.enum(["complete", "inprogress", "delayed"]),
-  progress: z.number().min(0).max(100),
-});
-
-type FormValues = z.infer<typeof formSchema>;
 
 interface ProjectFormModalProps {
   open: boolean;
   onClose: () => void;
   onSuccess: () => void;
-  project?: Partial<Project>;
+  project?: Project;
 }
 
-export function ProjectFormModal({ open, onClose, onSuccess, project }: ProjectFormModalProps) {
-  const [loading, setLoading] = useState(false);
-  const isEditing = !!project?.id;
-  
-  const form = useForm<FormValues>({
-    resolver: zodResolver(formSchema),
-    defaultValues: {
-      name: project?.name || "",
-      location: project?.location || "",
-      status: (project?.status as "complete" | "inprogress" | "delayed") || "inprogress",
-      progress: project?.progress || 0,
-    },
+export const ProjectFormModal = ({ open, onClose, onSuccess, project }: ProjectFormModalProps) => {
+  const isEditMode = !!project;
+  const { toast } = useToast();
+
+  const [formData, setFormData] = useState({
+    name: project?.name || "",
+    location: project?.location || "",
+    status: project?.status || "inprogress",
+    progress: project?.progress || 0,
+    start_date: project?.start_date ? new Date(project.start_date).toISOString().split('T')[0] : "",
+    end_date: project?.end_date ? new Date(project.end_date).toISOString().split('T')[0] : ""
   });
 
-  const onSubmit = async (data: FormValues) => {
+  const [loading, setLoading] = useState(false);
+
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const { name, value } = e.target;
+    setFormData(prev => ({ ...prev, [name]: value }));
+  };
+
+  const handleSelectChange = (name: string, value: string) => {
+    setFormData(prev => ({ ...prev, [name]: value }));
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+
+    if (!formData.name || !formData.location || !formData.status) {
+      toast({
+        title: "Campos requeridos",
+        description: "Por favor complete todos los campos obligatorios",
+        variant: "destructive"
+      });
+      return;
+    }
+
     setLoading(true);
+
     try {
-      if (isEditing && project.id) {
-        await updateProject(project.id, data);
+      if (isEditMode && project) {
+        await updateProject(project.id, formData);
+        toast({
+          title: "Proyecto actualizado",
+          description: "El proyecto ha sido actualizado correctamente"
+        });
       } else {
-        await createProject({
-          name: data.name,
-          location: data.location || null,
-          status: data.status,
-          progress: data.progress,
+        await createProject(formData);
+        toast({
+          title: "Proyecto creado",
+          description: "El proyecto ha sido creado correctamente"
         });
       }
+
       onSuccess();
-      onClose();
     } catch (error) {
-      console.error("Error al guardar el proyecto:", error);
+      console.error("Error al guardar proyecto:", error);
+      toast({
+        title: "Error",
+        description: "No se pudo guardar el proyecto",
+        variant: "destructive"
+      });
     } finally {
       setLoading(false);
     }
@@ -85,96 +84,99 @@ export function ProjectFormModal({ open, onClose, onSuccess, project }: ProjectF
     <Dialog open={open} onOpenChange={onClose}>
       <DialogContent className="sm:max-w-[425px]">
         <DialogHeader>
-          <DialogTitle>{isEditing ? "Editar Proyecto" : "Nuevo Proyecto"}</DialogTitle>
+          <DialogTitle>
+            {isEditMode ? "Editar Proyecto" : "Nuevo Proyecto"}
+          </DialogTitle>
         </DialogHeader>
-        <Form {...form}>
-          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-            <FormField
-              control={form.control}
+
+        <form onSubmit={handleSubmit} className="space-y-4 pt-4">
+          <div className="space-y-2">
+            <Label htmlFor="name">Nombre del Proyecto *</Label>
+            <Input
+              id="name"
               name="name"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Nombre del Proyecto</FormLabel>
-                  <FormControl>
-                    <Input placeholder="Nombre del proyecto" {...field} />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
+              value={formData.name}
+              onChange={handleInputChange}
+              placeholder="Ingrese nombre del proyecto"
+              required
             />
-            
-            <FormField
-              control={form.control}
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="location">Ubicación *</Label>
+            <Input
+              id="location"
               name="location"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Ubicación</FormLabel>
-                  <FormControl>
-                    <Input placeholder="Ubicación del proyecto" {...field} />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
+              value={formData.location}
+              onChange={handleInputChange}
+              placeholder="Ingrese la ubicación"
+              required
             />
-            
-            <FormField
-              control={form.control}
-              name="status"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Estado</FormLabel>
-                  <Select
-                    onValueChange={field.onChange}
-                    defaultValue={field.value}
-                  >
-                    <FormControl>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Selecciona el estado" />
-                      </SelectTrigger>
-                    </FormControl>
-                    <SelectContent>
-                      <SelectItem value="complete">Completado</SelectItem>
-                      <SelectItem value="inprogress">En Progreso</SelectItem>
-                      <SelectItem value="delayed">Retrasado</SelectItem>
-                    </SelectContent>
-                  </Select>
-                  <FormMessage />
-                </FormItem>
-              )}
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="start_date">Fecha de inicio</Label>
+            <Input
+              id="start_date"
+              name="start_date"
+              type="date"
+              value={formData.start_date}
+              onChange={handleInputChange}
             />
-            
-            <FormField
-              control={form.control}
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="end_date">Fecha de fin</Label>
+            <Input
+              id="end_date"
+              name="end_date"
+              type="date"
+              value={formData.end_date}
+              onChange={handleInputChange}
+            />
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="status">Estado *</Label>
+            <Select
+              value={formData.status}
+              onValueChange={(value) => handleSelectChange("status", value)}
+            >
+              <SelectTrigger id="status">
+                <SelectValue placeholder="Seleccionar estado" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="inprogress">En progreso</SelectItem>
+                <SelectItem value="complete">Completado</SelectItem>
+                <SelectItem value="delayed">Retrasado</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="progress">Progreso (%)</Label>
+            <Input
+              id="progress"
               name="progress"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Progreso (%)</FormLabel>
-                  <FormControl>
-                    <Input 
-                      type="number" 
-                      min="0" 
-                      max="100" 
-                      placeholder="Progreso del proyecto" 
-                      {...field} 
-                      onChange={(e) => field.onChange(parseInt(e.target.value))}
-                    />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
+              type="number"
+              min="0"
+              max="100"
+              value={formData.progress}
+              onChange={handleInputChange}
+              placeholder="0"
             />
-            
-            <DialogFooter>
-              <Button type="button" variant="outline" onClick={onClose}>
-                Cancelar
-              </Button>
-              <Button type="submit" disabled={loading}>
-                {loading ? "Guardando..." : "Guardar"}
-              </Button>
-            </DialogFooter>
-          </form>
-        </Form>
+          </div>
+
+          <div className="flex justify-end space-x-2 pt-4">
+            <Button type="button" variant="outline" onClick={onClose}>
+              Cancelar
+            </Button>
+            <Button type="submit" disabled={loading}>
+              {loading ? "Guardando..." : isEditMode ? "Actualizar" : "Crear"}
+            </Button>
+          </div>
+        </form>
       </DialogContent>
     </Dialog>
   );
-}
+};

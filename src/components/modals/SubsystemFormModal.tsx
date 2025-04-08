@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
@@ -29,7 +28,9 @@ export const SubsystemFormModal = ({
   const [formData, setFormData] = useState({
     name: subsystem?.name || "",
     system_id: subsystem?.system_id || "",
-    completion_rate: subsystem?.completion_rate || 0
+    completion_rate: subsystem?.completion_rate || 0,
+    start_date: subsystem?.start_date ? new Date(subsystem.start_date).toISOString().split('T')[0] : "",
+    end_date: subsystem?.end_date ? new Date(subsystem.end_date).toISOString().split('T')[0] : ""
   });
   
   const [loading, setLoading] = useState(false);
@@ -124,6 +125,28 @@ export const SubsystemFormModal = ({
                 ))}
               </SelectContent>
             </Select>
+          </div>
+          
+          <div className="space-y-2">
+            <Label htmlFor="start_date">Fecha de inicio</Label>
+            <Input
+              id="start_date"
+              name="start_date"
+              type="date"
+              value={formData.start_date}
+              onChange={handleInputChange}
+            />
+          </div>
+          
+          <div className="space-y-2">
+            <Label htmlFor="end_date">Fecha de fin</Label>
+            <Input
+              id="end_date"
+              name="end_date"
+              type="date"
+              value={formData.end_date}
+              onChange={handleInputChange}
+            />
           </div>
           
           <div className="space-y-2">

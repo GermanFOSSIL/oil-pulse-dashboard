@@ -1,5 +1,6 @@
+
 import { useState, useEffect } from "react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ProgressCard } from "@/components/ui/progress-card";
 import { StatCard } from "@/components/ui/stat-card";
@@ -8,6 +9,19 @@ import { getProjects, getSystems, getSubsystems, getITRs, getDashboardStats } fr
 import { format, parseISO } from "date-fns";
 import { es } from "date-fns/locale";
 import { ProjectSelector } from "@/components/ProjectSelector";
+import { Calendar as CalendarIcon } from "lucide-react";
+import { 
+  ResponsiveContainer, 
+  BarChart, 
+  Bar, 
+  XAxis, 
+  YAxis, 
+  Tooltip, 
+  Legend, 
+  CartesianGrid,
+  AreaChart as RechartsAreaChart,
+  Area
+} from "recharts";
 
 const Dashboard = () => {
   const [loading, setLoading] = useState(true);
@@ -159,25 +173,21 @@ const Dashboard = () => {
               title="Proyectos" 
               value={stats.totalProjects} 
               description="Total de proyectos" 
-              variant="default" 
             />
             <StatCard 
               title="Sistemas" 
               value={stats.totalSystems} 
               description="Total de sistemas" 
-              variant="default" 
             />
             <StatCard 
               title="ITRs" 
               value={stats.totalITRs} 
               description="Total de registros" 
-              variant="default" 
             />
             <StatCard 
               title="Cumplimiento" 
               value={`${stats.completionRate}%`} 
               description="Tasa promedio" 
-              variant="default" 
             />
           </div>
 
@@ -310,7 +320,7 @@ const Dashboard = () => {
                         {index === 3 && "Entrega final del proyecto al cliente, 1 día."}
                       </p>
                       <div className="mt-2 flex items-center text-xs text-muted-foreground">
-                        <Calendar className="mr-1 h-3 w-3" />
+                        <CalendarIcon className="mr-1 h-3 w-3" />
                         <span>
                           {index === 0 && "Responsable: Ing. Eléctrico"}
                           {index === 1 && "Responsable: Jefe de Proyecto"}
