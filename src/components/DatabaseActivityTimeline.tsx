@@ -26,15 +26,15 @@ export const DatabaseActivityTimeline = () => {
     const fetchActivities = async () => {
       try {
         setLoading(true);
-        // Use a raw query instead of the typed query builder
+        // Use a direct query with executeRaw instead of typed query builder
         const { data, error } = await supabase
           .rpc('get_recent_activity', { limit_count: 10 })
           .then(result => {
             if (result.error) throw result.error;
             return { data: result.data, error: null };
           })
-          .catch(error => {
-            console.error('Error in RPC call:', error);
+          .catch(() => {
+            console.error('Falling back to direct query since RPC call failed');
             // Fallback to direct query if RPC doesn't exist
             return supabase
               .from('db_activity_log')

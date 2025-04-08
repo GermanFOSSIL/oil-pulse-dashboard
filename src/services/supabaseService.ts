@@ -4,8 +4,8 @@
 
 export * from './types';
 // Import and re-export from userService without the Profile interface
-import { AVAILABLE_PERMISSIONS, getUserPermissions, getUserProfiles as getUserProfilesList, updateUserProfile, bulkCreateUsers } from './userService';
-export { AVAILABLE_PERMISSIONS, getUserPermissions, updateUserProfile, bulkCreateUsers };
+import { AVAILABLE_PERMISSIONS, getUserPermissions, getUserProfiles as getUserProfilesList, updateUserProfile, bulkCreateUsers, UserProfile } from './userService';
+export { AVAILABLE_PERMISSIONS, getUserPermissions, updateUserProfile, bulkCreateUsers, UserProfile };
 
 // Rename the function to avoid naming collision
 export const getUserProfiles = getUserProfilesList;
@@ -263,20 +263,6 @@ export const importDataFromExcel = async (data: ArrayBuffer) => {
     console.error("Error importing data from Excel:", error);
     throw error; // Lanzar error para manejo en componente
   }
-};
-
-// Temporary function for getting user profiles (plural)
-export const getUserProfiles = async () => {
-  const { data, error } = await supabase
-    .from('profiles')
-    .select('*');
-
-  if (error) {
-    console.error("Error fetching user profiles:", error);
-    throw error;
-  }
-
-  return data || [];
 };
 
 // Temporary function for creating user profile

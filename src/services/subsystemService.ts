@@ -1,7 +1,6 @@
 
 import { supabase } from "@/integrations/supabase/client";
 import { Subsystem } from "@/services/types";
-import { useAuth } from "@/contexts/AuthContext";
 
 export const getSubsystems = async (): Promise<Subsystem[]> => {
   const { data, error } = await supabase
@@ -171,31 +170,29 @@ export const logDatabaseActivity = async (data: ActivityLogData): Promise<void> 
         p_user_id: data.user_id,
         p_record_id: data.record_id,
         p_details: data.details || {}
-      });
-
-    if (rpcError) {
-      console.error("RPC Error:", rpcError);
-      // Fall back to a direct query if RPC doesn't exist or fails
-      const { error } = await supabase.rpc('log_db_activity', {
-        p_table_name: data.table_name,
-        p_action: data.action,
-        p_user_id: data.user_id,
-        p_record_id: data.record_id,
-        p_details: data.details || {}
-      }).catch(async () => {
-        // Final fallback to direct insert if both RPCs fail
-        return await supabase.from('db_activity_log').insert({
-          table_name: data.table_name,
-          action: data.action,
-          user_id: data.user_id,
-          record_id: data.record_id,
-          details: data.details || {}
-        });
+      })
+      .then(result => {
+        if (result.error) {
+          console.error("RPC Error:", result.error);
+          throw result.error;
+        }
+        return result;
+      })
+      .catch(async () => {
+        // Fall back to direct insert if RPC doesn't exist or fails
+        return await supabase
+          .from('db_activity_log')
+          .insert({
+            table_name: data.table_name,
+            action: data.action,
+            user_id: data.user_id,
+            record_id: data.record_id,
+            details: data.details || {}
+          });
       });
       
-      if (error) {
-        console.error("Error logging database activity:", error);
-      }
+    if (rpcError) {
+      console.error("Error logging database activity:", rpcError);
     }
   } catch (e) {
     console.error("Error logging database activity:", e);

@@ -3,22 +3,21 @@ import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { DataTable } from "@/components/ui/data-table";
 import { Badge } from "@/components/ui/badge";
-import { Plus, Check, X } from "lucide-react";
+import { Plus } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { getUserProfiles, updateUserProfile, Profile } from "@/services/userService";
+import { getUserProfiles, updateUserProfile, UserProfile, AVAILABLE_PERMISSIONS } from "@/services/userService";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
-import { AVAILABLE_PERMISSIONS } from "@/services/userService";
 
 interface UserFormModalProps {
   open: boolean;
   onClose: () => void;
   onSuccess: () => void;
-  user?: Profile;
+  user?: UserProfile;
 }
 
 const UserFormModal = ({ open, onClose, onSuccess, user }: UserFormModalProps) => {
@@ -207,10 +206,10 @@ const UserFormModal = ({ open, onClose, onSuccess, user }: UserFormModalProps) =
 };
 
 const Users = () => {
-  const [users, setUsers] = useState<Profile[]>([]);
+  const [users, setUsers] = useState<UserProfile[]>([]);
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
-  const [selectedUser, setSelectedUser] = useState<Profile | undefined>(undefined);
+  const [selectedUser, setSelectedUser] = useState<UserProfile | undefined>(undefined);
   const { toast } = useToast();
 
   const fetchUsers = async () => {
@@ -239,18 +238,18 @@ const Users = () => {
   const columns = [
     {
       header: "Nombre",
-      accessorKey: "full_name" as keyof Profile,
-      cell: (user: Profile) => <span>{user.full_name || 'Sin nombre'}</span>
+      accessorKey: "full_name" as keyof UserProfile,
+      cell: (user: UserProfile) => <span>{user.full_name || 'Sin nombre'}</span>
     },
     {
       header: "ID",
-      accessorKey: "id" as keyof Profile,
-      cell: (user: Profile) => <span className="text-xs text-muted-foreground">{user.id.substring(0, 8)}...</span>
+      accessorKey: "id" as keyof UserProfile,
+      cell: (user: UserProfile) => <span className="text-xs text-muted-foreground">{user.id.substring(0, 8)}...</span>
     },
     {
       header: "Rol",
-      accessorKey: "role" as keyof Profile,
-      cell: (user: Profile) => (
+      accessorKey: "role" as keyof UserProfile,
+      cell: (user: UserProfile) => (
         <Badge variant={user.role === "admin" ? "default" : user.role === "tecnico" ? "outline" : "secondary"}>
           {user.role === "admin" ? "Administrador" : 
            user.role === "tecnico" ? "Técnico" : "Usuario"}
@@ -259,8 +258,8 @@ const Users = () => {
     },
     {
       header: "Permisos",
-      accessorKey: "permissions" as keyof Profile,
-      cell: (user: Profile) => {
+      accessorKey: "permissions" as keyof UserProfile,
+      cell: (user: UserProfile) => {
         const permissionsCount = user.permissions?.length || 0;
         return (
           <span className="text-xs text-muted-foreground">
@@ -273,7 +272,7 @@ const Users = () => {
     },
     {
       header: "Estado",
-      accessorKey: "id" as keyof Profile,
+      accessorKey: "id" as keyof UserProfile,
       cell: () => (
         <Badge 
           variant="outline"
@@ -285,21 +284,21 @@ const Users = () => {
     },
     {
       header: "Fecha Creación",
-      accessorKey: "created_at" as keyof Profile,
-      cell: (user: Profile) => {
-        const date = new Date(user.created_at);
+      accessorKey: "created_at" as keyof UserProfile,
+      cell: (user: UserProfile) => {
+        const date = new Date(user.created_at || '');
         return <span>{date.toLocaleDateString('es-ES')}</span>;
       }
     },
   ];
 
-  const handleEditUser = (user: Profile) => {
+  const handleEditUser = (user: UserProfile) => {
     console.log("Editando usuario:", user);
     setSelectedUser(user);
     setShowModal(true);
   };
 
-  const handleDeleteUser = async (user: Profile) => {
+  const handleDeleteUser = async (user: UserProfile) => {
     // Actualmente no implementamos eliminación verdadera de usuarios por seguridad
     toast({
       title: "Funcionalidad limitada",
