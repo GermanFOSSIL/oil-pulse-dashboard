@@ -379,7 +379,7 @@ const BatchITRUpload = () => {
               <Select 
                 value={selectedProjectId || ""}
                 onValueChange={(value) => {
-                  setSelectedProjectId(value || null);
+                  setSelectedProjectId(value === "" ? null : value);
                   setSelectedSystemId(null);
                 }}
               >
@@ -387,7 +387,7 @@ const BatchITRUpload = () => {
                   <SelectValue placeholder="Todos los proyectos" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">Todos los proyectos</SelectItem>
+                  <SelectItem value="all-projects">Todos los proyectos</SelectItem>
                   {projectsData.map((project) => (
                     <SelectItem key={project.id} value={project.id}>
                       {project.name}
@@ -400,14 +400,14 @@ const BatchITRUpload = () => {
               <Label htmlFor="system">Sistema</Label>
               <Select 
                 value={selectedSystemId || ""}
-                onValueChange={(value) => setSelectedSystemId(value || null)}
+                onValueChange={(value) => setSelectedSystemId(value === "" ? null : value)}
                 disabled={!selectedProjectId}
               >
                 <SelectTrigger id="system">
                   <SelectValue placeholder="Todos los sistemas" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">Todos los sistemas</SelectItem>
+                  <SelectItem value="all-systems">Todos los sistemas</SelectItem>
                   {selectedProjectId && 
                     projectsData
                       .find(p => p.id === selectedProjectId)
