@@ -61,32 +61,50 @@ export const getTestPacks = async (): Promise<TestPack[]> => {
 export const getTestPackWithTags = async (id: string): Promise<TestPack | null> => {
   try {
     console.log(`Fetching test pack with ID: ${id}`);
-    const { data, error } = await supabase
+    
+    // First get the test pack
+    const { data: testPack, error: testPackError } = await supabase
       .from('test_packs')
-      .select('*, tags(*)')
+      .select('*')
       .eq('id', id)
-      .maybeSingle();
-
-    if (error) {
-      console.error(`Error fetching test pack with ID ${id}:`, error);
-      throw error;
+      .single();
+      
+    if (testPackError) {
+      console.error(`Error fetching test pack with ID ${id}:`, testPackError);
+      throw testPackError;
     }
-
-    if (!data) {
+    
+    if (!testPack) {
       return null;
     }
-
+    
+    // Then get the tags
+    const { data: tags, error: tagsError } = await supabase
+      .from('tags')
+      .select('*')
+      .eq('test_pack_id', id);
+      
+    if (tagsError) {
+      console.error(`Error fetching tags for test pack ${id}:`, tagsError);
+      throw tagsError;
+    }
+    
     // Calculate progress based on tags
-    if (data.tags && data.tags.length > 0) {
-      const totalTags = data.tags.length;
-      const releasedTags = data.tags.filter(tag => tag.estado === 'liberado').length;
-      data.progress = totalTags > 0 ? Math.round((releasedTags / totalTags) * 100) : 0;
+    const result = {
+      ...testPack,
+      tags: tags || []
+    } as TestPack;
+    
+    if (tags && tags.length > 0) {
+      const totalTags = tags.length;
+      const releasedTags = tags.filter(tag => tag.estado === 'liberado').length;
+      result.progress = totalTags > 0 ? Math.round((releasedTags / totalTags) * 100) : 0;
     } else {
-      data.progress = 0;
+      result.progress = 0;
     }
 
-    console.log(`Fetched test pack with ${data.tags?.length || 0} tags`);
-    return data as TestPack;
+    console.log(`Fetched test pack with ${tags?.length || 0} tags`);
+    return result;
   } catch (error) {
     console.error("Error in getTestPackWithTags:", error);
     throw error;
@@ -232,10 +250,10 @@ export const updateTag = async (id: string, updates: Partial<Tag>): Promise<Tag>
     
     // Log the action if tag was released
     if (updates.estado === 'liberado') {
-      const user = supabase.auth.getUser();
-      if ((await user).data.user) {
+      const { data: user } = await supabase.auth.getUser();
+      if (user?.user) {
         const logData = {
-          usuario_id: (await user).data.user.id,
+          usuario_id: user.user.id,
           tag_id: id,
           accion: 'Liberado'
         };
@@ -563,13 +581,13 @@ export const exportToExcel = async (): Promise<ArrayBuffer> => {
     
     Object.entries(systemData).forEach(([system, data]) => {
       const progress = data.total > 0 ? Math.round((data.released / data.total) * 100) : 0;
-      progressData.push(['Sistema', system, data.total, data.released, progress]);
+      progressData.push(['Sistema', system, data.total.toString(), data.released.toString(), progress.toString()]);
     });
     
     Object.entries(subsystemData).forEach(([key, data]) => {
       const [system, subsystem] = key.split(':');
       const progress = data.total > 0 ? Math.round((data.released / data.total) * 100) : 0;
-      progressData.push(['Subsistema', `${system} - ${subsystem}`, data.total, data.released, progress]);
+      progressData.push(['Subsistema', `${system} - ${subsystem}`, data.total.toString(), data.released.toString(), progress.toString()]);
     });
     
     const progressSheet = XLSX.utils.aoa_to_sheet(progressData);

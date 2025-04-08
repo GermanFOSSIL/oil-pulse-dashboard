@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
@@ -30,6 +29,7 @@ import TestPackImportDialog from "@/components/testpacks/TestPackImportDialog";
 import TestPackFormDialog from "@/components/testpacks/TestPackFormDialog";
 import TestPackStats from "@/components/testpacks/TestPackStats";
 import { DatabaseActivityTimeline } from "@/components/DatabaseActivityTimeline";
+import { supabase } from "@/integrations/supabase/client";
 
 const TestPacks = () => {
   const { user } = useAuth();
@@ -44,7 +44,6 @@ const TestPacks = () => {
   const [showFormDialog, setShowFormDialog] = useState(false);
   const [selectedTestPack, setSelectedTestPack] = useState<TestPack | null>(null);
   
-  // Get user role from the auth context
   const getUserRole = async () => {
     if (!user) return 'user';
     try {
@@ -66,27 +65,23 @@ const TestPacks = () => {
     getUserRole().then(role => setUserRole(role));
   }, [user]);
 
-  // Fetch test packs
   const { data: testPacks, isLoading: isLoadingTestPacks, refetch: refetchTestPacks } = useQuery({
     queryKey: ['testPacks'],
     queryFn: getTestPacks,
   });
 
-  // Fetch action logs
   const { data: actionLogs, isLoading: isLoadingLogs } = useQuery({
     queryKey: ['actionLogs'],
     queryFn: getActionLogs,
     enabled: selectedTab === 'activity'
   });
 
-  // Fetch statistics
   const { data: stats, isLoading: isLoadingStats } = useQuery({
     queryKey: ['testPacksStats'],
     queryFn: getTestPacksStats,
     enabled: selectedTab === 'dashboard'
   });
 
-  // Mutation for updating a tag
   const updateTagMutation = useMutation({
     mutationFn: ({ id, updates }: { id: string; updates: Partial<Tag> }) => updateTag(id, updates),
     onSuccess: () => {
@@ -107,7 +102,6 @@ const TestPacks = () => {
     },
   });
 
-  // Create tag release handler
   const handleTagRelease = (tag: Tag) => {
     if (tag.estado !== 'liberado') {
       updateTagMutation.mutate({ 
@@ -120,7 +114,6 @@ const TestPacks = () => {
     }
   };
 
-  // Filter test packs
   const filteredTestPacks = testPacks?.filter(testPack => {
     let matchesSearch = true;
     let matchesSystem = true;
@@ -148,14 +141,12 @@ const TestPacks = () => {
     return matchesSearch && matchesSystem && matchesSubsystem && matchesStatus;
   });
 
-  // Get unique systems and subsystems for filters
   const uniqueSystems = Array.from(new Set(testPacks?.map(tp => tp.sistema) || [])).sort();
   const uniqueSubsystems = Array.from(
     new Set(testPacks?.filter(tp => !selectedSystem || tp.sistema === selectedSystem)
     .map(tp => tp.subsistema) || [])
   ).sort();
 
-  // Download import template
   const handleDownloadTemplate = () => {
     try {
       const excelBuffer = generateImportTemplate();
@@ -183,7 +174,6 @@ const TestPacks = () => {
     }
   };
 
-  // Export data to Excel
   const handleExportData = async () => {
     try {
       const excelBuffer = await exportToExcel();
@@ -211,7 +201,6 @@ const TestPacks = () => {
     }
   };
 
-  // Clear all filters
   const clearFilters = () => {
     setSearchTerm("");
     setSelectedSystem("");
@@ -471,7 +460,6 @@ const TestPacks = () => {
   );
 };
 
-// Component to display tags for a specific test pack
 const TestPackTags = ({ 
   testPackId, 
   userRole, 
