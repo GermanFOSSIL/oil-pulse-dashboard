@@ -1,4 +1,3 @@
-
 import { supabase } from "@/integrations/supabase/client";
 import { Database } from "@/integrations/supabase/types";
 import { toast } from "@/hooks/use-toast";
@@ -514,9 +513,24 @@ export const getITRById = async (id: string): Promise<ITR | null> => {
 };
 
 export const createITR = async (itr: Omit<ITR, "id" | "created_at" | "updated_at">): Promise<ITR> => {
+  console.log("Datos recibidos en createITR:", itr);
+  
+  // Validación para asegurarnos de que los datos estén correctos
+  if (!itr.subsystem_id) {
+    throw new Error("El ID del subsistema es requerido");
+  }
+  
   const { data, error } = await supabase
     .from('itrs')
-    .insert(itr)
+    .insert({
+      name: itr.name,
+      subsystem_id: itr.subsystem_id,
+      status: itr.status || 'inprogress',
+      progress: itr.progress || 0,
+      assigned_to: itr.assigned_to || null, // Nos aseguramos de que sea null si no hay valor
+      start_date: itr.start_date || null,
+      end_date: itr.end_date || null
+    })
     .select()
     .single();
 
@@ -529,9 +543,19 @@ export const createITR = async (itr: Omit<ITR, "id" | "created_at" | "updated_at
 };
 
 export const updateITR = async (id: string, updates: Partial<ITR>): Promise<ITR> => {
+  console.log("Datos recibidos en updateITR:", updates);
+  
   const { data, error } = await supabase
     .from('itrs')
-    .update(updates)
+    .update({
+      name: updates.name,
+      subsystem_id: updates.subsystem_id,
+      status: updates.status,
+      progress: updates.progress,
+      assigned_to: updates.assigned_to || null, // Nos aseguramos de que sea null si no hay valor
+      start_date: updates.start_date || null,
+      end_date: updates.end_date || null
+    })
     .eq('id', id)
     .select()
     .single();

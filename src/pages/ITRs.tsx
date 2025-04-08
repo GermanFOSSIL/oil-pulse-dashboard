@@ -16,6 +16,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { ITRFormModal } from "@/components/modals/ITRFormModal";
 import { ProjectSelector } from "@/components/ProjectSelector";
 import { addSampleITRs } from "@/scripts/addSampleData";
+import { createTestITRs } from "@/scripts/testITRs";
 
 interface ITRWithDetails extends ITR {
   subsystemName?: string;
@@ -205,22 +206,32 @@ const ITRs = () => {
   const handleAddSampleData = async () => {
     setAddingSampleData(true);
     try {
-      const result = await addSampleITRs();
-      if (result.success) {
+      const testResult = await createTestITRs();
+      
+      if (testResult.success) {
         toast({
-          title: "Datos de muestra añadidos",
-          description: "Se han añadido ITRs de muestra correctamente",
+          title: "ITRs de prueba añadidos",
+          description: "Se han añadido 4 ITRs de prueba correctamente",
         });
-        if (result.data && result.data.project) {
-          setSelectedProjectId(result.data.project.id);
-        }
         fetchData();
       } else {
-        toast({
-          title: "Error",
-          description: "No se pudieron añadir los datos de muestra",
-          variant: "destructive"
-        });
+        const result = await addSampleITRs();
+        if (result.success) {
+          toast({
+            title: "Datos de muestra añadidos",
+            description: "Se han añadido ITRs de muestra correctamente",
+          });
+          if (result.data && result.data.project) {
+            setSelectedProjectId(result.data.project.id);
+          }
+          fetchData();
+        } else {
+          toast({
+            title: "Error",
+            description: "No se pudieron añadir los datos de muestra",
+            variant: "destructive"
+          });
+        }
       }
     } catch (error) {
       console.error("Error adding sample data:", error);

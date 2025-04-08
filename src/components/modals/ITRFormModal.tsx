@@ -62,14 +62,29 @@ export const ITRFormModal = ({
     setLoading(true);
     
     try {
+      // Depurar los datos enviados
+      console.log("Enviando datos a Supabase:", {
+        ...formData,
+        // Convertir assigned_to a null si está vacío
+        assigned_to: formData.assigned_to || null
+      });
+      
       if (isEditMode && itr) {
-        await updateITR(itr.id, formData);
+        await updateITR(itr.id, {
+          ...formData,
+          // Convertir assigned_to a null si está vacío
+          assigned_to: formData.assigned_to || null
+        });
         toast({
           title: "ITR actualizado",
           description: "El ITR ha sido actualizado correctamente"
         });
       } else {
-        await createITR(formData);
+        await createITR({
+          ...formData,
+          // Convertir assigned_to a null si está vacío
+          assigned_to: formData.assigned_to || null
+        });
         toast({
           title: "ITR creado",
           description: "El ITR ha sido creado correctamente"
