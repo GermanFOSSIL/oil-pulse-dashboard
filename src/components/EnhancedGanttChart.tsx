@@ -5,7 +5,7 @@ import 'dhtmlx-gantt/codebase/dhtmlxgantt.css';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { ChevronLeft, ChevronRight, Calendar, Search } from 'lucide-react';
-import { format, addMonths, subMonths, addDays } from 'date-fns';
+import { format, addMonths, subMonths } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { 
   Select,
@@ -82,7 +82,7 @@ export const EnhancedGanttChart: React.FC<EnhancedGanttProps> = ({ data }) => {
           resize: true,
           template: function(task: any) {
             if (task.progress) {
-              return Math.round(task.progress) + "%";
+              return Math.round(task.progress * 100) + "%";
             }
             return "";
           }
@@ -104,7 +104,7 @@ export const EnhancedGanttChart: React.FC<EnhancedGanttProps> = ({ data }) => {
       
       // Personalizar la leyenda
       gantt.templates.progress_text = function(start, end, task) {
-        return "<span style='text-align:center;'>" + Math.round(task.progress) + "% </span>";
+        return "<span style='text-align:center;'>" + Math.round(task.progress * 100) + "% </span>";
       };
 
       // Personalizar apariencia de las barras según el tipo y estado
@@ -141,7 +141,7 @@ export const EnhancedGanttChart: React.FC<EnhancedGanttProps> = ({ data }) => {
         let tooltipText = "<b>" + task.text + "</b><br/>";
         tooltipText += "Inicio: " + gantt.templates.tooltip_date_format(start) + "<br/>";
         tooltipText += "Fin: " + gantt.templates.tooltip_date_format(end) + "<br/>";
-        tooltipText += "Progreso: " + Math.round(task.progress) + "%<br/>";
+        tooltipText += "Progreso: " + Math.round(task.progress * 100) + "%<br/>";
         
         if (statusText) {
           tooltipText += "Estado: " + statusText;
@@ -320,7 +320,7 @@ export const EnhancedGanttChart: React.FC<EnhancedGanttProps> = ({ data }) => {
           text: item.task,
           start_date: new Date(item.start),
           end_date: new Date(item.end),
-          progress: item.progress / 100,
+          progress: item.progress / 100, // Convert from percentage to decimal
           parent: item.parent || 0,
           type: item.type,
           status: item.status,

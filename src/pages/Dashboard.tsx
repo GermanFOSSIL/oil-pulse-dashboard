@@ -2,7 +2,7 @@
 import { useEffect, useState } from "react";
 import { 
   AreaChart, BarChart3, Briefcase, Layers, 
-  CheckCircle, AlertTriangle, Clock, Calendar
+  CheckCircle, AlertTriangle, Clock, Calendar, ChartGantt
 } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Bar, BarChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
@@ -12,6 +12,7 @@ import { Button } from "@/components/ui/button";
 import { ProjectSelector } from "@/components/ProjectSelector";
 import { useNavigate } from "react-router-dom";
 import { useToast } from "@/hooks/use-toast";
+import { EnhancedGanttChart } from "@/components/EnhancedGanttChart";
 
 interface DashboardStats {
   totalProjects: number;
@@ -33,10 +34,23 @@ interface DashboardStats {
   }[];
 }
 
+interface GanttItem {
+  id: string;
+  task: string;
+  start: string;
+  end: string;
+  progress: number;
+  type?: string;
+  parent?: string;
+  status?: string;
+  dependencies?: string;
+}
+
 const Dashboard = () => {
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [loading, setLoading] = useState(true);
   const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null);
+  const [ganttData, setGanttData] = useState<GanttItem[]>([]);
   const navigate = useNavigate();
   const { toast } = useToast();
 
@@ -119,6 +133,86 @@ const Dashboard = () => {
         chartData,
         areaChartData
       });
+
+      // Generate Gantt chart data
+      const ganttItems: GanttItem[] = [];
+      
+      // Add projects
+      const projectsToShow = selectedProjectId 
+        ? projects.filter(p => p.id === selectedProjectId) 
+        : projects;
+      
+      projectsToShow.forEach(project => {
+        // Add project as a parent task
+        ganttItems.push({
+          id: `project-${project.id}`,
+          task: project.name,
+          start: new Date(project.created_at).toISOString().split('T')[0],
+          end: new Date(new Date(project.created_at).getTime() + 90 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+          progress: project.progress || 0,
+          type: "project"
+        });
+        
+        // Add systems for this project
+        const projectSystems = filteredSystems.filter(s => s.project_id === project.id);
+        
+        projectSystems.forEach(system => {
+          const systemStartDate = new Date(system.created_at);
+          const systemEndDate = new Date(systemStartDate.getTime() + 60 * 24 * 60 * 60 * 1000);
+          
+          ganttItems.push({
+            id: `system-${system.id}`,
+            task: system.name,
+            start: systemStartDate.toISOString().split('T')[0],
+            end: systemEndDate.toISOString().split('T')[0],
+            progress: system.completion_rate || 0,
+            type: "system",
+            parent: `project-${project.id}`
+          });
+          
+          // Add subsystems for this system
+          const systemSubsystems = subsystems.filter(ss => ss.system_id === system.id);
+          
+          systemSubsystems.forEach(subsystem => {
+            const subsystemStartDate = new Date(subsystem.created_at);
+            const subsystemEndDate = new Date(subsystemStartDate.getTime() + 30 * 24 * 60 * 60 * 1000);
+            
+            ganttItems.push({
+              id: `subsystem-${subsystem.id}`,
+              task: subsystem.name,
+              start: subsystemStartDate.toISOString().split('T')[0],
+              end: subsystemEndDate.toISOString().split('T')[0],
+              progress: subsystem.completion_rate || 0,
+              type: "subsystem",
+              parent: `system-${system.id}`
+            });
+            
+            // Add ITRs for this subsystem
+            const subsystemITRs = filteredITRs.filter(itr => itr.subsystem_id === subsystem.id);
+            
+            subsystemITRs.forEach(itr => {
+              const itrStartDate = new Date(itr.created_at);
+              // Use due_date if available, otherwise calculate based on creation date
+              const itrEndDate = itr.due_date 
+                ? new Date(itr.due_date) 
+                : new Date(itrStartDate.getTime() + 14 * 24 * 60 * 60 * 1000);
+              
+              ganttItems.push({
+                id: `itr-${itr.id}`,
+                task: itr.name,
+                start: itrStartDate.toISOString().split('T')[0],
+                end: itrEndDate.toISOString().split('T')[0],
+                progress: itr.progress || 0,
+                type: "task",
+                parent: `subsystem-${subsystem.id}`,
+                status: itr.status
+              });
+            });
+          });
+        });
+      });
+      
+      setGanttData(ganttItems);
       
     } catch (error) {
       console.error("Error al cargar datos del dashboard:", error);
@@ -327,6 +421,28 @@ const Dashboard = () => {
           </CardContent>
         </Card>
       </div>
+
+      {/* Gantt Chart */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center">
+            <ChartGantt className="mr-2 h-5 w-5" />
+            Cronograma de Tareas del Proyecto
+          </CardTitle>
+          <CardDescription>
+            Vista de sistemas, subsistemas e ITRs con fechas planificadas
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          {ganttData.length > 0 ? (
+            <EnhancedGanttChart data={ganttData} />
+          ) : (
+            <div className="text-center py-8">
+              <p className="text-muted-foreground">No hay datos disponibles para el cronograma</p>
+            </div>
+          )}
+        </CardContent>
+      </Card>
 
       {/* Charts */}
       <div className="grid gap-4 md:grid-cols-2">
