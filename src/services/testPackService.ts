@@ -13,7 +13,7 @@ export interface TestPack {
   estado: string;
   created_at: string;
   updated_at: string;
-  progress?: number; // Optional progress field
+  progress?: number; // Adding progress as an optional property
 }
 
 export interface Tag {

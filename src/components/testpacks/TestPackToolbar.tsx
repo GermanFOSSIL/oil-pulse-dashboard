@@ -1,6 +1,12 @@
 
 import { Button } from "@/components/ui/button";
-import { PlusCircle, Upload, FileDown, DownloadCloud, RefreshCw } from "lucide-react";
+import { 
+  PlusCircle, 
+  Upload, 
+  FileDown, 
+  DownloadCloud, 
+  RefreshCw 
+} from "lucide-react";
 
 interface TestPackToolbarProps {
   onCreateNew: () => void;
@@ -20,7 +26,7 @@ const TestPackToolbar = ({
   userRole
 }: TestPackToolbarProps) => {
   return (
-    <div className="flex items-center space-x-2">
+    <div className="flex flex-wrap items-center gap-2">
       {userRole === 'admin' && (
         <>
           <Button onClick={onCreateNew} variant="outline" size="sm">

@@ -94,7 +94,7 @@ const TestPackList = ({
                   <SelectValue placeholder="Sistema" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">Todos los sistemas</SelectItem>
+                  <SelectItem value="all">Todos los sistemas</SelectItem>
                   {uniqueSystems.map((system) => (
                     <SelectItem key={system} value={system}>
                       {system}
@@ -109,7 +109,7 @@ const TestPackList = ({
                   <SelectValue placeholder="Subsistema" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">Todos los subsistemas</SelectItem>
+                  <SelectItem value="all">Todos los subsistemas</SelectItem>
                   {uniqueSubsystems.map((subsystem) => (
                     <SelectItem key={subsystem} value={subsystem}>
                       {subsystem}
@@ -124,7 +124,7 @@ const TestPackList = ({
                   <SelectValue placeholder="Estado" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">Todos los estados</SelectItem>
+                  <SelectItem value="all">Todos los estados</SelectItem>
                   <SelectItem value="pendiente">Pendiente</SelectItem>
                   <SelectItem value="listo">Listo</SelectItem>
                 </SelectContent>
