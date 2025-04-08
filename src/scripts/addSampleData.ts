@@ -19,7 +19,7 @@ export const addSampleITRs = async () => {
       const { data: newProject, error: createProjectError } = await supabase
         .from('projects')
         .insert({
-          name: 'Proyecto Demo',
+          name: 'Proyecto Demo LACA 32',
           location: 'Ciudad Demo',
           status: 'inprogress',
           progress: 45
@@ -33,24 +33,35 @@ export const addSampleITRs = async () => {
       projectId = existingProjects[0].id;
     }
 
-    // Create a system for the project
-    const { data: newSystem, error: systemError } = await supabase
+    // Create multiple systems for the project
+    const systemsToCreate = [
+      { name: 'Sistema Eléctrico', project_id: projectId, completion_rate: 50 },
+      { name: 'Sistema Mecánico', project_id: projectId, completion_rate: 35 },
+      { name: 'Sistema de Control', project_id: projectId, completion_rate: 60 }
+    ];
+    
+    const { data: systems, error: systemsError } = await supabase
       .from('systems')
-      .insert({
-        name: 'Sistema Eléctrico',
-        project_id: projectId,
-        completion_rate: 50
-      })
-      .select()
-      .single();
+      .insert(systemsToCreate)
+      .select();
 
-    if (systemError) throw systemError;
+    if (systemsError) throw systemsError;
 
-    // Create a few subsystems
+    // Create a few subsystems for each system
     const subsystemsToCreate = [
-      { name: 'Subsistema Iluminación', system_id: newSystem.id, completion_rate: 60 },
-      { name: 'Subsistema Potencia', system_id: newSystem.id, completion_rate: 40 },
-      { name: 'Subsistema Control', system_id: newSystem.id, completion_rate: 30 }
+      // Sistema Eléctrico
+      { name: 'Subsistema Iluminación', system_id: systems[0].id, completion_rate: 70 },
+      { name: 'Subsistema Potencia', system_id: systems[0].id, completion_rate: 40 },
+      { name: 'Subsistema Control', system_id: systems[0].id, completion_rate: 30 },
+      
+      // Sistema Mecánico
+      { name: 'Subsistema Bombeo', system_id: systems[1].id, completion_rate: 25 },
+      { name: 'Subsistema Válvulas', system_id: systems[1].id, completion_rate: 40 },
+      
+      // Sistema de Control
+      { name: 'Subsistema PLC', system_id: systems[2].id, completion_rate: 80 },
+      { name: 'Subsistema HMI', system_id: systems[2].id, completion_rate: 55 },
+      { name: 'Subsistema Instrumentación', system_id: systems[2].id, completion_rate: 45 }
     ];
 
     const { data: subsystems, error: subsystemError } = await supabase
@@ -60,35 +71,109 @@ export const addSampleITRs = async () => {
 
     if (subsystemError) throw subsystemError;
 
-    // Create sample ITRs for each subsystem
+    // Current date for reference
+    const now = new Date();
+    
+    // Create sample ITRs for each subsystem with varying statuses and dates
     const itrsToCreate = [
+      // Sistema Eléctrico - Subsistema Iluminación
       {
-        name: 'ITR-001: Prueba de iluminación exterior',
+        name: 'ITR-E001: Prueba de iluminación exterior',
         subsystem_id: subsystems[0].id,
         status: 'complete',
         progress: 100,
-        due_date: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString()
+        due_date: new Date(now.getFullYear(), now.getMonth(), now.getDate() - 15).toISOString()
       },
       {
-        name: 'ITR-002: Verificación de cableado',
+        name: 'ITR-E002: Verificación de circuitos de iluminación',
         subsystem_id: subsystems[0].id,
         status: 'inprogress',
         progress: 65,
-        due_date: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString()
+        due_date: new Date(now.getFullYear(), now.getMonth(), now.getDate() + 10).toISOString()
       },
+      
+      // Sistema Eléctrico - Subsistema Potencia
       {
-        name: 'ITR-003: Prueba de cortocircuitos',
+        name: 'ITR-E003: Prueba de transformadores',
         subsystem_id: subsystems[1].id,
         status: 'delayed',
         progress: 30,
-        due_date: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString()
+        due_date: new Date(now.getFullYear(), now.getMonth(), now.getDate() - 3).toISOString()
       },
       {
-        name: 'ITR-004: Verificación de protecciones',
+        name: 'ITR-E004: Verificación de bancos de capacitores',
+        subsystem_id: subsystems[1].id,
+        status: 'inprogress',
+        progress: 25,
+        due_date: new Date(now.getFullYear(), now.getMonth(), now.getDate() + 30).toISOString()
+      },
+      
+      // Sistema Eléctrico - Subsistema Control
+      {
+        name: 'ITR-E005: Prueba de protecciones eléctricas',
         subsystem_id: subsystems[2].id,
         status: 'inprogress',
         progress: 15,
-        due_date: new Date(Date.now() + 21 * 24 * 60 * 60 * 1000).toISOString()
+        due_date: new Date(now.getFullYear(), now.getMonth(), now.getDate() + 21).toISOString()
+      },
+      
+      // Sistema Mecánico - Subsistema Bombeo
+      {
+        name: 'ITR-M001: Prueba hidrostática de bombas',
+        subsystem_id: subsystems[3].id,
+        status: 'delayed',
+        progress: 20,
+        due_date: new Date(now.getFullYear(), now.getMonth(), now.getDate() - 5).toISOString()
+      },
+      
+      // Sistema Mecánico - Subsistema Válvulas
+      {
+        name: 'ITR-M002: Inspección de válvulas de seguridad',
+        subsystem_id: subsystems[4].id,
+        status: 'complete',
+        progress: 100,
+        due_date: new Date(now.getFullYear(), now.getMonth(), now.getDate() - 10).toISOString()
+      },
+      {
+        name: 'ITR-M003: Prueba de actuadores neumáticos',
+        subsystem_id: subsystems[4].id,
+        status: 'inprogress',
+        progress: 45,
+        due_date: new Date(now.getFullYear(), now.getMonth(), now.getDate() + 15).toISOString()
+      },
+      
+      // Sistema de Control - Subsistema PLC
+      {
+        name: 'ITR-C001: Verificación de entradas/salidas PLC',
+        subsystem_id: subsystems[5].id,
+        status: 'complete',
+        progress: 100,
+        due_date: new Date(now.getFullYear(), now.getMonth(), now.getDate() - 20).toISOString()
+      },
+      
+      // Sistema de Control - Subsistema HMI
+      {
+        name: 'ITR-C002: Prueba de funcionalidad HMI',
+        subsystem_id: subsystems[6].id,
+        status: 'inprogress',
+        progress: 55,
+        due_date: new Date(now.getFullYear(), now.getMonth(), now.getDate() + 7).toISOString()
+      },
+      
+      // Sistema de Control - Subsistema Instrumentación
+      {
+        name: 'ITR-C003: Calibración de sensores de presión',
+        subsystem_id: subsystems[7].id,
+        status: 'delayed',
+        progress: 40,
+        due_date: new Date(now.getFullYear(), now.getMonth(), now.getDate() - 2).toISOString()
+      },
+      {
+        name: 'ITR-C004: Verificación de transmisores de nivel',
+        subsystem_id: subsystems[7].id,
+        status: 'inprogress',
+        progress: 70,
+        due_date: new Date(now.getFullYear(), now.getMonth(), now.getDate() + 25).toISOString()
       }
     ];
 
@@ -104,7 +189,7 @@ export const addSampleITRs = async () => {
       message: 'Datos de muestra añadidos correctamente',
       data: {
         project: { id: projectId },
-        system: newSystem,
+        systems,
         subsystems,
         itrs
       }

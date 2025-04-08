@@ -1,16 +1,17 @@
+
 import { useEffect, useState } from "react";
-import { AreaChart, BarChart3, Briefcase, Layers } from "lucide-react";
+import { AreaChart, BarChart3, Briefcase, Layers, ChevronRight } from "lucide-react";
 import { StatCard } from "@/components/ui/stat-card";
 import { ProgressCard } from "@/components/ui/progress-card";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Bar, BarChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { Area, AreaChart as RechartsAreaChart, CartesianGrid, Legend } from "recharts";
-import { getDashboardStats } from "@/services/supabaseService";
+import { getDashboardStats, getProjects, getSystems, getSubsystems, getITRs } from "@/services/supabaseService";
 import { initializeStorage } from "@/services/storageService";
 import { Button } from "@/components/ui/button";
 import { useNavigate } from "react-router-dom";
 import { ProjectSelector } from "@/components/ProjectSelector";
-import { GanttChart } from "@/components/GanttChart";
+import { EnhancedGanttChart } from "@/components/EnhancedGanttChart";
 
 interface DashboardStats {
   totalProjects: number;
@@ -30,20 +31,14 @@ interface DashboardStats {
     completions: number; 
     issues: number;
   }[];
-  ganttData: {
-    id: string;
-    task: string;
-    start: string;
-    end: string;
-    progress: number;
-    dependencies: string;
-  }[];
 }
 
 const Dashboard = () => {
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [loading, setLoading] = useState(true);
   const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null);
+  const [ganttData, setGanttData] = useState<any[]>([]);
+  const [ganttLoading, setGanttLoading] = useState(false);
   const navigate = useNavigate();
 
   const fetchData = async () => {
@@ -59,14 +54,116 @@ const Dashboard = () => {
     }
   };
 
+  const fetchGanttData = async () => {
+    if (!selectedProjectId) return;
+    
+    try {
+      setGanttLoading(true);
+      
+      // Obtener proyecto seleccionado
+      const projects = await getProjects();
+      const currentProject = projects.find(p => p.id === selectedProjectId);
+      
+      if (!currentProject) {
+        setGanttData([]);
+        return;
+      }
+      
+      // Obtener sistemas del proyecto
+      const allSystems = await getSystems();
+      const projectSystems = allSystems.filter(s => s.project_id === selectedProjectId);
+      
+      // Obtener todos los subsistemas
+      const allSubsystems = await getSubsystems();
+      
+      // Obtener todos los ITRs
+      const allITRs = await getITRs();
+      
+      // Formar estructura jerárquica para Gantt
+      const ganttItems = [];
+      
+      // Añadir proyecto como nivel principal
+      ganttItems.push({
+        id: currentProject.id,
+        task: currentProject.name,
+        type: 'project',
+        parent: '0',
+        start: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0], // 30 días atrás
+        end: new Date(Date.now() + 60 * 24 * 60 * 60 * 1000).toISOString().split('T')[0], // 60 días adelante
+        progress: currentProject.progress || 0,
+        dependencies: ''
+      });
+      
+      // Añadir sistemas como segundo nivel
+      projectSystems.forEach(system => {
+        ganttItems.push({
+          id: system.id,
+          task: system.name,
+          type: 'system',
+          parent: currentProject.id,
+          start: new Date(Date.now() - 25 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+          end: new Date(Date.now() + 55 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+          progress: system.completion_rate || 0,
+          dependencies: ''
+        });
+        
+        // Filtrar subsistemas del sistema actual
+        const systemSubsystems = allSubsystems.filter(ss => ss.system_id === system.id);
+        
+        // Añadir subsistemas como tercer nivel
+        systemSubsystems.forEach(subsystem => {
+          ganttItems.push({
+            id: subsystem.id,
+            task: subsystem.name,
+            type: 'subsystem',
+            parent: system.id,
+            start: new Date(Date.now() - 20 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+            end: new Date(Date.now() + 50 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+            progress: subsystem.completion_rate || 0,
+            dependencies: ''
+          });
+          
+          // Filtrar ITRs del subsistema actual
+          const subsystemITRs = allITRs.filter(itr => itr.subsystem_id === subsystem.id);
+          
+          // Añadir ITRs como cuarto nivel
+          subsystemITRs.forEach(itr => {
+            const dueDate = itr.due_date ? new Date(itr.due_date) : new Date(Date.now() + 45 * 24 * 60 * 60 * 1000);
+            const startDate = new Date(dueDate);
+            startDate.setDate(startDate.getDate() - 15); // Restar 15 días para fecha inicio
+            
+            ganttItems.push({
+              id: itr.id,
+              task: itr.name,
+              type: 'itr',
+              parent: subsystem.id,
+              start: startDate.toISOString().split('T')[0],
+              end: dueDate.toISOString().split('T')[0],
+              progress: itr.progress || 0,
+              status: itr.status,
+              dependencies: ''
+            });
+          });
+        });
+      });
+      
+      setGanttData(ganttItems);
+    } catch (error) {
+      console.error("Error al cargar datos del Gantt:", error);
+    } finally {
+      setGanttLoading(false);
+    }
+  };
+
   useEffect(() => {
     fetchData();
+    fetchGanttData();
   }, [selectedProjectId]);
 
   useEffect(() => {
     const interval = setInterval(() => {
       fetchData();
-    }, 30000);
+    }, 60000); // Actualizar cada minuto
     
     return () => clearInterval(interval);
   }, [selectedProjectId]);
@@ -75,7 +172,7 @@ const Dashboard = () => {
     setSelectedProjectId(projectId);
   };
 
-  if (loading) {
+  if (loading && !stats) {
     return (
       <div className="flex h-[80vh] items-center justify-center">
         <div className="text-center">
@@ -254,18 +351,33 @@ const Dashboard = () => {
       </div>
 
       <Card>
-        <CardHeader>
+        <CardHeader className="pb-0">
           <CardTitle>Cronograma de Tareas</CardTitle>
           <CardDescription>
             Planificación y progreso de las tareas del proyecto
           </CardDescription>
         </CardHeader>
         <CardContent className="p-0 overflow-hidden">
-          {stats?.ganttData && stats.ganttData.length > 0 ? (
-            <GanttChart data={stats.ganttData} />
+          {ganttLoading ? (
+            <div className="flex justify-center items-center py-12">
+              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
+            </div>
+          ) : ganttData.length > 0 ? (
+            <EnhancedGanttChart data={ganttData} />
           ) : (
             <div className="text-center py-10">
-              <p className="text-muted-foreground">No hay tareas programadas para este proyecto</p>
+              <p className="text-muted-foreground mb-4">No hay tareas programadas para este proyecto</p>
+              {selectedProjectId && (
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  onClick={() => navigate('/itrs')}
+                  className="mx-auto"
+                >
+                  Ir a gestión de ITRs
+                  <ChevronRight className="ml-2 h-4 w-4" />
+                </Button>
+              )}
             </div>
           )}
         </CardContent>

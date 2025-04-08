@@ -240,7 +240,7 @@ export const ITRFormModal = ({
   if (formLoading) {
     return (
       <Dialog open={open} onOpenChange={onClose}>
-        <DialogContent className="sm:max-w-[425px]">
+        <DialogContent className="sm:max-w-[425px] max-h-[90vh] overflow-y-auto">
           <div className="flex justify-center items-center h-40">
             <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
           </div>
@@ -251,7 +251,7 @@ export const ITRFormModal = ({
   
   return (
     <Dialog open={open} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-[500px]">
+      <DialogContent className="sm:max-w-[500px] max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>
             {isEditMode ? "Editar ITR" : "Nuevo ITR"}
@@ -289,7 +289,7 @@ export const ITRFormModal = ({
               </SelectTrigger>
               <SelectContent>
                 {projects.length === 0 ? (
-                  <SelectItem value="no-projects">No hay proyectos disponibles</SelectItem>
+                  <SelectItem value="no-projects-available">No hay proyectos disponibles</SelectItem>
                 ) : (
                   projects.map(project => (
                     <SelectItem key={project.id} value={project.id}>
@@ -313,7 +313,7 @@ export const ITRFormModal = ({
               </SelectTrigger>
               <SelectContent>
                 {systems.length === 0 ? (
-                  <SelectItem value="no-systems">No hay sistemas disponibles para este proyecto</SelectItem>
+                  <SelectItem value="no-systems-available">No hay sistemas disponibles para este proyecto</SelectItem>
                 ) : (
                   systems.map(system => (
                     <SelectItem key={system.id} value={system.id}>
@@ -337,7 +337,7 @@ export const ITRFormModal = ({
               </SelectTrigger>
               <SelectContent>
                 {subsystems.length === 0 ? (
-                  <SelectItem value="no-subsystems">No hay subsistemas disponibles para este sistema</SelectItem>
+                  <SelectItem value="no-subsystems-available">No hay subsistemas disponibles para este sistema</SelectItem>
                 ) : (
                   subsystems.map(subsystem => (
                     <SelectItem key={subsystem.id} value={subsystem.id}>
@@ -425,7 +425,7 @@ export const ITRFormModal = ({
   );
 };
 
-// Add missing functions import to fix the "getSubsystemById is not defined" error
+// Helper functions to get individual records
 const getSubsystemById = async (id: string): Promise<Subsystem | null> => {
   const { data, error } = await supabase
     .from('subsystems')
