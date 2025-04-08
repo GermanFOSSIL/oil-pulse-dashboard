@@ -265,7 +265,7 @@ export const createTestPack = async (
     // Step 2: Create tags for this test pack - using the proper naming format
     const basePackageName = testPack.nombre_paquete;
     const tagsToCreate = Array.from({ length: tagsCount }).map((_, index) => {
-      const tagNumber = String(index + 1).padStart(2, '0');
+      const tagNumber = String(index + 1).padStart(3, '0');
       return {
         tag_name: `${basePackageName}-${tagNumber}`,
         test_pack_id: testPack.id,

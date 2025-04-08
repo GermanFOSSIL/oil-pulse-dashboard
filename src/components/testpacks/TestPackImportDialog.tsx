@@ -98,7 +98,6 @@ const TestPackImportDialog = ({
           {!result && (
             <>
               <FileUpload
-                value={uploadedFile ? [uploadedFile] : []}
                 onValueChange={handleFileUpload}
                 disabled={isProcessing}
                 maxFiles={1}

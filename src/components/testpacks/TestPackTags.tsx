@@ -6,6 +6,7 @@ import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
 import { DataTable } from "@/components/ui/data-table";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Tag as TagIcon } from "lucide-react";
 
 interface TestPackTagsProps {
   testPackId: string;
@@ -50,6 +51,15 @@ const TestPackTags = ({
     {
       header: "TAG",
       accessorKey: "tag_name",
+      cell: ({ row }) => {
+        const tag = row.original as Tag;
+        return (
+          <div className="flex items-center gap-2">
+            <TagIcon className="h-4 w-4 text-muted-foreground" />
+            <span>{tag.tag_name}</span>
+          </div>
+        );
+      },
     },
     {
       header: "Estado",
