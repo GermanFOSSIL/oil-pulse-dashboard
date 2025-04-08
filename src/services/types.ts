@@ -95,3 +95,14 @@ export type PasswordChangeData = {
   userId: string;
   newPassword: string;
 };
+
+export type DBActivity = {
+  id: string;
+  created_at: string;
+  table_name: string;
+  action: string;
+  user_id: string | null;
+  record_id: string | null;
+  details?: any;
+  userName?: string;
+};

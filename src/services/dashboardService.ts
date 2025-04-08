@@ -158,6 +158,29 @@ export const getDashboardStats = async (projectId: string | null = null) => {
         dependencies: ''
       };
     }) || [];
+
+    // Calculate summary data for pie charts
+    const completedITRs = itrs?.filter(itr => itr.status === 'complete').length || 0;
+    const inProgressITRs = itrs?.filter(itr => itr.status === 'inprogress').length || 0;
+    const delayedITRs = itrs?.filter(itr => itr.status === 'delayed').length || 0;
+
+    // Calculate completion statuses for projects
+    const completedProjects = projects?.filter(project => project.status === 'complete').length || 0;
+    const inProgressProjects = projects?.filter(project => project.status === 'inprogress').length || 0;
+    const delayedProjects = projects?.filter(project => project.status === 'delayed').length || 0;
+
+    // Summary data for reports and charts
+    const summary = {
+      totalProjects,
+      completedProjects,
+      inProgressProjects,
+      delayedProjects,
+      totalSystems,
+      totalITRs,
+      completedITRs,
+      inProgressITRs,
+      delayedITRs
+    };
     
     return {
       totalProjects,
@@ -167,7 +190,8 @@ export const getDashboardStats = async (projectId: string | null = null) => {
       projectsData,
       chartData,
       areaChartData,
-      ganttData
+      ganttData,
+      summary
     };
   } catch (error) {
     console.error("Error al obtener estadísticas del dashboard:", error);

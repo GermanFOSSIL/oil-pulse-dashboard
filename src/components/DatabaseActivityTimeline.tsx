@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { supabase } from "@/integrations/supabase/client";
@@ -5,20 +6,10 @@ import { getUserProfile } from "@/services/userService";
 import { Separator } from "@/components/ui/separator";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
-
-interface DatabaseActivity {
-  id: string;
-  created_at: string;
-  table_name: string;
-  action: string;
-  user_id: string | null;
-  record_id: string | null;
-  details?: any;
-  userName?: string;
-}
+import { DBActivity } from "@/services/types";
 
 export const DatabaseActivityTimeline = () => {
-  const [activities, setActivities] = useState<DatabaseActivity[]>([]);
+  const [activities, setActivities] = useState<DBActivity[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -60,7 +51,7 @@ export const DatabaseActivityTimeline = () => {
           };
         }));
 
-        setActivities(enrichedActivities as DatabaseActivity[]);
+        setActivities(enrichedActivities as DBActivity[]);
       } catch (error) {
         console.error('Error:', error);
       } finally {
@@ -78,7 +69,7 @@ export const DatabaseActivityTimeline = () => {
         { event: 'INSERT', schema: 'public', table: 'db_activity_log' },
         (payload) => {
           setActivities(prevActivities => {
-            const newActivity = payload.new as DatabaseActivity;
+            const newActivity = payload.new as DBActivity;
             // To avoid duplicates
             if (prevActivities.some(act => act.id === newActivity.id)) {
               return prevActivities;
@@ -94,7 +85,7 @@ export const DatabaseActivityTimeline = () => {
     };
   }, []);
 
-  const getActionText = (activity: DatabaseActivity) => {
+  const getActionText = (activity: DBActivity) => {
     const actionMap: Record<string, string> = {
       'INSERT': 'creó',
       'UPDATE': 'actualizó',
@@ -127,7 +118,7 @@ export const DatabaseActivityTimeline = () => {
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Actividad de la Base de Datos</CardTitle>
+        <CardTitle>Línea de Tiempo</CardTitle>
         <CardDescription>
           Últimas modificaciones a la base de datos
         </CardDescription>
@@ -140,21 +131,35 @@ export const DatabaseActivityTimeline = () => {
         ) : activities.length === 0 ? (
           <p className="text-center text-muted-foreground py-6">No hay actividad reciente</p>
         ) : (
-          <div className="space-y-4">
+          <div className="relative">
+            <div className="absolute left-4 h-full w-px bg-muted"></div>
+            
             {activities.map((activity, index) => (
-              <div key={activity.id} className="space-y-2">
-                <div className="flex justify-between items-start">
-                  <div>
-                    <span className="font-medium">{activity.userName}</span>
-                    <span className="ml-2 text-muted-foreground">
-                      {getActionText(activity)}
+              <div key={activity.id} className="mb-8 grid gap-2 last:mb-0 md:grid-cols-[1fr_4fr]">
+                <div className="flex items-center">
+                  <div className="flex h-8 w-8 items-center justify-center rounded-full border border-muted bg-background z-10">
+                    <span className="flex h-2 w-2 rounded-full bg-primary"></span>
+                  </div>
+                  <div className="ml-4 text-sm">
+                    {format(new Date(activity.created_at), "d/M", { locale: es })}
+                  </div>
+                </div>
+                <div className="rounded-lg border p-4">
+                  <h3 className="font-semibold tracking-tight">
+                    {activity.action === 'INSERT' && `Creación de ${activity.table_name === 'profiles' ? 'Perfil' : activity.table_name}`}
+                    {activity.action === 'UPDATE' && `Actualización de ${activity.table_name === 'profiles' ? 'Perfil' : activity.table_name}`}
+                    {activity.action === 'DELETE' && `Eliminación de ${activity.table_name === 'profiles' ? 'Perfil' : activity.table_name}`}
+                  </h3>
+                  <p className="text-sm text-muted-foreground mt-1">
+                    {getActionText(activity)}
+                  </p>
+                  <div className="mt-2 flex items-center text-xs text-muted-foreground">
+                    <CalendarIcon className="mr-1 h-3 w-3" />
+                    <span>
+                      Responsable: {activity.userName}
                     </span>
                   </div>
-                  <span className="text-sm text-muted-foreground">
-                    {formatDateTime(activity.created_at)}
-                  </span>
                 </div>
-                {index < activities.length - 1 && <Separator className="mt-2" />}
               </div>
             ))}
           </div>
