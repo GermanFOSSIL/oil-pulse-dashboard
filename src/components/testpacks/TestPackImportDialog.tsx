@@ -5,7 +5,8 @@ import { Button } from "@/components/ui/button";
 import { FileUpload } from "@/components/FileUpload";
 import { importFromExcel } from "@/services/testPackService";
 import { useToast } from "@/hooks/use-toast";
-import { AlertTriangle, CheckCircle } from "lucide-react";
+import { AlertTriangle, CheckCircle, HelpCircle } from "lucide-react";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 
 interface TestPackImportDialogProps {
   open: boolean;
@@ -90,13 +91,22 @@ const TestPackImportDialog = ({
         <DialogHeader>
           <DialogTitle>Importar Test Packs</DialogTitle>
           <DialogDescription>
-            Suba un archivo Excel con la lista de test packs a importar.
+            Suba un archivo Excel con la lista de test packs y TAGs a importar.
           </DialogDescription>
         </DialogHeader>
 
         <div className="space-y-4 py-4">
           {!result && (
             <>
+              <Alert className="bg-blue-50 border-blue-200">
+                <HelpCircle className="h-4 w-4 text-blue-600" />
+                <AlertTitle className="text-blue-800">Formato de importación</AlertTitle>
+                <AlertDescription className="text-blue-700">
+                  El archivo de importación debe contener dos hojas: una para los Test Packs y otra para los TAGs asociados. 
+                  Descargue la plantilla para ver el formato correcto.
+                </AlertDescription>
+              </Alert>
+              
               <FileUpload
                 onFilesSelected={handleFileUpload}
                 disabled={isProcessing}
