@@ -38,6 +38,54 @@ export interface ActionLog {
   user_name?: string;
 }
 
+// Get a specific test pack with its tags
+export const getTestPackWithTags = async (testPackId: string): Promise<TestPack | null> => {
+  try {
+    console.log(`Fetching test pack ${testPackId} with tags`);
+    const { data, error } = await supabase
+      .from('test_packs')
+      .select(`
+        *,
+        tags:tags(*)
+      `)
+      .eq('id', testPackId)
+      .single();
+
+    if (error) {
+      console.error(`Error fetching test pack ${testPackId}:`, error);
+      throw error;
+    }
+
+    if (!data) {
+      console.log(`No test pack found with id ${testPackId}`);
+      return null;
+    }
+
+    // Ensure estado property is the correct type
+    const formattedTestPack: TestPack = {
+      ...data,
+      estado: data.estado as 'pendiente' | 'listo',
+      tags: data.tags ? data.tags.map((tag: any) => ({
+        ...tag,
+        estado: tag.estado as 'pendiente' | 'liberado'
+      })) : []
+    };
+
+    // Calculate progress
+    const totalTags = formattedTestPack.tags ? formattedTestPack.tags.length : 0;
+    const releasedTags = formattedTestPack.tags ? formattedTestPack.tags.filter(t => t.estado === 'liberado').length : 0;
+    const progress = totalTags > 0 ? Math.round((releasedTags / totalTags) * 100) : 0;
+    
+    return {
+      ...formattedTestPack,
+      progress
+    };
+  } catch (error) {
+    console.error(`Error in getTestPackWithTags for ${testPackId}:`, error);
+    return null;
+  }
+};
+
 // Create a new tag
 export const createTag = async (tagData: Omit<Tag, "id" | "created_at" | "updated_at">): Promise<Tag> => {
   try {
@@ -73,7 +121,10 @@ export const createTag = async (tagData: Omit<Tag, "id" | "created_at" | "update
       // Don't throw here, just log the error
     }
 
-    return data as Tag;
+    return {
+      ...data,
+      estado: data.estado as 'pendiente' | 'liberado'
+    };
   } catch (error) {
     console.error("Error in createTag:", error);
     throw error;
@@ -114,61 +165,30 @@ export const getTestPacks = async (): Promise<TestPack[]> => {
       throw error;
     }
 
-    // Calculate progress for each test pack
-    const testPacksWithProgress = data.map((tp: any) => {
-      const totalTags = tp.tags ? tp.tags.length : 0;
-      const releasedTags = tp.tags ? tp.tags.filter((t: any) => t.estado === 'liberado').length : 0;
+    // Ensure estado property is the correct type and calculate progress
+    const formattedTestPacks: TestPack[] = data.map((tp: any) => {
+      const formattedTags = tp.tags ? tp.tags.map((tag: any) => ({
+        ...tag,
+        estado: tag.estado as 'pendiente' | 'liberado'
+      })) : [];
+      
+      const totalTags = formattedTags.length;
+      const releasedTags = formattedTags.filter((t: any) => t.estado === 'liberado').length;
       const progress = totalTags > 0 ? Math.round((releasedTags / totalTags) * 100) : 0;
       
       return {
         ...tp,
+        estado: tp.estado as 'pendiente' | 'listo',
+        tags: formattedTags,
         progress
       };
     });
 
-    console.log(`Found ${testPacksWithProgress.length} test packs`);
-    return testPacksWithProgress;
+    console.log(`Found ${formattedTestPacks.length} test packs`);
+    return formattedTestPacks;
   } catch (error) {
     console.error("Error in getTestPacks:", error);
     return [];
-  }
-};
-
-// Get a specific test pack with its tags
-export const getTestPackWithTags = async (testPackId: string): Promise<TestPack | null> => {
-  try {
-    console.log(`Fetching test pack ${testPackId} with tags`);
-    const { data, error } = await supabase
-      .from('test_packs')
-      .select(`
-        *,
-        tags:tags(*)
-      `)
-      .eq('id', testPackId)
-      .single();
-
-    if (error) {
-      console.error(`Error fetching test pack ${testPackId}:`, error);
-      throw error;
-    }
-
-    if (!data) {
-      console.log(`No test pack found with id ${testPackId}`);
-      return null;
-    }
-
-    // Calculate progress
-    const totalTags = data.tags ? data.tags.length : 0;
-    const releasedTags = data.tags ? data.tags.filter((t: any) => t.estado === 'liberado').length : 0;
-    const progress = totalTags > 0 ? Math.round((releasedTags / totalTags) * 100) : 0;
-    
-    return {
-      ...data,
-      progress
-    };
-  } catch (error) {
-    console.error(`Error in getTestPackWithTags for ${testPackId}:`, error);
-    return null;
   }
 };
 
@@ -204,7 +224,10 @@ export const updateTag = async (tagId: string, updates: Partial<Tag>): Promise<T
       // Don't throw here, just log the error
     }
 
-    return data as Tag;
+    return {
+      ...data,
+      estado: data.estado as 'pendiente' | 'liberado'
+    };
   } catch (error) {
     console.error(`Error in updateTag for ${tagId}:`, error);
     throw error;
@@ -219,10 +242,16 @@ export const createTestPack = async (
   try {
     console.log("Creating test pack with data:", testPackData);
     
+    // Ensure estado is the correct type
+    const formattedTestPackData = {
+      ...testPackData,
+      estado: testPackData.estado as 'pendiente' | 'listo'
+    };
+    
     // Step 1: Create the test pack
     const { data: testPack, error: testPackError } = await supabase
       .from('test_packs')
-      .insert(testPackData)
+      .insert(formattedTestPackData)
       .select()
       .single();
 
@@ -233,13 +262,17 @@ export const createTestPack = async (
 
     console.log("Test pack created:", testPack);
 
-    // Step 2: Create tags for this test pack
-    const tagsToCreate = Array.from({ length: tagsCount }).map((_, index) => ({
-      tag_name: `TAG-${testPack.nombre_paquete.substring(0, 5)}-${String(index + 1).padStart(3, '0')}`,
-      test_pack_id: testPack.id,
-      estado: 'pendiente',
-      fecha_liberacion: null
-    }));
+    // Step 2: Create tags for this test pack - using the proper naming format
+    const basePackageName = testPack.nombre_paquete;
+    const tagsToCreate = Array.from({ length: tagsCount }).map((_, index) => {
+      const tagNumber = String(index + 1).padStart(2, '0');
+      return {
+        tag_name: `${basePackageName}-${tagNumber}`,
+        test_pack_id: testPack.id,
+        estado: 'pendiente' as 'pendiente' | 'liberado',
+        fecha_liberacion: null
+      };
+    });
 
     console.log(`Creating ${tagsToCreate.length} tags for test pack ${testPack.id}`);
     
@@ -255,9 +288,16 @@ export const createTestPack = async (
 
     console.log(`Created ${tags?.length || 0} tags for test pack ${testPack.id}`);
 
+    // Format the tags to ensure estado is the correct type
+    const formattedTags = tags ? tags.map(tag => ({
+      ...tag,
+      estado: tag.estado as 'pendiente' | 'liberado'
+    })) : [];
+
     return {
       ...testPack,
-      tags: tags || [],
+      estado: testPack.estado as 'pendiente' | 'listo',
+      tags: formattedTags,
       progress: 0
     };
   } catch (error) {
@@ -270,9 +310,16 @@ export const createTestPack = async (
 export const updateTestPack = async (testPackId: string, updates: Partial<TestPack>): Promise<TestPack> => {
   try {
     console.log(`Updating test pack ${testPackId} with:`, updates);
+    
+    // Ensure estado is the correct type if it's being updated
+    const formattedUpdates = {
+      ...updates,
+      estado: updates.estado as 'pendiente' | 'listo'
+    };
+    
     const { data, error } = await supabase
       .from('test_packs')
-      .update(updates)
+      .update(formattedUpdates)
       .eq('id', testPackId)
       .select()
       .single();
@@ -282,7 +329,10 @@ export const updateTestPack = async (testPackId: string, updates: Partial<TestPa
       throw error;
     }
 
-    return data as TestPack;
+    return {
+      ...data,
+      estado: data.estado as 'pendiente' | 'listo'
+    };
   } catch (error) {
     console.error(`Error in updateTestPack for ${testPackId}:`, error);
     throw error;
@@ -330,8 +380,8 @@ export const generateImportTemplate = (): ArrayBuffer => {
     // Create a template worksheet
     const worksheet = XLSX.utils.aoa_to_sheet([
       ['sistema', 'subsistema', 'nombre_paquete', 'itr_asociado', 'tags_count'],
-      ['Sistema 1', 'Subsistema 1', 'Test Pack 001', 'ITR-001', 10],
-      ['Sistema 2', 'Subsistema 2', 'Test Pack 002', 'ITR-002', 15],
+      ['Sistema 1', 'Subsistema 1', 'PACKAGE_LL-SLS-LE-C', 'E19A', 4],
+      ['Sistema 2', 'Subsistema 2', 'PACKAGE_LL-SLS-LE-C', 'E19B', 4],
     ]);
 
     // Create a workbook and append the worksheet
@@ -370,11 +420,11 @@ export const importFromExcel = async (excelBuffer: ArrayBuffer): Promise<{ succe
         subsistema: row.subsistema,
         nombre_paquete: row.nombre_paquete,
         itr_asociado: row.itr_asociado,
-        estado: 'pendiente'
+        estado: 'pendiente' as 'pendiente' | 'listo'
       };
 
       // Create test pack with tags
-      await createTestPack(testPackData, Number(row.tags_count) || 10);
+      await createTestPack(testPackData, Number(row.tags_count) || 4);
       importedCount++;
     }
 
@@ -515,9 +565,4 @@ export const getTestPacksStats = async () => {
       itrs: []
     };
   }
-};
-
-// Add Tag type to types.ts
-export const addTagType = () => {
-  // This function doesn't do anything, it's just to show that we need to add Tag type
 };
