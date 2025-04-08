@@ -19,6 +19,7 @@ import * as XLSX from 'xlsx';
 // Functions required by other parts of the app but not included in refactored files
 export const generateImportTemplate = async () => {
   try {
+    console.log("Iniciando la generación de la plantilla de importación");
     // Create workbook with sheets for projects, systems, subsystems, and ITRs
     const wb = XLSX.utils.book_new();
     
@@ -56,15 +57,17 @@ export const generateImportTemplate = async () => {
     
     // Generate buffer
     const wbout = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
+    console.log("Plantilla generada correctamente");
     return wbout;
   } catch (error) {
     console.error("Error generating import template:", error);
-    return null; // Return null on error instead of empty buffer
+    throw error; // Lanzar el error para manejarlo en el componente
   }
 };
 
 export const importDataFromExcel = async (data: ArrayBuffer) => {
   try {
+    console.log("Iniciando importación de datos desde Excel");
     if (!data) {
       console.log("No data provided for import");
       return {
@@ -78,12 +81,14 @@ export const importDataFromExcel = async (data: ArrayBuffer) => {
     }
     
     const wb = XLSX.read(data, { type: 'array' });
+    console.log("Hojas disponibles:", wb.SheetNames);
     
     // Process Projects
     let projectsCount = 0;
     if (wb.SheetNames.includes('Proyectos')) {
       const projectsSheet = wb.Sheets['Proyectos'];
       const projectsData = XLSX.utils.sheet_to_json(projectsSheet);
+      console.log(`Datos de proyectos encontrados: ${projectsData.length}`);
       
       for (const row of projectsData) {
         const project = row as any;
@@ -99,7 +104,12 @@ export const importDataFromExcel = async (data: ArrayBuffer) => {
               end_date: project.end_date || null
             });
             
-          if (!error) projectsCount++;
+          if (!error) {
+            projectsCount++;
+            console.log(`Proyecto ${project.name} insertado correctamente`);
+          } else {
+            console.error(`Error al insertar proyecto ${project.name}:`, error);
+          }
         }
       }
     }
@@ -116,6 +126,7 @@ export const importDataFromExcel = async (data: ArrayBuffer) => {
     if (wb.SheetNames.includes('Sistemas') && latestProjects?.length) {
       const systemsSheet = wb.Sheets['Sistemas'];
       const systemsData = XLSX.utils.sheet_to_json(systemsSheet);
+      console.log(`Datos de sistemas encontrados: ${systemsData.length}`);
       
       for (const row of systemsData) {
         const system = row as any;
@@ -135,7 +146,12 @@ export const importDataFromExcel = async (data: ArrayBuffer) => {
               end_date: system.end_date || null
             });
             
-          if (!error) systemsCount++;
+          if (!error) {
+            systemsCount++;
+            console.log(`Sistema ${system.name} insertado correctamente`);
+          } else {
+            console.error(`Error al insertar sistema ${system.name}:`, error);
+          }
         }
       }
     }
@@ -152,6 +168,7 @@ export const importDataFromExcel = async (data: ArrayBuffer) => {
     if (wb.SheetNames.includes('Subsistemas') && latestSystems?.length) {
       const subsystemsSheet = wb.Sheets['Subsistemas'];
       const subsystemsData = XLSX.utils.sheet_to_json(subsystemsSheet);
+      console.log(`Datos de subsistemas encontrados: ${subsystemsData.length}`);
       
       for (const row of subsystemsData) {
         const subsystem = row as any;
@@ -171,7 +188,12 @@ export const importDataFromExcel = async (data: ArrayBuffer) => {
               end_date: subsystem.end_date || null
             });
             
-          if (!error) subsystemsCount++;
+          if (!error) {
+            subsystemsCount++;
+            console.log(`Subsistema ${subsystem.name} insertado correctamente`);
+          } else {
+            console.error(`Error al insertar subsistema ${subsystem.name}:`, error);
+          }
         }
       }
     }
@@ -188,6 +210,7 @@ export const importDataFromExcel = async (data: ArrayBuffer) => {
     if (wb.SheetNames.includes('ITRs') && latestSubsystems?.length) {
       const itrsSheet = wb.Sheets['ITRs'];
       const itrsData = XLSX.utils.sheet_to_json(itrsSheet);
+      console.log(`Datos de ITRs encontrados: ${itrsData.length}`);
       
       for (const row of itrsData) {
         const itr = row as any;
@@ -209,12 +232,17 @@ export const importDataFromExcel = async (data: ArrayBuffer) => {
               end_date: itr.end_date || null
             });
             
-          if (!error) itrsCount++;
+          if (!error) {
+            itrsCount++;
+            console.log(`ITR ${itr.name} insertado correctamente`);
+          } else {
+            console.error(`Error al insertar ITR ${itr.name}:`, error);
+          }
         }
       }
     }
     
-    return {
+    const result = {
       projects: projectsCount,
       systems: systemsCount,
       subsystems: subsystemsCount,
@@ -222,16 +250,12 @@ export const importDataFromExcel = async (data: ArrayBuffer) => {
       itrs: itrsCount,
       users: 0  // Users are not imported in this version
     };
+    
+    console.log("Importación completada:", result);
+    return result;
   } catch (error) {
     console.error("Error importing data from Excel:", error);
-    return {
-      projects: 0,
-      systems: 0,
-      subsystems: 0,
-      tasks: 0,
-      itrs: 0,
-      users: 0
-    };
+    throw error; // Lanzar error para manejo en componente
   }
 };
 

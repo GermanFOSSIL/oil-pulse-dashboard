@@ -63,7 +63,7 @@ export const ITRFormModal = ({
         end_date: ""
       });
     }
-  }, [itr, subsystems]);
+  }, [itr, subsystems, open]);
   
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
@@ -110,16 +110,19 @@ export const ITRFormModal = ({
       console.log("Formulario a enviar:", {
         ...formData,
         progress: Number(formData.progress),
-        assigned_to: formData.assigned_to || null
       });
+      
+      const dataToSend = {
+        ...formData,
+        progress: Number(formData.progress),
+        assigned_to: formData.assigned_to || null,
+        start_date: formData.start_date || null,
+        end_date: formData.end_date || null
+      };
       
       if (isEditMode && itr) {
         console.log("Actualizando ITR con ID:", itr.id);
-        const updatedITR = await updateITR(itr.id, {
-          ...formData,
-          progress: Number(formData.progress),
-          assigned_to: formData.assigned_to || null
-        });
+        const updatedITR = await updateITR(itr.id, dataToSend);
         
         console.log("ITR actualizado:", updatedITR);
         
@@ -129,11 +132,7 @@ export const ITRFormModal = ({
         });
       } else {
         console.log("Creando nuevo ITR");
-        const newITR = await createITR({
-          ...formData,
-          progress: Number(formData.progress),
-          assigned_to: formData.assigned_to || null
-        });
+        const newITR = await createITR(dataToSend);
         
         console.log("ITR creado:", newITR);
         
@@ -144,6 +143,7 @@ export const ITRFormModal = ({
       }
       
       onSuccess();
+      onClose();
     } catch (error: any) {
       console.error("Error al guardar ITR:", error);
       toast({

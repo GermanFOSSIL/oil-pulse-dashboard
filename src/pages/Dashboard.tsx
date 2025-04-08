@@ -280,142 +280,139 @@ const Dashboard = () => {
             </CardContent>
           </Card>
 
-          {/* Always visible sections for Sistemas and Línea de Tiempo */}
-          <div className="space-y-6">
-            {/* Sistemas section */}
-            <Card>
-              <CardHeader>
-                <CardTitle>Sistemas</CardTitle>
-                <CardDescription>
-                  Tasas de finalización en todos los sistemas
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="grid gap-4 md:grid-cols-2">
-                  <Card>
-                    <CardHeader>
-                      <CardTitle>Progreso del Proyecto</CardTitle>
-                      <CardDescription>
-                        Tasas de finalización mensuales en todos los proyectos
-                      </CardDescription>
-                    </CardHeader>
-                    <CardContent>
-                      <ResponsiveContainer width="100%" height={300}>
-                        <BarChart data={stats.chartData}>
-                          <XAxis dataKey="name" stroke="#888888" fontSize={12} />
-                          <YAxis stroke="#888888" fontSize={12} />
-                          <Tooltip 
-                            formatter={(value) => [`${value}%`, 'Progreso']}
-                            labelFormatter={(label) => `Mes: ${label}`}
-                          />
-                          <Bar
-                            dataKey="value"
-                            fill="hsl(var(--secondary))"
-                            radius={[4, 4, 0, 0]}
-                          />
-                        </BarChart>
-                      </ResponsiveContainer>
-                    </CardContent>
-                  </Card>
+          {/* Sistemas section - Siempre visible */}
+          <Card>
+            <CardHeader>
+              <CardTitle>Sistemas</CardTitle>
+              <CardDescription>
+                Tasas de finalización en todos los sistemas
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="grid gap-4 md:grid-cols-2">
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Progreso del Proyecto</CardTitle>
+                    <CardDescription>
+                      Tasas de finalización mensuales en todos los proyectos
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <ResponsiveContainer width="100%" height={300}>
+                      <BarChart data={stats.chartData}>
+                        <XAxis dataKey="name" stroke="#888888" fontSize={12} />
+                        <YAxis stroke="#888888" fontSize={12} />
+                        <Tooltip 
+                          formatter={(value) => [`${value}%`, 'Progreso']}
+                          labelFormatter={(label) => `Mes: ${label}`}
+                        />
+                        <Bar
+                          dataKey="value"
+                          fill="hsl(var(--secondary))"
+                          radius={[4, 4, 0, 0]}
+                        />
+                      </BarChart>
+                    </ResponsiveContainer>
+                  </CardContent>
+                </Card>
 
-                  <Card>
-                    <CardHeader>
-                      <CardTitle>Actividad ITR</CardTitle>
-                      <CardDescription>
-                        Tendencias de inspección y finalización
-                      </CardDescription>
-                    </CardHeader>
-                    <CardContent>
-                      <ResponsiveContainer width="100%" height={300}>
-                        <RechartsAreaChart data={stats.areaChartData}>
-                          <CartesianGrid strokeDasharray="3 3" />
-                          <XAxis dataKey="name" stroke="#888888" fontSize={12} />
-                          <YAxis stroke="#888888" fontSize={12} />
-                          <Tooltip />
-                          <Legend />
-                          <Area 
-                            type="monotone" 
-                            dataKey="inspections" 
-                            stroke="hsl(var(--secondary))" 
-                            fill="hsl(var(--secondary)/0.2)" 
-                            stackId="1" 
-                            name="Inspecciones"
-                          />
-                          <Area 
-                            type="monotone" 
-                            dataKey="completions" 
-                            stroke="#22c55e" 
-                            fill="#22c55e20" 
-                            stackId="2" 
-                            name="Completados"
-                          />
-                          <Area 
-                            type="monotone" 
-                            dataKey="issues" 
-                            stroke="#ef4444" 
-                            fill="#ef444420" 
-                            stackId="3" 
-                            name="Problemas"
-                          />
-                        </RechartsAreaChart>
-                      </ResponsiveContainer>
-                    </CardContent>
-                  </Card>
-                </div>
-              </CardContent>
-            </Card>
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Actividad ITR</CardTitle>
+                    <CardDescription>
+                      Tendencias de inspección y finalización
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <ResponsiveContainer width="100%" height={300}>
+                      <RechartsAreaChart data={stats.areaChartData}>
+                        <CartesianGrid strokeDasharray="3 3" />
+                        <XAxis dataKey="name" stroke="#888888" fontSize={12} />
+                        <YAxis stroke="#888888" fontSize={12} />
+                        <Tooltip />
+                        <Legend />
+                        <Area 
+                          type="monotone" 
+                          dataKey="inspections" 
+                          stroke="hsl(var(--secondary))" 
+                          fill="hsl(var(--secondary)/0.2)" 
+                          stackId="1" 
+                          name="Inspecciones"
+                        />
+                        <Area 
+                          type="monotone" 
+                          dataKey="completions" 
+                          stroke="#22c55e" 
+                          fill="#22c55e20" 
+                          stackId="2" 
+                          name="Completados"
+                        />
+                        <Area 
+                          type="monotone" 
+                          dataKey="issues" 
+                          stroke="#ef4444" 
+                          fill="#ef444420" 
+                          stackId="3" 
+                          name="Problemas"
+                        />
+                      </RechartsAreaChart>
+                    </ResponsiveContainer>
+                  </CardContent>
+                </Card>
+              </div>
+            </CardContent>
+          </Card>
 
-            {/* Línea de Tiempo section */}
-            <Card>
-              <CardHeader>
-                <CardTitle>Línea de Tiempo</CardTitle>
-                <CardDescription>
-                  Fechas importantes y próximos eventos
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="relative">
-                  <div className="absolute left-4 h-full w-px bg-muted"></div>
-                  
-                  {[1, 2, 3, 4].map((item, index) => (
-                    <div key={index} className="mb-8 grid gap-2 last:mb-0 md:grid-cols-[1fr_4fr]">
-                      <div className="flex items-center">
-                        <div className="flex h-8 w-8 items-center justify-center rounded-full border border-muted bg-background z-10">
-                          <span className="flex h-2 w-2 rounded-full bg-primary"></span>
-                        </div>
-                        <div className="ml-4 text-sm">
-                          {`${new Date().getDate() + index * 7}/${new Date().getMonth() + 1}`}
-                        </div>
+          {/* Línea de Tiempo section - Siempre visible */}
+          <Card>
+            <CardHeader>
+              <CardTitle>Línea de Tiempo</CardTitle>
+              <CardDescription>
+                Fechas importantes y próximos eventos
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="relative">
+                <div className="absolute left-4 h-full w-px bg-muted"></div>
+                
+                {[1, 2, 3, 4].map((item, index) => (
+                  <div key={index} className="mb-8 grid gap-2 last:mb-0 md:grid-cols-[1fr_4fr]">
+                    <div className="flex items-center">
+                      <div className="flex h-8 w-8 items-center justify-center rounded-full border border-muted bg-background z-10">
+                        <span className="flex h-2 w-2 rounded-full bg-primary"></span>
                       </div>
-                      <div className="rounded-lg border p-4">
-                        <h3 className="font-semibold tracking-tight">
-                          {index === 0 && "Revisión del Sistema de Control"}
-                          {index === 1 && "Pruebas de Integración"}
-                          {index === 2 && "Validación Final de Seguridad"}
-                          {index === 3 && "Entrega del Proyecto"}
-                        </h3>
-                        <p className="text-sm text-muted-foreground mt-1">
-                          {index === 0 && "Verificación de todos los sistemas de control automatizado, 5 días de trabajo."}
-                          {index === 1 && "Integración de sistemas eléctricos y mecánicos, 7 días de trabajo."}
-                          {index === 2 && "Validación de todos los sistemas de seguridad, 4 días de trabajo."}
-                          {index === 3 && "Entrega final del proyecto al cliente, 1 día."}
-                        </p>
-                        <div className="mt-2 flex items-center text-xs text-muted-foreground">
-                          <CalendarIcon className="mr-1 h-3 w-3" />
-                          <span>
-                            {index === 0 && "Responsable: Ing. Eléctrico"}
-                            {index === 1 && "Responsable: Jefe de Proyecto"}
-                            {index === 2 && "Responsable: Ing. de Seguridad"}
-                            {index === 3 && "Responsable: Director de Proyecto"}
-                          </span>
-                        </div>
+                      <div className="ml-4 text-sm">
+                        {`${new Date().getDate() + index * 7}/${new Date().getMonth() + 1}`}
                       </div>
                     </div>
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
-          </div>
+                    <div className="rounded-lg border p-4">
+                      <h3 className="font-semibold tracking-tight">
+                        {index === 0 && "Revisión del Sistema de Control"}
+                        {index === 1 && "Pruebas de Integración"}
+                        {index === 2 && "Validación Final de Seguridad"}
+                        {index === 3 && "Entrega del Proyecto"}
+                      </h3>
+                      <p className="text-sm text-muted-foreground mt-1">
+                        {index === 0 && "Verificación de todos los sistemas de control automatizado, 5 días de trabajo."}
+                        {index === 1 && "Integración de sistemas eléctricos y mecánicos, 7 días de trabajo."}
+                        {index === 2 && "Validación de todos los sistemas de seguridad, 4 días de trabajo."}
+                        {index === 3 && "Entrega final del proyecto al cliente, 1 día."}
+                      </p>
+                      <div className="mt-2 flex items-center text-xs text-muted-foreground">
+                        <CalendarIcon className="mr-1 h-3 w-3" />
+                        <span>
+                          {index === 0 && "Responsable: Ing. Eléctrico"}
+                          {index === 1 && "Responsable: Jefe de Proyecto"}
+                          {index === 2 && "Responsable: Ing. de Seguridad"}
+                          {index === 3 && "Responsable: Director de Proyecto"}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
         </>
       )}
     </div>

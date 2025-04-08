@@ -247,7 +247,7 @@ export const EnhancedGanttChart: React.FC<EnhancedGanttProps> = ({ data }) => {
           } else if (task.status === "delayed") {
             return "gantt-task-delayed";
           } else {
-            return "gantt-task-itr"; // New class for ITRs
+            return "gantt-task-itr"; // ITRs normales
           }
         }
       };
@@ -319,7 +319,7 @@ export const EnhancedGanttChart: React.FC<EnhancedGanttProps> = ({ data }) => {
       
       configureTimeScale();
       
-      // Ajustar estilos CSS personalizados - Updated colors
+      // Estilos CSS personalizados con colores actualizados
       const customStyles = `
         .gantt_task_line {
           border-radius: 4px;

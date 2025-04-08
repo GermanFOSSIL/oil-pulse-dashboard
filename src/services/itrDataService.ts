@@ -29,7 +29,7 @@ export const getITRById = async (id: string): Promise<ITR | null> => {
       .from('itrs')
       .select('*')
       .eq('id', id)
-      .single();
+      .maybeSingle();
 
     if (error) {
       console.error(`Error fetching ITR with id ${id}:`, error);
@@ -88,6 +88,7 @@ export const createITR = async (itr: Omit<ITR, "id" | "created_at" | "updated_at
     
     console.log("Datos preparados para inserción:", newITR);
     
+    // Insertar el ITR en la base de datos
     const { data, error } = await supabase
       .from('itrs')
       .insert(newITR)
@@ -124,6 +125,7 @@ export const updateITR = async (id: string, updates: Partial<ITR>): Promise<ITR>
     
     console.log("Datos preparados para actualización:", updateData);
     
+    // Actualizar el ITR en la base de datos
     const { data, error } = await supabase
       .from('itrs')
       .update(updateData)
@@ -192,7 +194,7 @@ export const getITRWithDetails = async (itrId: string): Promise<any> => {
       .from('itrs')
       .select('*')
       .eq('id', itrId)
-      .single();
+      .maybeSingle();
       
     if (itrError) {
       console.error(`Error fetching ITR with id ${itrId}:`, itrError);
@@ -211,7 +213,7 @@ export const getITRWithDetails = async (itrId: string): Promise<any> => {
       .from('subsystems')
       .select('*, systems(*)')
       .eq('id', itr.subsystem_id)
-      .single();
+      .maybeSingle();
       
     if (subsystemError) {
       console.error(`Error fetching subsystem for ITR ${itrId}:`, subsystemError);
@@ -233,7 +235,7 @@ export const getITRWithDetails = async (itrId: string): Promise<any> => {
       .from('projects')
       .select('*')
       .eq('id', system.project_id)
-      .single();
+      .maybeSingle();
       
     if (projectError) {
       console.error(`Error fetching project for system ${system.id}:`, projectError);
