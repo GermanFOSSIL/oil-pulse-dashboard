@@ -1,7 +1,19 @@
 
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { gantt } from 'dhtmlx-gantt';
 import 'dhtmlx-gantt/codebase/dhtmlxgantt.css';
+import { Button } from '@/components/ui/button';
+import { Card } from '@/components/ui/card';
+import { ChevronLeft, ChevronRight, Calendar, Search } from 'lucide-react';
+import { format, addMonths, subMonths } from 'date-fns';
+import { es } from 'date-fns/locale';
+import { 
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue
+} from '@/components/ui/select';
 
 interface GanttProps {
   data: {
@@ -16,6 +28,20 @@ interface GanttProps {
 
 export const GanttChart: React.FC<GanttProps> = ({ data }) => {
   const containerRef = useRef<HTMLDivElement>(null);
+  const [currentDate, setCurrentDate] = useState(new Date());
+  const [viewMode, setViewMode] = useState<string>("month");
+
+  const goToPreviousMonth = () => {
+    setCurrentDate(prevDate => subMonths(prevDate, 1));
+  };
+
+  const goToNextMonth = () => {
+    setCurrentDate(prevDate => addMonths(prevDate, 1));
+  };
+
+  const goToToday = () => {
+    setCurrentDate(new Date());
+  };
 
   useEffect(() => {
     if (containerRef.current) {
@@ -26,10 +52,10 @@ export const GanttChart: React.FC<GanttProps> = ({ data }) => {
       gantt.config.date_format = "%Y-%m-%d %H:%i";
       gantt.config.scale_height = 50;
       gantt.config.row_height = 30;
+      gantt.config.show_progress = true;
+      gantt.config.fit_tasks = true;
       gantt.config.columns = [
-        { name: "text", label: "Tarea", tree: true, width: '*' },
-        { name: "start_date", label: "Inicio", align: "center", width: 100 },
-        { name: "duration", label: "Duración", align: "center", width: 80 },
+        { name: "text", label: "Tarea", tree: true, width: 200 },
         { 
           name: "progress", 
           label: "Progreso", 
@@ -141,26 +167,105 @@ export const GanttChart: React.FC<GanttProps> = ({ data }) => {
         day_short: ["Dom", "Lun", "Mar", "Mié", "Jue", "Vie", "Sáb"]
       };
 
-      // Configurar la escala de tiempo
-      gantt.config.scales = [
-        { unit: "month", step: 1, format: "%F, %Y" },
-        { unit: "week", step: 1, format: "Semana #%W" },
-        { unit: "day", step: 1, format: "%j %D" }
-      ];
+      // Personalizar apariencia similar a la imagen de referencia
+      gantt.templates.task_class = function(start, end, task) {
+        switch (task.status) {
+          case "completed":
+            return "gantt-task-completed";
+          case "overdue":
+            return "gantt-task-overdue";
+          case "in-progress":
+          default:
+            return "gantt-task-in-progress";
+        }
+      };
+      
+      // Función para configurar la escala de tiempo según el modo de visualización
+      const configureTimeScale = () => {
+        if (viewMode === "month") {
+          gantt.config.scales = [
+            { unit: "month", step: 1, format: "%F %Y" },
+            { unit: "day", step: 1, format: "%j" }
+          ];
+        } else if (viewMode === "week") {
+          gantt.config.scales = [
+            { unit: "week", step: 1, format: "Semana #%W" },
+            { unit: "day", step: 1, format: "%j %D" }
+          ];
+        } else if (viewMode === "day") {
+          gantt.config.scales = [
+            { unit: "day", step: 1, format: "%j %D" },
+            { unit: "hour", step: 1, format: "%H:00" }
+          ];
+        }
+      };
+      
+      configureTimeScale();
+
+      // Personalizar la leyenda
+      gantt.templates.progress_text = function(start, end, task) {
+        return "<span style='text-align:center;'>" + Math.round(task.progress * 100) + "% </span>";
+      };
 
       // Inicializar gantt
       gantt.init(containerRef.current);
 
-      // Preparar los datos
+      // Establecer fecha actual
+      gantt.showDate(currentDate);
+
+      // Ajustar estilos CSS personalizados para que coincida con la imagen de referencia
+      const customStyles = `
+        .gantt_task_line {
+          border-radius: 20px;
+        }
+        .gantt-task-completed {
+          background-color: #10b981 !important;
+        }
+        .gantt-task-in-progress {
+          background-color: #f59e0b !important;
+        }
+        .gantt-task-overdue {
+          background-color: #ef4444 !important;
+        }
+        .gantt_grid_head_cell {
+          font-weight: bold;
+        }
+        .gantt_grid {
+          background-color: #f3f4f6;
+        }
+        .gantt_task {
+          background-color: #fff;
+        }
+        .gantt_task_row {
+          border-bottom: 1px solid #e5e7eb;
+        }
+      `;
+      
+      const styleElement = document.createElement('style');
+      styleElement.innerHTML = customStyles;
+      document.head.appendChild(styleElement);
+
+      // Preparar los datos con formato específico
       const tasks = {
-        data: data.map(item => ({
-          id: item.id,
-          text: item.task,
-          start_date: new Date(item.start),
-          end_date: new Date(item.end),
-          progress: item.progress / 100,
-          parent: 0
-        })),
+        data: data.map(item => {
+          // Determinar el estado de la tarea para asignar el color
+          let status = "in-progress";
+          if (item.progress === 100) {
+            status = "completed";
+          } else if (new Date(item.end) < new Date()) {
+            status = "overdue";
+          }
+          
+          return {
+            id: item.id,
+            text: item.task,
+            start_date: new Date(item.start),
+            end_date: new Date(item.end),
+            progress: item.progress / 100,
+            status: status,
+            parent: 0
+          };
+        }),
         links: data
           .filter(item => item.dependencies)
           .map(item => {
@@ -177,14 +282,76 @@ export const GanttChart: React.FC<GanttProps> = ({ data }) => {
 
       // Cargar datos en el gantt
       gantt.parse(tasks);
+      
+      // Refrescar cuando cambie la fecha
+      gantt.showDate(currentDate);
+      
+      return () => {
+        // Limpiar estilos personalizados
+        styleElement.remove();
+        gantt.clearAll();
+      };
     }
-
-    return () => {
-      gantt.clearAll();
-    };
-  }, [data]);
+  }, [data, currentDate, viewMode]);
 
   return (
-    <div ref={containerRef} style={{ width: '100%', height: '100%' }}></div>
+    <div className="flex flex-col space-y-4">
+      <div className="flex justify-between items-center">
+        <div className="flex items-center space-x-2">
+          <Button variant="outline" size="icon" onClick={goToPreviousMonth}>
+            <ChevronLeft className="h-4 w-4" />
+          </Button>
+          <Button variant="outline" className="font-medium" onClick={goToToday}>
+            <Calendar className="h-4 w-4 mr-2" />
+            Hoy
+          </Button>
+          <Button variant="outline" size="icon" onClick={goToNextMonth}>
+            <ChevronRight className="h-4 w-4" />
+          </Button>
+          <h3 className="text-lg font-medium ml-2">
+            {format(currentDate, 'MMMM yyyy', { locale: es })}
+          </h3>
+        </div>
+        <div className="flex items-center space-x-2">
+          <Select value={viewMode} onValueChange={setViewMode}>
+            <SelectTrigger className="w-[180px]">
+              <SelectValue placeholder="Vista por Mes" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="month">Vista por Mes</SelectItem>
+              <SelectItem value="week">Vista por Semana</SelectItem>
+              <SelectItem value="day">Vista por Día</SelectItem>
+            </SelectContent>
+          </Select>
+          <Button variant="outline" size="icon">
+            <Search className="h-4 w-4" />
+          </Button>
+        </div>
+      </div>
+      
+      <div className="border rounded-lg">
+        <div ref={containerRef} className="h-[500px] w-full" />
+        <div className="flex justify-end p-4 border-t">
+          <div className="flex items-center space-x-4">
+            <div className="flex items-center">
+              <div className="w-3 h-3 bg-green-500 rounded-full mr-2"></div>
+              <span className="text-sm">Completado</span>
+            </div>
+            <div className="flex items-center">
+              <div className="w-3 h-3 bg-amber-500 rounded-full mr-2"></div>
+              <span className="text-sm">En curso</span>
+            </div>
+            <div className="flex items-center">
+              <div className="w-3 h-3 bg-red-500 rounded-full mr-2"></div>
+              <span className="text-sm">Vencido</span>
+            </div>
+            <div className="flex items-center">
+              <div className="w-3 h-3 bg-gray-500 rounded-full mr-2"></div>
+              <span className="text-sm">Actividad</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
   );
 };

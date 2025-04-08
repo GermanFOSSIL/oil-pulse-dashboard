@@ -1,4 +1,3 @@
-
 import { useEffect, useState } from "react";
 import { AreaChart, BarChart3, Briefcase, Layers } from "lucide-react";
 import { StatCard } from "@/components/ui/stat-card";
@@ -50,10 +49,7 @@ const Dashboard = () => {
   const fetchData = async () => {
     try {
       setLoading(true);
-      // Inicializar buckets de almacenamiento
       await initializeStorage();
-      
-      // Obtener estadísticas del dashboard
       const dashboardData = await getDashboardStats(selectedProjectId);
       setStats(dashboardData as DashboardStats);
     } catch (error) {
@@ -67,7 +63,6 @@ const Dashboard = () => {
     fetchData();
   }, [selectedProjectId]);
 
-  // Refetch data every 30 seconds for real-time updates
   useEffect(() => {
     const interval = setInterval(() => {
       fetchData();
@@ -91,7 +86,6 @@ const Dashboard = () => {
     );
   }
 
-  // Display empty state if no data exists
   const isEmpty = !stats || (
     stats.totalProjects === 0 &&
     stats.totalSystems === 0 &&
@@ -259,7 +253,6 @@ const Dashboard = () => {
         </Card>
       </div>
 
-      {/* Gantt Chart Section */}
       <Card>
         <CardHeader>
           <CardTitle>Cronograma de Tareas</CardTitle>
@@ -267,11 +260,9 @@ const Dashboard = () => {
             Planificación y progreso de las tareas del proyecto
           </CardDescription>
         </CardHeader>
-        <CardContent>
-          {stats.ganttData && stats.ganttData.length > 0 ? (
-            <div className="h-[400px]">
-              <GanttChart data={stats.ganttData} />
-            </div>
+        <CardContent className="p-0 overflow-hidden">
+          {stats?.ganttData && stats.ganttData.length > 0 ? (
+            <GanttChart data={stats.ganttData} />
           ) : (
             <div className="text-center py-10">
               <p className="text-muted-foreground">No hay tareas programadas para este proyecto</p>
