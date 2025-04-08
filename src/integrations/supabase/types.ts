@@ -47,6 +47,7 @@ export type Database = {
           id: string
           name: string
           progress: number | null
+          quantity: number
           start_date: string | null
           status: string
           subsystem_id: string
@@ -59,6 +60,7 @@ export type Database = {
           id?: string
           name: string
           progress?: number | null
+          quantity?: number
           start_date?: string | null
           status?: string
           subsystem_id: string
@@ -71,6 +73,7 @@ export type Database = {
           id?: string
           name?: string
           progress?: number | null
+          quantity?: number
           start_date?: string | null
           status?: string
           subsystem_id?: string

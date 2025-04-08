@@ -1,3 +1,4 @@
+
 export type Project = {
   id: string;
   created_at: string;
@@ -43,7 +44,7 @@ export type ITR = {
   start_date: string | null;
   end_date: string | null;
   assigned_to: string | null;
-  quantity?: number;
+  quantity: number;
 };
 
 export type Task = {

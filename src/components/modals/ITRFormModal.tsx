@@ -35,7 +35,7 @@ export const ITRFormModal = ({
     assigned_to: "",
     start_date: "",
     end_date: "",
-    quantity: 1 // Default quantity is 1
+    quantity: 1
   });
   
   const [loading, setLoading] = useState(false);
@@ -51,7 +51,7 @@ export const ITRFormModal = ({
         assigned_to: itr.assigned_to || "",
         start_date: itr.start_date ? new Date(itr.start_date).toISOString().split('T')[0] : "",
         end_date: itr.end_date ? new Date(itr.end_date).toISOString().split('T')[0] : "",
-        quantity: (itr as any).quantity || 1 // Get quantity if available
+        quantity: itr.quantity || 1 // Get quantity directly from ITR object
       });
     } else {
       // Reset form for new ITR
@@ -128,7 +128,7 @@ export const ITRFormModal = ({
       const dataToSend = {
         ...formData,
         progress: Number(formData.progress),
-        quantity: Number(formData.quantity), // Add quantity to data sent
+        quantity: Number(formData.quantity),
         assigned_to: formData.assigned_to || null,
         start_date: formData.start_date || null,
         end_date: formData.end_date || null

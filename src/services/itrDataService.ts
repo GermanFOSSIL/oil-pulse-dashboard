@@ -1,3 +1,4 @@
+
 import { supabase } from "@/integrations/supabase/client";
 import { ITR } from "@/services/types";
 
@@ -43,18 +44,18 @@ export const getITRById = async (id: string): Promise<ITR | null> => {
   }
 };
 
-export const createITR = async (itr: Omit<ITR, "id" | "created_at" | "updated_at"> & { quantity?: number }): Promise<ITR> => {
+export const createITR = async (itr: Omit<ITR, "id" | "created_at" | "updated_at">): Promise<ITR> => {
   try {
     console.log("Creating new ITR with data:", itr);
     
-    // Validación para asegurarnos de que los datos estén correctos
+    // Validation to ensure data is correct
     if (!itr.subsystem_id) {
       const error = new Error("El ID del subsistema es requerido");
       console.error(error);
       throw error;
     }
     
-    // Verificar que el subsistema existe
+    // Verify that the subsystem exists
     const { data: subsystemCheck, error: subsystemError } = await supabase
       .from('subsystems')
       .select('id, name')
@@ -74,10 +75,7 @@ export const createITR = async (itr: Omit<ITR, "id" | "created_at" | "updated_at
     
     console.log(`Subsistema verificado: ${subsystemCheck.name}`);
     
-    // Extraer y almacenar la cantidad
-    const quantity = itr.quantity || 1;
-    
-    // Preparar el objeto para inserción, asegurando tipos correctos
+    // Prepare the object for insertion, ensuring correct types
     const newITR = {
       name: itr.name,
       subsystem_id: itr.subsystem_id,
@@ -86,12 +84,12 @@ export const createITR = async (itr: Omit<ITR, "id" | "created_at" | "updated_at
       assigned_to: itr.assigned_to || null,
       start_date: itr.start_date || null,
       end_date: itr.end_date || null,
-      quantity: quantity  // Add quantity to the metadata in the database
+      quantity: itr.quantity !== undefined ? Number(itr.quantity) : 1  // Ensure we use the quantity field
     };
     
     console.log("Datos preparados para inserción:", newITR);
     
-    // Insertar el ITR en la base de datos
+    // Insert the ITR into the database
     const { data, error } = await supabase
       .from('itrs')
       .insert(newITR)
@@ -111,11 +109,11 @@ export const createITR = async (itr: Omit<ITR, "id" | "created_at" | "updated_at
   }
 };
 
-export const updateITR = async (id: string, updates: Partial<ITR> & { quantity?: number }): Promise<ITR> => {
+export const updateITR = async (id: string, updates: Partial<ITR>): Promise<ITR> => {
   try {
     console.log(`Updating ITR with id ${id}:`, updates);
     
-    // Preparar los datos para actualización, asegurando tipos correctos
+    // Prepare data for update, ensuring correct types
     const updateData: any = {};
     
     if (updates.name !== undefined) updateData.name = updates.name;
@@ -129,7 +127,7 @@ export const updateITR = async (id: string, updates: Partial<ITR> & { quantity?:
     
     console.log("Datos preparados para actualización:", updateData);
     
-    // Actualizar el ITR en la base de datos
+    // Update the ITR in the database
     const { data, error } = await supabase
       .from('itrs')
       .update(updateData)

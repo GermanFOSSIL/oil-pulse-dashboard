@@ -5,5 +5,5 @@ export interface ITRWithDetails extends ITR {
   subsystemName?: string;
   systemName?: string;
   projectName?: string;
-  quantity?: number; // Added quantity property for ITRs
+  quantity: number; // Changed from optional to required
 }
