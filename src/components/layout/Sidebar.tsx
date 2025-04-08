@@ -12,6 +12,7 @@ import {
   FilePieChart,
   Layers,
   X,
+  PackageCheck
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -31,7 +32,7 @@ type NavItem = {
 const navItems: NavItem[] = [
   {
     label: "Dashboard",
-    href: "/",
+    href: "/dashboard",
     icon: LayoutDashboard,
     permission: "dashboard"
   },
@@ -58,6 +59,12 @@ const navItems: NavItem[] = [
     href: "/itrs",
     icon: FileText,
     permission: "itrs"
+  },
+  {
+    label: "Test Packs",
+    href: "/testpacks",
+    icon: PackageCheck,
+    permission: "testpacks"
   },
   {
     label: "Configuration",
