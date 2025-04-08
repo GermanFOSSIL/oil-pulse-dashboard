@@ -3,6 +3,7 @@ import { getITRs, getSubsystems, getSystemsByProjectId, ITR, Subsystem, System }
 import { ITRWithDetails } from "@/types/itr-types";
 import { createITR } from "@/services/itrDataService";
 import { supabase } from "@/integrations/supabase/client";
+import { getTestPacksByITR } from "@/services/testPackService";
 
 export const fetchITRsWithDetails = async (selectedProjectId: string | null): Promise<ITRWithDetails[]> => {
   try {
@@ -24,13 +25,37 @@ export const fetchITRsWithDetails = async (selectedProjectId: string | null): Pr
       const itrsData = await getITRs();
       console.log(`Total ITRs in the database: ${itrsData.length}`);
       
-      const enrichedITRs = itrsData
+      // Get test packs status for each ITR
+      const enrichedITRsPromises = itrsData
         .filter(itr => {
           return filteredSubsystems.some(sub => sub.id === itr.subsystem_id);
         })
-        .map(itr => {
+        .map(async (itr) => {
           const relatedSubsystem = subsystemsData.find(sub => sub.id === itr.subsystem_id);
           const relatedSystem = systemsData.find(sys => sys.id === relatedSubsystem?.system_id);
+          
+          // Check if this ITR has associated test packs and their status
+          const testPacks = await getTestPacksByITR(itr.name);
+          const allTestPacksComplete = testPacks.length > 0 && testPacks.every(tp => tp.estado === 'listo');
+          
+          // If all test packs are complete, update ITR status to complete
+          if (allTestPacksComplete && itr.status !== 'complete') {
+            try {
+              await supabase
+                .from('itrs')
+                .update({
+                  status: 'complete',
+                  progress: 100,
+                  updated_at: new Date().toISOString()
+                })
+                .eq('id', itr.id);
+              
+              itr.status = 'complete';
+              itr.progress = 100;
+            } catch (err) {
+              console.error(`Error updating ITR ${itr.id} status:`, err);
+            }
+          }
           
           return {
             ...itr,
@@ -40,14 +65,39 @@ export const fetchITRsWithDetails = async (selectedProjectId: string | null): Pr
           };
         });
       
+      const enrichedITRs = await Promise.all(enrichedITRsPromises);
       console.log(`Enriched ITRs for this project: ${enrichedITRs.length}`);
       return enrichedITRs;
     } else {
       const itrsData = await getITRs();
       console.log(`Total ITRs in the database: ${itrsData.length}`);
       
-      const enrichedITRs = itrsData.map(itr => {
+      // Get test packs status for each ITR
+      const enrichedITRsPromises = itrsData.map(async (itr) => {
         const relatedSubsystem = subsystemsData.find(sub => sub.id === itr.subsystem_id);
+        
+        // Check if this ITR has associated test packs and their status
+        const testPacks = await getTestPacksByITR(itr.name);
+        const allTestPacksComplete = testPacks.length > 0 && testPacks.every(tp => tp.estado === 'listo');
+        
+        // If all test packs are complete, update ITR status to complete
+        if (allTestPacksComplete && itr.status !== 'complete') {
+          try {
+            await supabase
+              .from('itrs')
+              .update({
+                status: 'complete',
+                progress: 100,
+                updated_at: new Date().toISOString()
+              })
+              .eq('id', itr.id);
+            
+            itr.status = 'complete';
+            itr.progress = 100;
+          } catch (err) {
+            console.error(`Error updating ITR ${itr.id} status:`, err);
+          }
+        }
         
         return {
           ...itr,
@@ -56,6 +106,7 @@ export const fetchITRsWithDetails = async (selectedProjectId: string | null): Pr
         };
       });
       
+      const enrichedITRs = await Promise.all(enrichedITRsPromises);
       console.log(`Enriched ITRs (all projects): ${enrichedITRs.length}`);
       return enrichedITRs;
     }
@@ -160,5 +211,55 @@ export const createTestITRs = async (): Promise<{ success: boolean; message: str
       success: false, 
       message: `Error al crear ITRs de prueba: ${error instanceof Error ? error.message : error}`, 
     };
+  }
+};
+
+// Update ITR status based on test packs status
+export const updateITRStatusBasedOnTestPacks = async (itrName: string): Promise<boolean> => {
+  try {
+    console.log(`Updating ITR status for: ${itrName}`);
+    
+    // Get the ITR
+    const { data: itrData, error: itrError } = await supabase
+      .from('itrs')
+      .select('id, status, progress')
+      .eq('name', itrName)
+      .single();
+      
+    if (itrError || !itrData) {
+      console.error(`Error fetching ITR with name ${itrName}:`, itrError);
+      return false;
+    }
+    
+    // Get all test packs for this ITR
+    const testPacks = await getTestPacksByITR(itrName);
+    
+    // Check if there are any test packs and if they are all complete
+    const allTestPacksComplete = testPacks.length > 0 && testPacks.every(tp => tp.estado === 'listo');
+    
+    // If all test packs are complete and the ITR is not already complete, update its status
+    if (allTestPacksComplete && itrData.status !== 'complete') {
+      const { error: updateError } = await supabase
+        .from('itrs')
+        .update({
+          status: 'complete',
+          progress: 100,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', itrData.id);
+        
+      if (updateError) {
+        console.error(`Error updating ITR ${itrData.id} status:`, updateError);
+        return false;
+      }
+      
+      console.log(`ITR ${itrName} status updated to 'complete'`);
+      return true;
+    }
+    
+    return false;
+  } catch (error) {
+    console.error(`Error in updateITRStatusBasedOnTestPacks for ${itrName}:`, error);
+    return false;
   }
 };

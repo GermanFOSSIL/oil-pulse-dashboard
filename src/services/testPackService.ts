@@ -224,6 +224,17 @@ export const updateTag = async (tagId: string, updates: Partial<Tag>): Promise<T
       // Don't throw here, just log the error
     }
 
+    // Check if all tags for this test pack are released and update test pack status if needed
+    const { data: testPackData } = await supabase
+      .from('tags')
+      .select('test_pack_id')
+      .eq('id', tagId)
+      .single();
+    
+    if (testPackData?.test_pack_id) {
+      await updateTestPackStatusBasedOnTags(testPackData.test_pack_id);
+    }
+
     return {
       ...data,
       estado: data.estado as 'pendiente' | 'liberado'
@@ -231,6 +242,41 @@ export const updateTag = async (tagId: string, updates: Partial<Tag>): Promise<T
   } catch (error) {
     console.error(`Error in updateTag for ${tagId}:`, error);
     throw error;
+  }
+};
+
+// Helper function to update test pack status based on its tags
+export const updateTestPackStatusBasedOnTags = async (testPackId: string): Promise<void> => {
+  try {
+    // Get all tags for this test pack
+    const { data: tags, error: tagsError } = await supabase
+      .from('tags')
+      .select('estado')
+      .eq('test_pack_id', testPackId);
+    
+    if (tagsError) {
+      console.error(`Error fetching tags for test pack ${testPackId}:`, tagsError);
+      return;
+    }
+    
+    // Check if all tags are released
+    const allTagsReleased = tags.length > 0 && tags.every(tag => tag.estado === 'liberado');
+    
+    if (allTagsReleased) {
+      // Update test pack status to 'listo'
+      const { error: updateError } = await supabase
+        .from('test_packs')
+        .update({ estado: 'listo' })
+        .eq('id', testPackId);
+      
+      if (updateError) {
+        console.error(`Error updating test pack ${testPackId} status:`, updateError);
+      } else {
+        console.log(`Test pack ${testPackId} status updated to 'listo'`);
+      }
+    }
+  } catch (error) {
+    console.error(`Error in updateTestPackStatusBasedOnTags for ${testPackId}:`, error);
   }
 };
 
@@ -346,9 +392,9 @@ export const generateImportTemplate = (): ArrayBuffer => {
     
     // Create a template worksheet
     const worksheet = XLSX.utils.aoa_to_sheet([
-      ['sistema', 'subsistema', 'nombre_paquete', 'itr_asociado', 'tags_count'],
-      ['Sistema 1', 'Subsistema 1', 'PACKAGE_LL-SLS-LE-C', 'E19A', 4],
-      ['Sistema 2', 'Subsistema 2', 'PACKAGE_LL-SLS-LE-C', 'E19B', 4],
+      ['sistema', 'subsistema', 'nombre_paquete', 'itr_asociado'],
+      ['Sistema 1', 'Subsistema 1', 'PACKAGE_LL-SLS-LE-C', 'E19A'],
+      ['Sistema 2', 'Subsistema 2', 'PACKAGE_LL-SLS-LE-C', 'E19B'],
     ]);
 
     // Create a workbook and append the worksheet
@@ -403,20 +449,21 @@ export const importFromExcel = async (excelBuffer: ArrayBuffer): Promise<{ succe
   }
 };
 
-// Export to Excel
+// Export to Excel with detailed TAG information
 export const exportToExcel = async (): Promise<ArrayBuffer> => {
   try {
-    console.log("Exporting test packs to Excel");
+    console.log("Exporting test packs to Excel with detailed TAG information");
     
     // Get all test packs with their tags
     const testPacks = await getTestPacks();
     
-    // Prepare data for export
+    // Prepare data for export - Detailed main sheet with test pack info
     const exportData = testPacks.map(tp => {
       const releasedTags = tp.tags ? tp.tags.filter(t => t.estado === 'liberado').length : 0;
       const totalTags = tp.tags ? tp.tags.length : 0;
       
       return {
+        'ID': tp.id,
         'Nombre': tp.nombre_paquete,
         'Sistema': tp.sistema,
         'Subsistema': tp.subsistema,
@@ -429,12 +476,37 @@ export const exportToExcel = async (): Promise<ArrayBuffer> => {
       };
     });
 
-    // Create worksheet
-    const worksheet = XLSX.utils.json_to_sheet(exportData);
-    
-    // Create workbook and append worksheet
+    // Prepare detailed tags data - will be a separate sheet
+    const tagsData: any[] = [];
+    testPacks.forEach(tp => {
+      if (tp.tags && tp.tags.length > 0) {
+        tp.tags.forEach(tag => {
+          tagsData.push({
+            'Test Pack': tp.nombre_paquete,
+            'Sistema': tp.sistema,
+            'Subsistema': tp.subsistema,
+            'ITR Asociado': tp.itr_asociado,
+            'TAG': tag.tag_name,
+            'Estado TAG': tag.estado === 'liberado' ? 'Liberado' : 'Pendiente',
+            'Fecha Liberación': tag.fecha_liberacion ? new Date(tag.fecha_liberacion).toLocaleString() : 'Pendiente',
+            'Fecha Creación': new Date(tag.created_at).toLocaleString()
+          });
+        });
+      }
+    });
+
+    // Create a workbook with multiple sheets
     const workbook = XLSX.utils.book_new();
+    
+    // Add main Test Packs sheet
+    const worksheet = XLSX.utils.json_to_sheet(exportData);
     XLSX.utils.book_append_sheet(workbook, worksheet, 'Test Packs');
+    
+    // Add detailed Tags sheet
+    if (tagsData.length > 0) {
+      const tagsWorksheet = XLSX.utils.json_to_sheet(tagsData);
+      XLSX.utils.book_append_sheet(workbook, tagsWorksheet, 'TAGs Detalle');
+    }
 
     // Generate Excel buffer
     return XLSX.write(workbook, { type: 'array', bookType: 'xlsx' });
@@ -531,5 +603,50 @@ export const getTestPacksStats = async () => {
       subsystems: [],
       itrs: []
     };
+  }
+};
+
+// Get test packs by ITR name
+export const getTestPacksByITR = async (itrName: string): Promise<TestPack[]> => {
+  try {
+    console.log(`Fetching test packs for ITR: ${itrName}`);
+    const { data, error } = await supabase
+      .from('test_packs')
+      .select(`
+        *,
+        tags:tags(*)
+      `)
+      .eq('itr_asociado', itrName)
+      .order('created_at', { ascending: false });
+
+    if (error) {
+      console.error(`Error fetching test packs for ITR ${itrName}:`, error);
+      throw error;
+    }
+
+    // Format the data
+    const formattedTestPacks: TestPack[] = data.map((tp: any) => {
+      const formattedTags = tp.tags ? tp.tags.map((tag: any) => ({
+        ...tag,
+        estado: tag.estado as 'pendiente' | 'liberado'
+      })) : [];
+      
+      const totalTags = formattedTags.length;
+      const releasedTags = formattedTags.filter((t: any) => t.estado === 'liberado').length;
+      const progress = totalTags > 0 ? Math.round((releasedTags / totalTags) * 100) : 0;
+      
+      return {
+        ...tp,
+        estado: tp.estado as 'pendiente' | 'listo',
+        tags: formattedTags,
+        progress
+      };
+    });
+
+    console.log(`Found ${formattedTestPacks.length} test packs for ITR ${itrName}`);
+    return formattedTestPacks;
+  } catch (error) {
+    console.error(`Error in getTestPacksByITR for ${itrName}:`, error);
+    return [];
   }
 };
