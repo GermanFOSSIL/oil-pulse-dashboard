@@ -1,6 +1,6 @@
 
 import { supabase } from "@/integrations/supabase/client";
-import { Profile, BulkUserData } from "@/services/types";
+import { BulkUserData } from "@/services/types";
 
 // Define available permissions for sidebar menu items
 export const AVAILABLE_PERMISSIONS = [
@@ -15,6 +15,16 @@ export const AVAILABLE_PERMISSIONS = [
   "database"
 ];
 
+export interface Profile {
+  id: string;
+  full_name?: string;
+  avatar_url?: string;
+  role?: string;
+  permissions?: string[];
+  created_at?: string;
+  updated_at?: string;
+}
+
 export const getUserProfile = async (userId: string): Promise<Profile | null> => {
   const { data, error } = await supabase
     .from('profiles')
@@ -28,6 +38,19 @@ export const getUserProfile = async (userId: string): Promise<Profile | null> =>
   }
 
   return data as unknown as Profile;
+};
+
+export const getUserProfiles = async (): Promise<Profile[]> => {
+  const { data, error } = await supabase
+    .from('profiles')
+    .select('*');
+
+  if (error) {
+    console.error('Error fetching user profiles:', error);
+    throw error;
+  }
+
+  return data as unknown as Profile[];
 };
 
 export const updateUserProfile = async (userId: string, updates: Partial<Profile>): Promise<Profile> => {

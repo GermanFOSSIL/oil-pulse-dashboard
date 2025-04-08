@@ -5,7 +5,7 @@ import { DataTable } from "@/components/ui/data-table";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { ITRWithDetails } from "@/types/itr-types";
-import { Plus, Database, CheckCircle2 } from "lucide-react";
+import { Plus, Database, CheckCircle2, Filter } from "lucide-react";
 import {
   Select,
   SelectContent,
@@ -16,11 +16,21 @@ import {
 import { ITRFormModal } from "@/components/modals/ITRFormModal";
 import { Subsystem, deleteITR, updateITR } from "@/services/supabaseService";
 import { useToast } from "@/hooks/use-toast";
+import { System } from "@/services/types";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuGroup,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 interface ITRListProps {
   itrs: ITRWithDetails[];
   subsystems: Subsystem[];
-  systems: any[];
+  systems: System[];
   loading: boolean;
   selectedProjectId: string | null;
   onRefresh: () => void;
@@ -39,6 +49,8 @@ export const ITRList = ({
   addingSampleData
 }: ITRListProps) => {
   const [statusFilter, setStatusFilter] = useState<string>("all");
+  const [systemFilter, setSystemFilter] = useState<string>("all");
+  const [subsystemFilter, setSubsystemFilter] = useState<string>("all");
   const [showModal, setShowModal] = useState(false);
   const [selectedITR, setSelectedITR] = useState<ITRWithDetails | undefined>(undefined);
   const [markingComplete, setMarkingComplete] = useState<string | null>(null);
@@ -56,50 +68,50 @@ export const ITRList = ({
     {
       header: "Sistema",
       accessorKey: "systemName" as const,
-      cell: (itr: ITRWithDetails) => <span>{itr.systemName || 'No disponible'}</span>,
+      cell: (item: ITRWithDetails) => <span>{item.systemName || 'No disponible'}</span>,
     },
     {
       header: "Asignado a",
       accessorKey: "assigned_to" as const,
-      cell: (itr: ITRWithDetails) => <span>{itr.assigned_to || 'No Asignado'}</span>,
+      cell: (item: ITRWithDetails) => <span>{item.assigned_to || 'No Asignado'}</span>,
     },
     {
       header: "Fecha Inicio",
       accessorKey: "start_date" as const,
-      cell: (itr: ITRWithDetails) => <span>{itr.start_date ? new Date(itr.start_date).toLocaleDateString('es-ES') : 'Sin Fecha'}</span>,
+      cell: (item: ITRWithDetails) => <span>{item.start_date ? new Date(item.start_date).toLocaleDateString('es-ES') : 'Sin Fecha'}</span>,
     },
     {
       header: "Fecha Límite",
       accessorKey: "end_date" as const,
-      cell: (itr: ITRWithDetails) => <span>{itr.end_date ? new Date(itr.end_date).toLocaleDateString('es-ES') : 'Sin Fecha'}</span>,
+      cell: (item: ITRWithDetails) => <span>{item.end_date ? new Date(item.end_date).toLocaleDateString('es-ES') : 'Sin Fecha'}</span>,
     },
     {
       header: "Estado",
       accessorKey: "status" as const,
-      cell: (itr: ITRWithDetails) => <StatusBadge status={itr.status} />,
+      cell: (item: ITRWithDetails) => <StatusBadge status={item.status} />,
     },
     {
       header: "Progreso",
       accessorKey: "progress" as const,
-      cell: (itr: ITRWithDetails) => (
+      cell: (item: ITRWithDetails) => (
         <div className="w-full bg-secondary/10 rounded-full h-2.5">
           <div
             className={`h-2.5 rounded-full ${
-              itr.status === "complete"
+              item.status === "complete"
                 ? "bg-status-complete"
-                : itr.status === "delayed"
+                : item.status === "delayed"
                 ? "bg-status-delayed"
                 : "bg-status-inprogress"
             }`}
-            style={{ width: `${itr.progress || 0}%` }}
+            style={{ width: `${item.progress || 0}%` }}
           ></div>
         </div>
       ),
     },
     {
       header: "Acciones",
-      id: "actions",
-      cell: (itr: ITRWithDetails) => (
+      accessorKey: "actions" as const,
+      cell: (item: ITRWithDetails) => (
         <div className="flex items-center space-x-2">
           <Button 
             variant="outline" 
@@ -107,11 +119,11 @@ export const ITRList = ({
             className="h-8 px-2 text-xs"
             onClick={(e) => {
               e.stopPropagation();
-              handleMarkComplete(itr);
+              handleMarkComplete(item);
             }}
-            disabled={itr.status === "complete" || markingComplete === itr.id}
+            disabled={item.status === "complete" || markingComplete === item.id}
           >
-            {markingComplete === itr.id ? (
+            {markingComplete === item.id ? (
               <div className="animate-spin h-4 w-4 border-2 border-current border-t-transparent rounded-full" />
             ) : (
               <>
@@ -125,10 +137,25 @@ export const ITRList = ({
     }
   ];
 
-  const filteredITRs =
-    statusFilter === "all"
-      ? itrs
-      : itrs.filter((itr) => itr.status === statusFilter);
+  // Apply all active filters
+  const filteredITRs = itrs.filter(itr => {
+    // Status filter
+    if (statusFilter !== "all" && itr.status !== statusFilter) {
+      return false;
+    }
+    
+    // System filter
+    if (systemFilter !== "all" && itr.systemName !== systemFilter) {
+      return false;
+    }
+    
+    // Subsystem filter
+    if (subsystemFilter !== "all" && itr.subsystemName !== subsystemFilter) {
+      return false;
+    }
+    
+    return true;
+  });
 
   const handleMarkComplete = async (itr: ITRWithDetails) => {
     setMarkingComplete(itr.id);
@@ -197,6 +224,10 @@ export const ITRList = ({
     setSelectedITR(undefined);
   };
 
+  // Get unique system and subsystem names for filters
+  const uniqueSystems = Array.from(new Set(itrs.map(itr => itr.systemName))).filter(Boolean);
+  const uniqueSubsystems = Array.from(new Set(itrs.map(itr => itr.subsystemName))).filter(Boolean);
+
   if (!selectedProjectId) {
     return (
       <Card>
@@ -216,22 +247,66 @@ export const ITRList = ({
   return (
     <>
       <div className="flex justify-between items-center mb-4">
-        <div className="w-[180px]">
-          <Select
-            value={statusFilter}
-            onValueChange={setStatusFilter}
-          >
-            <SelectTrigger>
-              <SelectValue placeholder="Filtrar por estado" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">Todos los estados</SelectItem>
-              <SelectItem value="complete">Completado</SelectItem>
-              <SelectItem value="inprogress">En Progreso</SelectItem>
-              <SelectItem value="delayed">Retrasado</SelectItem>
-            </SelectContent>
-          </Select>
+        <div className="flex space-x-2">
+          {/* Status Filter */}
+          <div className="w-[180px]">
+            <Select
+              value={statusFilter}
+              onValueChange={setStatusFilter}
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="Filtrar por estado" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Todos los estados</SelectItem>
+                <SelectItem value="complete">Completado</SelectItem>
+                <SelectItem value="inprogress">En Progreso</SelectItem>
+                <SelectItem value="delayed">Retrasado</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          
+          {/* System Filter */}
+          <div className="w-[180px]">
+            <Select
+              value={systemFilter}
+              onValueChange={setSystemFilter}
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="Filtrar por sistema" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Todos los sistemas</SelectItem>
+                {uniqueSystems.map((system, index) => (
+                  <SelectItem key={index} value={system as string}>
+                    {system}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          
+          {/* Subsystem Filter */}
+          <div className="w-[180px]">
+            <Select
+              value={subsystemFilter}
+              onValueChange={setSubsystemFilter}
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="Filtrar por subsistema" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Todos los subsistemas</SelectItem>
+                {uniqueSubsystems.map((subsystem, index) => (
+                  <SelectItem key={index} value={subsystem as string}>
+                    {subsystem}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
         </div>
+        
         <div className="flex space-x-2">
           <Button onClick={handleNewITR}>
             <Plus className="h-4 w-4 mr-2" />

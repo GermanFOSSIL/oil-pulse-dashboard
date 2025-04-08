@@ -8,6 +8,7 @@ import { ITRWithDetails } from "@/types/itr-types";
 import { ITRList } from "@/components/itr/ITRList";
 import { fetchITRsWithDetails, createTestITRs } from "@/services/itrService";
 import { addSampleITRs } from "@/scripts/addSampleData";
+import { DatabaseActivityTimeline } from "@/components/DatabaseActivityTimeline";
 
 const ITRs = () => {
   const [itrs, setITRs] = useState<ITRWithDetails[]>([]);
@@ -123,6 +124,8 @@ const ITRs = () => {
         onAddSampleData={handleAddSampleData}
         addingSampleData={addingSampleData}
       />
+      
+      <DatabaseActivityTimeline />
     </div>
   );
 };

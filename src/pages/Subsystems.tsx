@@ -2,11 +2,19 @@
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { DataTable } from "@/components/ui/data-table";
-import { Plus } from "lucide-react";
+import { Plus, Filter } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { getSubsystems, Subsystem, getSystems, System, deleteSubsystem, getITRsBySubsystemId } from "@/services/supabaseService";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { SubsystemFormModal } from "@/components/modals/SubsystemFormModal";
+import { DatabaseActivityTimeline } from "@/components/DatabaseActivityTimeline";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 interface SubsystemWithDetails extends Subsystem {
   systemName?: string;
@@ -20,6 +28,8 @@ const Subsystems = () => {
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
   const [selectedSubsystem, setSelectedSubsystem] = useState<Subsystem | undefined>(undefined);
+  const [systemFilter, setSystemFilter] = useState<string>("all");
+  const [completionFilter, setCompletionFilter] = useState<string>("all");
   const { toast } = useToast();
 
   const fetchData = async () => {
@@ -65,6 +75,23 @@ const Subsystems = () => {
   useEffect(() => {
     fetchData();
   }, []);
+
+  // Apply all active filters
+  const filteredSubsystems = subsystems.filter(subsystem => {
+    // System filter
+    if (systemFilter !== "all" && subsystem.systemName !== systemFilter) {
+      return false;
+    }
+    
+    // Completion filter
+    if (completionFilter === "completed" && (subsystem.completion_rate || 0) < 100) {
+      return false;
+    } else if (completionFilter === "inprogress" && (subsystem.completion_rate || 0) === 100) {
+      return false;
+    }
+    
+    return true;
+  });
 
   const columns = [
     {
@@ -143,6 +170,9 @@ const Subsystems = () => {
     setSelectedSubsystem(undefined);
   };
 
+  // Get unique system names for filter
+  const uniqueSystems = Array.from(new Set(subsystems.map(s => s.systemName))).filter(Boolean);
+
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center">
@@ -156,6 +186,45 @@ const Subsystems = () => {
           <Plus className="h-4 w-4 mr-2" />
           Nuevo Subsistema
         </Button>
+      </div>
+
+      <div className="flex justify-start items-center mb-4 space-x-2">
+        {/* System Filter */}
+        <div className="w-[180px]">
+          <Select
+            value={systemFilter}
+            onValueChange={setSystemFilter}
+          >
+            <SelectTrigger>
+              <SelectValue placeholder="Filtrar por sistema" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Todos los sistemas</SelectItem>
+              {uniqueSystems.map((system, index) => (
+                <SelectItem key={index} value={system as string}>
+                  {system}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+        
+        {/* Completion Filter */}
+        <div className="w-[180px]">
+          <Select
+            value={completionFilter}
+            onValueChange={setCompletionFilter}
+          >
+            <SelectTrigger>
+              <SelectValue placeholder="Filtrar por completado" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Todos</SelectItem>
+              <SelectItem value="completed">Completados</SelectItem>
+              <SelectItem value="inprogress">En progreso</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
       </div>
 
       {subsystems.length === 0 && !loading ? (
@@ -172,13 +241,15 @@ const Subsystems = () => {
         </Card>
       ) : (
         <DataTable
-          data={subsystems}
+          data={filteredSubsystems}
           columns={columns}
           onEdit={handleEditSubsystem}
           onDelete={handleDeleteSubsystem}
           loading={loading}
         />
       )}
+
+      <DatabaseActivityTimeline />
 
       {showModal && (
         <SubsystemFormModal
