@@ -68,6 +68,7 @@ const TestPackImportDialog = ({ open, onOpenChange, onSuccess }: TestPackImportD
             });
             
             onSuccess();
+            onOpenChange(false);
           }
         } catch (error) {
           console.error("Error processing Excel data:", error);

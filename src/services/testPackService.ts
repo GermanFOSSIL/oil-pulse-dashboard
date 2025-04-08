@@ -1,3 +1,4 @@
+
 import { supabase } from "@/integrations/supabase/client";
 import { v4 as uuidv4 } from 'uuid';
 import * as XLSX from 'xlsx';
@@ -59,6 +60,11 @@ export interface TestPackStats {
   }[];
 }
 
+export interface ImportResult {
+  testPacks: number;
+  tags: number;
+}
+
 // Get all test packs
 export const getTestPacks = async (): Promise<TestPack[]> => {
   try {
@@ -81,18 +87,15 @@ export const getTestPacks = async (): Promise<TestPack[]> => {
 
         if (tagsError) {
           console.error(`Error fetching tags for test pack ${testPack.id}:`, tagsError);
-          testPack.progress = 0;
-          return testPack;
+          return { ...testPack, progress: 0 };
         }
 
         if (tags && tags.length > 0) {
           const releasedTags = tags.filter(tag => tag.estado === 'liberado').length;
-          testPack.progress = Math.round((releasedTags / tags.length) * 100);
+          return { ...testPack, progress: Math.round((releasedTags / tags.length) * 100) };
         } else {
-          testPack.progress = 0;
+          return { ...testPack, progress: 0 };
         }
-
-        return testPack;
       })
     );
 
@@ -129,10 +132,11 @@ export const getTestPackWithTags = async (testPackId: string): Promise<TestPack 
 
     const testPack = data as TestPack;
     const releasedTags = tags.filter(tag => tag.estado === 'liberado').length;
-    testPack.progress = tags.length > 0 ? Math.round((releasedTags / tags.length) * 100) : 0;
+    const progress = tags.length > 0 ? Math.round((releasedTags / tags.length) * 100) : 0;
 
     return {
       ...testPack,
+      progress,
       tags: tags as Tag[]
     };
   } catch (error) {
@@ -262,12 +266,12 @@ export const logTagAction = async (actionData: { usuario_id: string; tag_id: str
 // Get all action logs
 export const getActionLogs = async (): Promise<AccionLog[]> => {
   try {
-    const { data, error } = await supabase
+    const { data: rawLogs, error } = await supabase
       .from('acciones_log')
       .select(`
         *,
-        profiles:usuario_id (full_name),
-        tags:tag_id (tag_name)
+        profiles (full_name),
+        tags (tag_name)
       `)
       .order('fecha', { ascending: false })
       .limit(20);
@@ -278,7 +282,7 @@ export const getActionLogs = async (): Promise<AccionLog[]> => {
     }
 
     // Transform the data to match AccionLog interface
-    const logs = data.map(log => ({
+    const logs: AccionLog[] = rawLogs.map(log => ({
       id: log.id,
       tag_id: log.tag_id,
       usuario_id: log.usuario_id,
@@ -288,7 +292,7 @@ export const getActionLogs = async (): Promise<AccionLog[]> => {
       tag_name: log.tags?.tag_name || 'TAG desconocido'
     }));
 
-    return logs as AccionLog[];
+    return logs;
   } catch (error) {
     console.error("Error in getActionLogs:", error);
     return [];
@@ -485,6 +489,84 @@ export const exportToExcel = async () => {
     return wbout;
   } catch (error) {
     console.error("Error exporting to Excel:", error);
+    throw error;
+  }
+};
+
+// Function to import test packs and tags from Excel file
+export const importFromExcel = async (fileBuffer: ArrayBuffer): Promise<ImportResult> => {
+  try {
+    const workbook = XLSX.read(fileBuffer, { type: 'array' });
+    const sheetName = workbook.SheetNames[0];
+    const worksheet = workbook.Sheets[sheetName];
+    const data = XLSX.utils.sheet_to_json<any>(worksheet);
+    
+    let testPacksCreated = 0;
+    let tagsCreated = 0;
+    
+    // Process each row in the spreadsheet
+    for (const row of data) {
+      const sistema = row['Sistema'];
+      const subsistema = row['Subsistema'];
+      const nombre_paquete = row['Nombre del Test Pack'];
+      const itr_asociado = row['ITR Asociado'];
+      const tagsStr = row['TAGs (separados por coma)'];
+      
+      if (!sistema || !subsistema || !nombre_paquete || !itr_asociado) {
+        console.warn('Skipping row with missing required fields');
+        continue;
+      }
+      
+      // Create test pack
+      const testPackData = {
+        sistema,
+        subsistema,
+        nombre_paquete,
+        itr_asociado,
+        estado: 'pendiente'
+      };
+      
+      const { data: newTestPack, error } = await supabase
+        .from('test_packs')
+        .insert(testPackData)
+        .select()
+        .single();
+      
+      if (error) {
+        console.error('Error creating test pack:', error);
+        continue;
+      }
+      
+      testPacksCreated++;
+      
+      // Process tags if provided
+      if (tagsStr) {
+        const tagNames = tagsStr.split(',').map(t => t.trim()).filter(t => t);
+        
+        for (const tagName of tagNames) {
+          const tagData = {
+            test_pack_id: newTestPack.id,
+            tag_name: tagName,
+            estado: 'pendiente'
+          };
+          
+          const { error: tagError } = await supabase
+            .from('tags')
+            .insert(tagData);
+          
+          if (tagError) {
+            console.error(`Error creating tag '${tagName}':`, tagError);
+            continue;
+          }
+          
+          tagsCreated++;
+        }
+      }
+    }
+    
+    return { testPacks: testPacksCreated, tags: tagsCreated };
+  } catch (error) {
+    console.error('Error importing from Excel:', error);
     throw error;
   }
 };
