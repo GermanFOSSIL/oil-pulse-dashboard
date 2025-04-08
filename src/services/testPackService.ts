@@ -146,8 +146,9 @@ export const getTestPackWithTags = async (testPackId: string): Promise<TestPack 
 };
 
 // Create a new test pack
-export const createTestPack = async (testPackData: Omit<TestPack, "id" | "created_at" | "updated_at">): Promise<TestPack> => {
+export const createTestPack = async (testPackData: Omit<TestPack, "id" | "created_at" | "updated_at">, tagsCount: number = 0): Promise<TestPack> => {
   try {
+    // Create the test pack
     const { data, error } = await supabase
       .from('test_packs')
       .insert(testPackData)
@@ -159,7 +160,24 @@ export const createTestPack = async (testPackData: Omit<TestPack, "id" | "create
       throw error;
     }
 
-    return data as TestPack;
+    const newTestPack = data as TestPack;
+
+    // Create the tags if tagsCount > 0
+    if (tagsCount > 0) {
+      const tagPromises = Array.from({ length: tagsCount }).map((_, index) => {
+        const tagData = {
+          test_pack_id: newTestPack.id,
+          tag_name: `TAG-${newTestPack.itr_asociado}-${index + 1}`,
+          estado: 'pendiente'
+        };
+        
+        return createTag(tagData);
+      });
+
+      await Promise.all(tagPromises);
+    }
+
+    return newTestPack;
   } catch (error) {
     console.error("Error in createTestPack:", error);
     throw error;
@@ -266,13 +284,10 @@ export const logTagAction = async (actionData: { usuario_id: string; tag_id: str
 // Get all action logs
 export const getActionLogs = async (): Promise<AccionLog[]> => {
   try {
-    // First attempt to query with joins
+    // First get the raw action logs
     const { data: rawLogs, error } = await supabase
       .from('acciones_log')
-      .select(`
-        id, tag_id, usuario_id, accion, fecha,
-        tags:tag_id (tag_name)
-      `)
+      .select('*')
       .order('fecha', { ascending: false })
       .limit(20);
 
@@ -284,17 +299,33 @@ export const getActionLogs = async (): Promise<AccionLog[]> => {
     // Process the data to match AccionLog interface
     const logs: AccionLog[] = await Promise.all(
       rawLogs.map(async (log) => {
+        // Get tag information
+        let tagName = 'TAG desconocido';
+        try {
+          const { data: tag } = await supabase
+            .from('tags')
+            .select('tag_name')
+            .eq('id', log.tag_id)
+            .maybeSingle();
+            
+          if (tag) {
+            tagName = tag.tag_name;
+          }
+        } catch (error) {
+          console.error("Error fetching tag:", error);
+        }
+
         // Get user name from profiles if possible
         let userName = 'Usuario desconocido';
         if (log.usuario_id !== 'system') {
           try {
-            const { data: profile, error: profileError } = await supabase
+            const { data: profile } = await supabase
               .from('profiles')
               .select('full_name')
               .eq('id', log.usuario_id)
               .maybeSingle();
               
-            if (profile && !profileError) {
+            if (profile) {
               userName = profile.full_name || 'Usuario desconocido';
             }
           } catch (error) {
@@ -311,7 +342,7 @@ export const getActionLogs = async (): Promise<AccionLog[]> => {
           accion: log.accion,
           fecha: log.fecha,
           user_name: userName,
-          tag_name: log.tags?.tag_name || 'TAG desconocido'
+          tag_name: tagName
         };
       })
     );
@@ -591,6 +622,68 @@ export const importFromExcel = async (fileBuffer: ArrayBuffer): Promise<ImportRe
     return { testPacks: testPacksCreated, tags: tagsCreated };
   } catch (error) {
     console.error('Error importing from Excel:', error);
+    throw error;
+  }
+};
+
+// Get available systems from the systems table
+export const getAvailableSystems = async () => {
+  try {
+    const { data, error } = await supabase
+      .from('systems')
+      .select('id, name')
+      .order('name');
+      
+    if (error) {
+      console.error("Error fetching systems:", error);
+      throw error;
+    }
+    
+    return data || [];
+  } catch (error) {
+    console.error("Error in getAvailableSystems:", error);
+    throw error;
+  }
+};
+
+// Get available subsystems for a specific system
+export const getAvailableSubsystems = async (systemId: string) => {
+  try {
+    const { data, error } = await supabase
+      .from('subsystems')
+      .select('id, name')
+      .eq('system_id', systemId)
+      .order('name');
+      
+    if (error) {
+      console.error("Error fetching subsystems:", error);
+      throw error;
+    }
+    
+    return data || [];
+  } catch (error) {
+    console.error("Error in getAvailableSubsystems:", error);
+    throw error;
+  }
+};
+
+// Get available ITRs for a specific subsystem
+export const getAvailableITRs = async (subsystemId: string) => {
+  try {
+    const { data, error } = await supabase
+      .from('itrs')
+      .select('id, name, quantity')
+      .eq('subsystem_id', subsystemId)
+      .order('name');
+      
+    if (error) {
+      console.error("Error fetching ITRs:", error);
+      throw error;
+    }
+    
+    return data || [];
+  } catch (error) {
+    console.error("Error in getAvailableITRs:", error);
     throw error;
   }
 };
