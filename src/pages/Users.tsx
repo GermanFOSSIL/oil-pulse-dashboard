@@ -1,20 +1,18 @@
+
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { DataTable } from "@/components/ui/data-table";
 import { Badge } from "@/components/ui/badge";
-import { Plus } from "lucide-react";
+import { Plus, Check, X } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { 
-  getUserProfiles, 
-  createUserProfile, 
-  updateUserProfile, 
-  Profile 
-} from "@/services/supabaseService";
+import { getUserProfiles, updateUserProfile, Profile } from "@/services/userService";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Checkbox } from "@/components/ui/checkbox";
+import { AVAILABLE_PERMISSIONS } from "@/services/userService";
 
 interface UserFormModalProps {
   open: boolean;
@@ -31,7 +29,8 @@ const UserFormModal = ({ open, onClose, onSuccess, user }: UserFormModalProps) =
   const [formData, setFormData] = useState({
     full_name: user?.full_name || "",
     role: user?.role || "user",
-    avatar_url: user?.avatar_url || ""
+    avatar_url: user?.avatar_url || "",
+    permissions: user?.permissions || []
   });
   
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -40,7 +39,38 @@ const UserFormModal = ({ open, onClose, onSuccess, user }: UserFormModalProps) =
   };
   
   const handleSelectChange = (name: string, value: string) => {
-    setFormData(prev => ({ ...prev, [name]: value }));
+    // When the role changes, set default permissions
+    if (name === 'role') {
+      let defaultPermissions: string[] = ['dashboard'];
+      
+      if (value === 'admin') {
+        defaultPermissions = [...AVAILABLE_PERMISSIONS];
+      } else if (value === 'tecnico') {
+        defaultPermissions = ['dashboard', 'reports', 'itrs'];
+      } else if (value === 'user') {
+        defaultPermissions = ['dashboard', 'reports'];
+      }
+      
+      setFormData(prev => ({ 
+        ...prev, 
+        [name]: value,
+        permissions: defaultPermissions
+      }));
+    } else {
+      setFormData(prev => ({ ...prev, [name]: value }));
+    }
+  };
+  
+  const handlePermissionChange = (permission: string, checked: boolean) => {
+    setFormData(prev => {
+      const currentPermissions = prev.permissions || [];
+      
+      if (checked) {
+        return { ...prev, permissions: [...currentPermissions, permission] };
+      } else {
+        return { ...prev, permissions: currentPermissions.filter(p => p !== permission) };
+      }
+    });
   };
   
   const handleSubmit = async (e: React.FormEvent) => {
@@ -65,11 +95,12 @@ const UserFormModal = ({ open, onClose, onSuccess, user }: UserFormModalProps) =
           description: "El usuario ha sido actualizado correctamente"
         });
       } else {
-        await createUserProfile();
         toast({
-          title: "Usuario creado",
-          description: "El usuario ha sido creado correctamente"
+          title: "Error",
+          description: "La creación de usuarios está disponible mediante el proceso de registro",
+          variant: "destructive"
         });
+        return;
       }
       
       onSuccess();
@@ -87,7 +118,7 @@ const UserFormModal = ({ open, onClose, onSuccess, user }: UserFormModalProps) =
   
   return (
     <Dialog open={open} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-[425px]">
+      <DialogContent className="sm:max-w-[500px]">
         <DialogHeader>
           <DialogTitle>
             {isEditMode ? "Editar Usuario" : "Nuevo Usuario"}
@@ -133,6 +164,32 @@ const UserFormModal = ({ open, onClose, onSuccess, user }: UserFormModalProps) =
               onChange={handleInputChange}
               placeholder="https://ejemplo.com/avatar.jpg"
             />
+          </div>
+          
+          <div className="space-y-2">
+            <Label>Permisos de acceso</Label>
+            <div className="grid grid-cols-2 gap-2 pt-2">
+              {AVAILABLE_PERMISSIONS.map((permission) => (
+                <div key={permission} className="flex items-center space-x-2">
+                  <Checkbox 
+                    id={`permission-${permission}`}
+                    checked={(formData.permissions || []).includes(permission)}
+                    onCheckedChange={(checked) => 
+                      handlePermissionChange(permission, checked as boolean)
+                    }
+                    disabled={formData.role === 'admin'} // Admins always have all permissions
+                  />
+                  <Label htmlFor={`permission-${permission}`} className="capitalize">
+                    {permission}
+                  </Label>
+                </div>
+              ))}
+            </div>
+            {formData.role === 'admin' && (
+              <p className="text-xs text-muted-foreground mt-2">
+                Los administradores tienen acceso a todas las secciones.
+              </p>
+            )}
           </div>
           
           <div className="flex justify-end space-x-2 pt-4">
@@ -194,11 +251,25 @@ const Users = () => {
       header: "Rol",
       accessorKey: "role" as keyof Profile,
       cell: (user: Profile) => (
-        <Badge variant={user.role === "admin" ? "default" : "secondary"}>
+        <Badge variant={user.role === "admin" ? "default" : user.role === "tecnico" ? "outline" : "secondary"}>
           {user.role === "admin" ? "Administrador" : 
            user.role === "tecnico" ? "Técnico" : "Usuario"}
         </Badge>
       ),
+    },
+    {
+      header: "Permisos",
+      accessorKey: "permissions" as keyof Profile,
+      cell: (user: Profile) => {
+        const permissionsCount = user.permissions?.length || 0;
+        return (
+          <span className="text-xs text-muted-foreground">
+            {user.role === "admin" ? "Acceso completo" : 
+             permissionsCount > 0 ? `${permissionsCount} ${permissionsCount === 1 ? 'sección' : 'secciones'}` : 
+             "Sin permisos"}
+          </span>
+        );
+      }
     },
     {
       header: "Estado",

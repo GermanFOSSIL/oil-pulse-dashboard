@@ -5,7 +5,7 @@ import { DataTable } from "@/components/ui/data-table";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { ITRWithDetails } from "@/types/itr-types";
-import { Plus, Database } from "lucide-react";
+import { Plus, Database, CheckCircle2 } from "lucide-react";
 import {
   Select,
   SelectContent,
@@ -14,7 +14,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { ITRFormModal } from "@/components/modals/ITRFormModal";
-import { Subsystem, deleteITR } from "@/services/supabaseService";
+import { Subsystem, deleteITR, updateITR } from "@/services/supabaseService";
 import { useToast } from "@/hooks/use-toast";
 
 interface ITRListProps {
@@ -41,6 +41,7 @@ export const ITRList = ({
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [showModal, setShowModal] = useState(false);
   const [selectedITR, setSelectedITR] = useState<ITRWithDetails | undefined>(undefined);
+  const [markingComplete, setMarkingComplete] = useState<string | null>(null);
   const { toast } = useToast();
 
   const columns = [
@@ -95,12 +96,65 @@ export const ITRList = ({
         </div>
       ),
     },
+    {
+      header: "Acciones",
+      id: "actions",
+      cell: (itr: ITRWithDetails) => (
+        <div className="flex items-center space-x-2">
+          <Button 
+            variant="outline" 
+            size="sm" 
+            className="h-8 px-2 text-xs"
+            onClick={(e) => {
+              e.stopPropagation();
+              handleMarkComplete(itr);
+            }}
+            disabled={itr.status === "complete" || markingComplete === itr.id}
+          >
+            {markingComplete === itr.id ? (
+              <div className="animate-spin h-4 w-4 border-2 border-current border-t-transparent rounded-full" />
+            ) : (
+              <>
+                <CheckCircle2 className="h-4 w-4 mr-1" />
+                <span>Completar</span>
+              </>
+            )}
+          </Button>
+        </div>
+      ),
+    }
   ];
 
   const filteredITRs =
     statusFilter === "all"
       ? itrs
       : itrs.filter((itr) => itr.status === statusFilter);
+
+  const handleMarkComplete = async (itr: ITRWithDetails) => {
+    setMarkingComplete(itr.id);
+    try {
+      await updateITR(itr.id, {
+        status: "complete",
+        progress: 100
+      });
+      
+      toast({
+        title: "ITR completado",
+        description: `${itr.name} ha sido marcado como completado`,
+      });
+      
+      onRefresh();
+    } catch (error) {
+      console.error("Error al marcar como completado:", error);
+      toast({
+        title: "Error",
+        description: "No se pudo marcar el ITR como completado",
+        variant: "destructive"
+      });
+    } finally {
+      setMarkingComplete(null);
+    }
+  };
 
   const handleEditITR = (itr: ITRWithDetails) => {
     setSelectedITR(itr);
