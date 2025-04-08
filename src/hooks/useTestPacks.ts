@@ -1,5 +1,5 @@
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
 import { 
@@ -11,6 +11,7 @@ import {
   TestPack 
 } from "@/services/testPackService";
 import { supabase } from "@/integrations/supabase/client";
+import { getSystemsWithSubsystems, getProjectsHierarchy } from "@/services/systemService";
 
 // Custom hook to manage Test Packs functionality
 export const useTestPacks = () => {
@@ -21,6 +22,7 @@ export const useTestPacks = () => {
   const [showFormDialog, setShowFormDialog] = useState(false);
   const [selectedTestPack, setSelectedTestPack] = useState<TestPack | null>(null);
   const [userRole, setUserRole] = useState<string>('user');
+  const [projectsData, setProjectsData] = useState<any[]>([]);
 
   // Get user role
   const getUserRole = async () => {
@@ -41,9 +43,25 @@ export const useTestPacks = () => {
     }
   };
   
-  useState(() => {
+  // Load project hierarchy data
+  useEffect(() => {
+    const loadProjectData = async () => {
+      try {
+        const data = await getProjectsHierarchy();
+        setProjectsData(data);
+      } catch (error) {
+        console.error("Error loading project hierarchy:", error);
+        toast({
+          title: "Error",
+          description: "No se pudo cargar la jerarquía de proyectos",
+          variant: "destructive"
+        });
+      }
+    };
+    
+    loadProjectData();
     getUserRole().then(role => setUserRole(role));
-  });
+  }, [toast]);
 
   // Queries for test packs data
   const { 
@@ -178,6 +196,7 @@ export const useTestPacks = () => {
     userRole,
     testPacks,
     stats,
+    projectsData,
     
     // Loading states
     isLoadingTestPacks,

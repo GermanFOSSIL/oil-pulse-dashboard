@@ -209,9 +209,15 @@ export const updateTestPack = async (id: string, updates: Partial<TestPack>): Pr
 // Create a new tag
 export const createTag = async (tagData: Omit<Tag, "id" | "created_at" | "updated_at">): Promise<Tag> => {
   try {
+    // Make sure tagData has the fecha_liberacion property
+    const completeTagData = {
+      ...tagData,
+      fecha_liberacion: tagData.fecha_liberacion || null
+    };
+
     const { data, error } = await supabase
       .from('tags')
-      .insert(tagData)
+      .insert(completeTagData)
       .select()
       .single();
 
@@ -602,7 +608,8 @@ export const importFromExcel = async (fileBuffer: ArrayBuffer): Promise<ImportRe
           const tagData = {
             test_pack_id: newTestPack.id,
             tag_name: tagName,
-            estado: 'pendiente'
+            estado: 'pendiente',
+            fecha_liberacion: null
           };
           
           const { error: tagError } = await supabase

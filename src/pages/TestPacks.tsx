@@ -20,6 +20,8 @@ const TestPacks = () => {
     isLoadingTestPacks,
     isLoadingStats,
     setSelectedTab,
+    setShowImportDialog,
+    setShowFormDialog,
     handleTagRelease,
     handleDownloadTemplate,
     handleExportData,

@@ -5,6 +5,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
 import { DataTable } from "@/components/ui/data-table";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
 interface TestPackTagsProps {
   testPackId: string;
@@ -32,9 +33,16 @@ const TestPackTags = ({
 
   if (!testPack || !testPack.tags || testPack.tags.length === 0) {
     return (
-      <div className="text-center py-6 mt-6">
-        <p className="text-muted-foreground">No hay TAGs asociados a este Test Pack.</p>
-      </div>
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-lg">TAGs del Test Pack</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="text-center py-6">
+            <p className="text-muted-foreground">No hay TAGs asociados a este Test Pack.</p>
+          </div>
+        </CardContent>
+      </Card>
     );
   }
 
@@ -82,25 +90,30 @@ const TestPackTags = ({
   ];
 
   return (
-    <div className="mt-6">
-      <div className="mb-4">
-        <div className="flex justify-between items-center">
-          <div>
-            <span className="text-sm font-medium">Progreso: </span>
-            <span className="text-sm">{testPack.progress || 0}%</span>
+    <Card>
+      <CardHeader>
+        <CardTitle className="text-lg">TAGs del Test Pack</CardTitle>
+      </CardHeader>
+      <CardContent>
+        <div className="mb-4">
+          <div className="flex justify-between items-center">
+            <div>
+              <span className="text-sm font-medium">Progreso: </span>
+              <span className="text-sm">{testPack.progress || 0}%</span>
+            </div>
+            <div className="text-sm text-muted-foreground">
+              {testPack.tags.filter(tag => tag.estado === 'liberado').length} de {testPack.tags.length} TAGs liberados
+            </div>
           </div>
-          <div className="text-sm text-muted-foreground">
-            {testPack.tags.filter(tag => tag.estado === 'liberado').length} de {testPack.tags.length} TAGs liberados
-          </div>
+          <Progress value={testPack.progress || 0} className="h-2 mt-1" />
         </div>
-        <Progress value={testPack.progress || 0} className="h-2 mt-1" />
-      </div>
-      
-      <DataTable
-        columns={columns}
-        data={testPack.tags}
-      />
-    </div>
+        
+        <DataTable
+          columns={columns}
+          data={testPack.tags}
+        />
+      </CardContent>
+    </Card>
   );
 };
 

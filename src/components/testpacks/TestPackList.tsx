@@ -1,13 +1,13 @@
 
 import { useState } from "react";
-import { Card } from "@/components/ui/card";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { TestPack } from "@/services/testPackService";
+import { Progress } from "@/components/ui/progress";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Badge } from "@/components/ui/badge";
-import { Progress } from "@/components/ui/progress";
-import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
-import { TestPack } from "@/services/testPackService";
+import { SearchIcon, FilterIcon, X } from "lucide-react";
 import TestPackTags from "./TestPackTags";
 
 interface TestPackListProps {
@@ -20,189 +20,206 @@ interface TestPackListProps {
 
 const TestPackList = ({ 
   testPacks, 
-  isLoading, 
+  isLoading,
+
   onTagRelease,
   userRole,
   onClearFilters
 }: TestPackListProps) => {
-  const [searchTerm, setSearchTerm] = useState("");
-  const [selectedSystem, setSelectedSystem] = useState<string>("");
-  const [selectedSubsystem, setSelectedSubsystem] = useState<string>("");
-  const [selectedStatus, setSelectedStatus] = useState<string>("");
-
-  if (!testPacks) {
-    return null;
-  }
-
-  const uniqueSystems = Array.from(new Set(testPacks.map(tp => tp.sistema) || [])).sort();
-  const uniqueSubsystems = Array.from(
-    new Set(testPacks.filter(tp => !selectedSystem || tp.sistema === selectedSystem)
-    .map(tp => tp.subsistema) || [])
-  ).sort();
-
-  const filteredTestPacks = testPacks.filter(testPack => {
-    let matchesSearch = true;
-    let matchesSystem = true;
-    let matchesSubsystem = true;
-    let matchesStatus = true;
-    
-    if (searchTerm) {
-      matchesSearch = 
-        testPack.nombre_paquete.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        testPack.itr_asociado.toLowerCase().includes(searchTerm.toLowerCase());
-    }
-    
-    if (selectedSystem) {
-      matchesSystem = testPack.sistema === selectedSystem;
-    }
-    
-    if (selectedSubsystem) {
-      matchesSubsystem = testPack.subsistema === selectedSubsystem;
-    }
-    
-    if (selectedStatus) {
-      matchesStatus = testPack.estado === selectedStatus;
-    }
-    
-    return matchesSearch && matchesSystem && matchesSubsystem && matchesStatus;
+  const [expandedTestPack, setExpandedTestPack] = useState<string | null>(null);
+  const [filter, setFilter] = useState({
+    search: "",
+    sistema: "",
+    subsistema: "",
+    estado: ""
   });
 
-  const clearFilters = () => {
-    setSearchTerm("");
-    setSelectedSystem("");
-    setSelectedSubsystem("");
-    setSelectedStatus("");
+  // Get unique list of systems
+  const systems = testPacks 
+    ? [...new Set(testPacks.map(tp => tp.sistema))]
+    : [];
+
+  // Get unique list of subsystems for the selected system
+  const subsystems = testPacks 
+    ? [...new Set(testPacks
+        .filter(tp => !filter.sistema || tp.sistema === filter.sistema)
+        .map(tp => tp.subsistema))]
+    : [];
+
+  // Apply filters
+  const filteredTestPacks = testPacks
+    ? testPacks.filter(tp => {
+        const matchesSearch = 
+          tp.nombre_paquete.toLowerCase().includes(filter.search.toLowerCase()) ||
+          tp.itr_asociado.toLowerCase().includes(filter.search.toLowerCase());
+        
+        const matchesSistema = !filter.sistema || tp.sistema === filter.sistema;
+        const matchesSubsistema = !filter.subsistema || tp.subsistema === filter.subsistema;
+        const matchesEstado = !filter.estado || tp.estado === filter.estado;
+        
+        return matchesSearch && matchesSistema && matchesSubsistema && matchesEstado;
+      })
+    : [];
+
+  const handleClearFilters = () => {
+    setFilter({
+      search: "",
+      sistema: "",
+      subsistema: "",
+      estado: ""
+    });
     onClearFilters();
   };
 
-  return (
-    <div className="space-y-4">
+  const toggleExpand = (id: string) => {
+    setExpandedTestPack(expandedTestPack === id ? null : id);
+  };
+
+  if (isLoading) {
+    return (
+      <div className="flex justify-center py-10">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
+      </div>
+    );
+  }
+
+  if (!testPacks || testPacks.length === 0) {
+    return (
       <Card>
-        <div className="p-4 space-y-4">
-          <h3 className="text-lg font-medium">Filtros</h3>
+        <CardHeader>
+          <CardTitle>No se encontraron Test Packs</CardTitle>
+          <CardDescription>No hay Test Packs para mostrar. ¿Desea crear uno nuevo?</CardDescription>
+        </CardHeader>
+      </Card>
+    );
+  }
+
+  return (
+    <div className="space-y-6">
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-lg">Filtros</CardTitle>
+        </CardHeader>
+        <CardContent>
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-            <div>
+            <div className="relative">
+              <SearchIcon className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
               <Input
-                placeholder="Buscar por nombre o ITR..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
+                placeholder="Buscar por nombre o ITR"
+                className="pl-8"
+                value={filter.search}
+                onChange={e => setFilter({...filter, search: e.target.value})}
               />
             </div>
-            <div>
-              <Select value={selectedSystem} onValueChange={setSelectedSystem}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Sistema" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">Todos los sistemas</SelectItem>
-                  {uniqueSystems.map((system) => (
-                    <SelectItem key={system} value={system}>
-                      {system}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div>
-              <Select value={selectedSubsystem} onValueChange={setSelectedSubsystem}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Subsistema" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">Todos los subsistemas</SelectItem>
-                  {uniqueSubsystems.map((subsystem) => (
-                    <SelectItem key={subsystem} value={subsystem}>
-                      {subsystem}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div>
-              <Select value={selectedStatus} onValueChange={setSelectedStatus}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Estado" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">Todos los estados</SelectItem>
-                  <SelectItem value="pendiente">Pendiente</SelectItem>
-                  <SelectItem value="listo">Listo</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
+            
+            <Select
+              value={filter.sistema}
+              onValueChange={value => setFilter({...filter, sistema: value, subsistema: ""})}
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="Sistema" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="">Todos los sistemas</SelectItem>
+                {systems.map(system => (
+                  <SelectItem key={system} value={system}>{system}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            
+            <Select
+              value={filter.subsistema}
+              onValueChange={value => setFilter({...filter, subsistema: value})}
+              disabled={!filter.sistema}
+            >
+              <SelectTrigger>
+                <SelectValue placeholder={filter.sistema ? "Subsistema" : "Primero seleccione un sistema"} />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="">Todos los subsistemas</SelectItem>
+                {subsystems.map(subsystem => (
+                  <SelectItem key={subsystem} value={subsystem}>{subsystem}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            
+            <Select
+              value={filter.estado}
+              onValueChange={value => setFilter({...filter, estado: value})}
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="Estado" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="">Todos los estados</SelectItem>
+                <SelectItem value="pendiente">Pendiente</SelectItem>
+                <SelectItem value="listo">Listo</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
-          <div className="flex justify-end">
-            <Button variant="ghost" size="sm" onClick={clearFilters}>
-              Limpiar filtros
-            </Button>
-          </div>
-        </div>
-      </Card>
-
-      {isLoading ? (
-        <div className="flex justify-center py-10">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
-        </div>
-      ) : (
-        <div className="space-y-4">
-          {filteredTestPacks && filteredTestPacks.length > 0 ? (
-            filteredTestPacks.map((testPack) => (
-              <Card key={testPack.id} className="overflow-hidden">
-                <div className="p-4 border-b flex flex-col md:flex-row justify-between md:items-center gap-4">
-                  <div className="space-y-1">
-                    <div className="flex items-center gap-2">
-                      <h3 className="text-lg font-semibold">{testPack.nombre_paquete}</h3>
-                      <Badge variant={testPack.estado === 'listo' ? 'default' : 'outline'}>
-                        {testPack.estado === 'listo' ? 'Listo' : 'Pendiente'}
-                      </Badge>
-                    </div>
-                    <div className="text-sm text-muted-foreground">
-                      <span className="font-medium">Sistema:</span> {testPack.sistema} | 
-                      <span className="font-medium"> Subsistema:</span> {testPack.subsistema} | 
-                      <span className="font-medium"> ITR:</span> {testPack.itr_asociado}
-                    </div>
-                  </div>
-                  <div className="w-full md:w-1/3 space-y-1">
-                    <div className="flex justify-between text-xs">
-                      <span>Progreso</span>
-                      <span>{testPack.progress || 0}%</span>
-                    </div>
-                    <Progress value={testPack.progress || 0} className="h-2" />
-                  </div>
-                </div>
-                
-                <Sheet>
-                  <SheetTrigger asChild>
-                    <Button className="w-full rounded-none" variant="ghost">
-                      Ver TAGs
-                    </Button>
-                  </SheetTrigger>
-                  <SheetContent className="w-[90%] sm:max-w-xl">
-                    <SheetHeader>
-                      <SheetTitle>{testPack.nombre_paquete}</SheetTitle>
-                      <SheetDescription>
-                        Sistema: {testPack.sistema} | Subsistema: {testPack.subsistema} | ITR: {testPack.itr_asociado}
-                      </SheetDescription>
-                    </SheetHeader>
-                    <TestPackTags 
-                      testPackId={testPack.id} 
-                      userRole={userRole} 
-                      onTagRelease={onTagRelease} 
-                    />
-                  </SheetContent>
-                </Sheet>
-              </Card>
-            ))
-          ) : (
-            <div className="text-center py-10">
-              <p className="text-muted-foreground">No se encontraron Test Packs que coincidan con los filtros.</p>
-              <Button variant="outline" className="mt-4" onClick={clearFilters}>
+          
+          {(filter.search || filter.sistema || filter.subsistema || filter.estado) && (
+            <div className="flex justify-end mt-4">
+              <Button variant="outline" size="sm" onClick={handleClearFilters} className="flex items-center">
+                <X className="mr-1 h-4 w-4" />
                 Limpiar filtros
               </Button>
             </div>
           )}
+        </CardContent>
+      </Card>
+      
+      <div>
+        <p className="mb-2 text-muted-foreground text-sm">{filteredTestPacks.length} Test Packs encontrados</p>
+        
+        <div className="space-y-4">
+          {filteredTestPacks.map(testPack => (
+            <Card key={testPack.id} className={expandedTestPack === testPack.id ? "ring-2 ring-primary" : ""}>
+              <CardHeader className="pb-2">
+                <div className="flex flex-wrap justify-between items-start">
+                  <div>
+                    <CardTitle className="text-lg">{testPack.nombre_paquete}</CardTitle>
+                    <CardDescription>
+                      ITR: {testPack.itr_asociado} | Sistema: {testPack.sistema} | Subsistema: {testPack.subsistema}
+                    </CardDescription>
+                  </div>
+                  <Badge variant={testPack.estado === 'listo' ? 'default' : 'outline'}>
+                    {testPack.estado === 'listo' ? 'Listo' : 'Pendiente'}
+                  </Badge>
+                </div>
+              </CardHeader>
+              
+              <CardContent>
+                <div className="mb-3">
+                  <div className="flex justify-between items-center mb-1">
+                    <span className="text-sm text-muted-foreground">Progreso:</span>
+                    <span className="text-sm font-medium">{testPack.progress || 0}%</span>
+                  </div>
+                  <Progress value={testPack.progress || 0} className="h-2" />
+                </div>
+                
+                <Button 
+                  variant="outline"
+                  size="sm"
+                  onClick={() => toggleExpand(testPack.id)}
+                >
+                  {expandedTestPack === testPack.id ? "Ocultar TAGs" : "Ver TAGs"}
+                </Button>
+                
+                {expandedTestPack === testPack.id && (
+                  <div className="mt-4">
+                    <TestPackTags
+                      testPackId={testPack.id}
+                      userRole={userRole}
+                      onTagRelease={onTagRelease}
+                    />
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          ))}
         </div>
-      )}
+      </div>
     </div>
   );
 };

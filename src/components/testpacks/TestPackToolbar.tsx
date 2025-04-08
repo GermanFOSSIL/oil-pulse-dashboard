@@ -1,12 +1,6 @@
 
 import { Button } from "@/components/ui/button";
-import { 
-  PlusCircle, 
-  Upload, 
-  FileDown, 
-  DownloadCloud, 
-  RefreshCw 
-} from "lucide-react";
+import { Plus, Import, FileDown, FileUp, RefreshCw } from "lucide-react";
 
 interface TestPackToolbarProps {
   onCreateNew: () => void;
@@ -17,38 +11,45 @@ interface TestPackToolbarProps {
   userRole: string;
 }
 
-const TestPackToolbar = ({
-  onCreateNew,
-  onImport,
-  onDownloadTemplate,
-  onExport,
+const TestPackToolbar = ({ 
+  onCreateNew, 
+  onImport, 
+  onDownloadTemplate, 
+  onExport, 
   onRefresh,
-  userRole
+  userRole 
 }: TestPackToolbarProps) => {
+  const isAdmin = userRole === 'admin';
+  
   return (
-    <div className="flex flex-wrap items-center gap-2">
-      {userRole === 'admin' && (
+    <div className="flex flex-wrap gap-2 items-center">
+      <Button size="sm" onClick={onRefresh} variant="outline">
+        <RefreshCw className="h-4 w-4 mr-2" />
+        <span className="hidden sm:inline">Actualizar</span>
+      </Button>
+      
+      {isAdmin && (
         <>
-          <Button onClick={onCreateNew} variant="outline" size="sm">
-            <PlusCircle className="h-4 w-4 mr-2" />
-            Nuevo Test Pack
+          <Button size="sm" onClick={onCreateNew}>
+            <Plus className="h-4 w-4 mr-2" />
+            <span className="hidden sm:inline">Nuevo</span>
           </Button>
-          <Button onClick={onImport} variant="outline" size="sm">
-            <Upload className="h-4 w-4 mr-2" />
-            Importar
+          
+          <Button size="sm" onClick={onImport} variant="outline">
+            <Import className="h-4 w-4 mr-2" />
+            <span className="hidden sm:inline">Importar</span>
           </Button>
-          <Button onClick={onDownloadTemplate} variant="outline" size="sm">
+          
+          <Button size="sm" onClick={onDownloadTemplate} variant="outline">
             <FileDown className="h-4 w-4 mr-2" />
-            Plantilla
+            <span className="hidden sm:inline">Plantilla</span>
           </Button>
         </>
       )}
-      <Button onClick={onExport} variant="outline" size="sm">
-        <DownloadCloud className="h-4 w-4 mr-2" />
-        Exportar
-      </Button>
-      <Button onClick={onRefresh} variant="ghost" size="icon">
-        <RefreshCw className="h-4 w-4" />
+      
+      <Button size="sm" onClick={onExport} variant="outline">
+        <FileUp className="h-4 w-4 mr-2" />
+        <span className="hidden sm:inline">Exportar</span>
       </Button>
     </div>
   );

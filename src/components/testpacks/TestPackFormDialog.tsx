@@ -1,205 +1,147 @@
 
 import { useState, useEffect } from "react";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
-import { 
-  createTestPack, 
-  updateTestPack, 
-  TestPack,
-  getAvailableSystems,
-  getAvailableSubsystems,
-  getAvailableITRs
-} from "@/services/testPackService";
+import { TestPack, createTestPack, updateTestPack } from "@/services/testPackService";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { useForm } from "react-hook-form";
+import * as z from "zod";
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from "@/components/ui/form";
+import { Input } from "@/components/ui/input";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { getSystemsWithSubsystems, getAvailableITRs } from "@/services/systemService";
 
 interface TestPackFormDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  testPack: TestPack | null;
   onSuccess: () => void;
-  testPack?: TestPack | null;
 }
 
-const TestPackFormDialog = ({ open, onOpenChange, onSuccess, testPack }: TestPackFormDialogProps) => {
+const formSchema = z.object({
+  sistema: z.string().min(1, "El sistema es requerido"),
+  subsistema: z.string().min(1, "El subsistema es requerido"),
+  nombre_paquete: z.string().min(1, "El nombre del paquete es requerido"),
+  itr_asociado: z.string().min(1, "El ITR asociado es requerido"),
+  tagsCount: z.coerce.number().min(1, "Debe crear al menos un TAG").max(50, "Máximo 50 TAGs permitidos")
+});
+
+type FormValues = z.infer<typeof formSchema>;
+
+const TestPackFormDialog = ({ open, onOpenChange, testPack, onSuccess }: TestPackFormDialogProps) => {
   const { toast } = useToast();
+  const [systems, setSystems] = useState<any[]>([]);
+  const [subsystems, setSubsystems] = useState<any[]>([]);
+  const [itrs, setItrs] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
-  const isEditMode = !!testPack;
-  
-  const [formData, setFormData] = useState({
-    sistema: '',
-    subsistema: '',
-    nombre_paquete: '',
-    itr_asociado: '',
-    estado: 'pendiente'
+  const [selectedSystem, setSelectedSystem] = useState<string | null>(null);
+  const [selectedSubsystem, setSelectedSubsystem] = useState<string | null>(null);
+
+  const form = useForm<FormValues>({
+    resolver: zodResolver(formSchema),
+    defaultValues: {
+      sistema: testPack?.sistema || "",
+      subsistema: testPack?.subsistema || "",
+      nombre_paquete: testPack?.nombre_paquete || "",
+      itr_asociado: testPack?.itr_asociado || "",
+      tagsCount: 10 // Default to 10 tags
+    }
   });
 
-  const [systems, setSystems] = useState<{id: string, name: string}[]>([]);
-  const [subsystems, setSubsystems] = useState<{id: string, name: string}[]>([]);
-  const [itrs, setItrs] = useState<{id: string, name: string, quantity: number}[]>([]);
-  
-  const [selectedSystemId, setSelectedSystemId] = useState<string>('');
-  const [selectedSubsystemId, setSelectedSubsystemId] = useState<string>('');
-  const [selectedItrId, setSelectedItrId] = useState<string>('');
-  const [selectedItrQuantity, setSelectedItrQuantity] = useState<number>(0);
-  const [loadingSystems, setLoadingSystems] = useState(false);
-  const [loadingSubsystems, setLoadingSubsystems] = useState(false);
-  const [loadingItrs, setLoadingItrs] = useState(false);
-  
-  // Fetch available systems
+  // Load systems on component mount
   useEffect(() => {
-    const fetchSystems = async () => {
-      setLoadingSystems(true);
+    const loadSystemData = async () => {
       try {
-        const data = await getAvailableSystems();
-        setSystems(data);
+        const systemsData = await getSystemsWithSubsystems();
+        setSystems(systemsData);
       } catch (error) {
-        console.error("Error fetching systems:", error);
+        console.error("Error loading systems:", error);
         toast({
           title: "Error",
-          description: "No se pudieron cargar los sistemas disponibles",
+          description: "No se pudieron cargar los sistemas",
           variant: "destructive"
         });
-      } finally {
-        setLoadingSystems(false);
       }
     };
-    
-    if (open) {
-      fetchSystems();
-    }
-  }, [open, toast]);
-  
-  // Fetch subsystems when a system is selected
+
+    loadSystemData();
+  }, [toast]);
+
+  // Update subsystems when system changes
   useEffect(() => {
-    const fetchSubsystems = async () => {
-      if (!selectedSystemId) return;
-      
-      setLoadingSubsystems(true);
-      try {
-        const data = await getAvailableSubsystems(selectedSystemId);
-        setSubsystems(data);
-      } catch (error) {
-        console.error("Error fetching subsystems:", error);
-        toast({
-          title: "Error",
-          description: "No se pudieron cargar los subsistemas disponibles",
-          variant: "destructive"
-        });
-      } finally {
-        setLoadingSubsystems(false);
-      }
-    };
-    
-    fetchSubsystems();
-  }, [selectedSystemId, toast]);
-  
-  // Fetch ITRs when a subsystem is selected
-  useEffect(() => {
-    const fetchITRs = async () => {
-      if (!selectedSubsystemId) return;
-      
-      setLoadingItrs(true);
-      try {
-        const data = await getAvailableITRs(selectedSubsystemId);
-        setItrs(data);
-      } catch (error) {
-        console.error("Error fetching ITRs:", error);
-        toast({
-          title: "Error",
-          description: "No se pudieron cargar los ITRs disponibles",
-          variant: "destructive"
-        });
-      } finally {
-        setLoadingItrs(false);
-      }
-    };
-    
-    fetchITRs();
-  }, [selectedSubsystemId, toast]);
-  
-  // Handle system selection
-  const handleSystemChange = (value: string) => {
-    const selectedSystem = systems.find(s => s.id === value);
     if (selectedSystem) {
-      setSelectedSystemId(value);
-      setFormData(prev => ({ ...prev, sistema: selectedSystem.name }));
-      setSelectedSubsystemId('');
-      setSelectedItrId('');
-      setFormData(prev => ({ ...prev, subsistema: '', itr_asociado: '' }));
+      const system = systems.find(s => s.id === selectedSystem);
+      if (system && system.subsystems) {
+        setSubsystems(system.subsystems);
+      } else {
+        setSubsystems([]);
+      }
+      form.setValue("subsistema", "");
+      setSelectedSubsystem(null);
+      setItrs([]);
     }
-  };
-  
-  // Handle subsystem selection
-  const handleSubsystemChange = (value: string) => {
-    const selectedSubsystem = subsystems.find(s => s.id === value);
-    if (selectedSubsystem) {
-      setSelectedSubsystemId(value);
-      setFormData(prev => ({ ...prev, subsistema: selectedSubsystem.name }));
-      setSelectedItrId('');
-      setFormData(prev => ({ ...prev, itr_asociado: '' }));
-    }
-  };
-  
-  // Handle ITR selection
-  const handleItrChange = (value: string) => {
-    const selectedItr = itrs.find(i => i.id === value);
-    if (selectedItr) {
-      setSelectedItrId(value);
-      setSelectedItrQuantity(selectedItr.quantity || 0);
-      setFormData(prev => ({ ...prev, itr_asociado: selectedItr.name }));
-    }
-  };
-  
-  // Load existing test pack data for edit mode
+  }, [selectedSystem, systems, form]);
+
+  // Update ITRs when subsystem changes
+  useEffect(() => {
+    const loadITRs = async () => {
+      if (selectedSubsystem) {
+        try {
+          const itrsData = await getAvailableITRs(selectedSubsystem);
+          setItrs(itrsData);
+        } catch (error) {
+          console.error("Error loading ITRs:", error);
+          toast({
+            title: "Error",
+            description: "No se pudieron cargar los ITRs",
+            variant: "destructive"
+          });
+        }
+      }
+    };
+
+    loadITRs();
+  }, [selectedSubsystem, toast]);
+
+  // Set form values if editing
   useEffect(() => {
     if (testPack) {
-      setFormData({
+      form.reset({
         sistema: testPack.sistema,
         subsistema: testPack.subsistema,
         nombre_paquete: testPack.nombre_paquete,
         itr_asociado: testPack.itr_asociado,
-        estado: testPack.estado
+        tagsCount: 10
       });
     }
-  }, [testPack]);
-  
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const { name, value } = e.target;
-    setFormData(prev => ({ ...prev, [name]: value }));
-  };
-  
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    
-    if (!formData.sistema || !formData.subsistema || !formData.nombre_paquete || !formData.itr_asociado) {
-      toast({
-        title: "Campos incompletos",
-        description: "Por favor complete todos los campos obligatorios",
-        variant: "destructive"
-      });
-      return;
-    }
-    
+  }, [testPack, form]);
+
+  const onSubmit = async (values: FormValues) => {
     setLoading(true);
-    
     try {
-      if (isEditMode && testPack) {
-        await updateTestPack(testPack.id, formData);
+      if (testPack) {
+        // Update existing test pack
+        await updateTestPack(testPack.id, values);
         toast({
           title: "Test Pack actualizado",
           description: "El Test Pack ha sido actualizado correctamente"
         });
       } else {
-        // Create test pack with tags
-        await createTestPack(formData, selectedItrQuantity);
+        // Create new test pack
+        await createTestPack(values, values.tagsCount);
         toast({
           title: "Test Pack creado",
-          description: `El Test Pack ha sido creado correctamente con ${selectedItrQuantity} TAGs`
+          description: `Se ha creado un nuevo Test Pack con ${values.tagsCount} TAGs`
         });
       }
-      
       onSuccess();
     } catch (error: any) {
       console.error("Error saving test pack:", error);
@@ -212,122 +154,147 @@ const TestPackFormDialog = ({ open, onOpenChange, onSuccess, testPack }: TestPac
       setLoading(false);
     }
   };
-  
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[500px]">
+      <DialogContent className="sm:max-w-[550px]">
         <DialogHeader>
-          <DialogTitle>
-            {isEditMode ? "Editar Test Pack" : "Nuevo Test Pack"}
-          </DialogTitle>
-          <DialogDescription>
-            Complete la información del Test Pack. Los campos marcados con * son obligatorios.
-          </DialogDescription>
+          <DialogTitle>{testPack ? "Editar Test Pack" : "Nuevo Test Pack"}</DialogTitle>
         </DialogHeader>
         
-        <form onSubmit={handleSubmit} className="space-y-4 pt-4">
-          <div className="space-y-2">
-            <Label htmlFor="sistema">Sistema *</Label>
-            {isEditMode ? (
-              <Input
-                id="sistema"
-                name="sistema"
-                value={formData.sistema}
-                onChange={handleInputChange}
-                placeholder="Nombre del sistema"
-                required
-              />
-            ) : (
-              <Select onValueChange={handleSystemChange} value={selectedSystemId}>
-                <SelectTrigger className="w-full" disabled={loadingSystems}>
-                  <SelectValue placeholder="Seleccione un sistema" />
-                </SelectTrigger>
-                <SelectContent>
-                  {systems.map((system) => (
-                    <SelectItem key={system.id} value={system.id}>
-                      {system.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            )}
-          </div>
-          
-          <div className="space-y-2">
-            <Label htmlFor="subsistema">Subsistema *</Label>
-            {isEditMode ? (
-              <Input
-                id="subsistema"
-                name="subsistema"
-                value={formData.subsistema}
-                onChange={handleInputChange}
-                placeholder="Nombre del subsistema"
-                required
-              />
-            ) : (
-              <Select onValueChange={handleSubsystemChange} value={selectedSubsystemId} disabled={!selectedSystemId || loadingSubsystems}>
-                <SelectTrigger className="w-full">
-                  <SelectValue placeholder="Seleccione un subsistema" />
-                </SelectTrigger>
-                <SelectContent>
-                  {subsystems.map((subsystem) => (
-                    <SelectItem key={subsystem.id} value={subsystem.id}>
-                      {subsystem.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            )}
-          </div>
-          
-          <div className="space-y-2">
-            <Label htmlFor="itr_asociado">ITR Asociado *</Label>
-            {isEditMode ? (
-              <Input
-                id="itr_asociado"
-                name="itr_asociado"
-                value={formData.itr_asociado}
-                onChange={handleInputChange}
-                placeholder="Código o nombre del ITR"
-                required
-              />
-            ) : (
-              <Select onValueChange={handleItrChange} value={selectedItrId} disabled={!selectedSubsystemId || loadingItrs}>
-                <SelectTrigger className="w-full">
-                  <SelectValue placeholder="Seleccione un ITR" />
-                </SelectTrigger>
-                <SelectContent>
-                  {itrs.map((itr) => (
-                    <SelectItem key={itr.id} value={itr.id}>
-                      {itr.name} ({itr.quantity} TAGs)
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            )}
-          </div>
-          
-          <div className="space-y-2">
-            <Label htmlFor="nombre_paquete">Nombre del Test Pack *</Label>
-            <Input
-              id="nombre_paquete"
-              name="nombre_paquete"
-              value={formData.nombre_paquete}
-              onChange={handleInputChange}
-              placeholder="Nombre identificativo del paquete"
-              required
+        <Form {...form}>
+          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4 py-2">
+            <FormField
+              control={form.control}
+              name="sistema"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Sistema</FormLabel>
+                  <Select
+                    disabled={loading}
+                    onValueChange={(value) => {
+                      field.onChange(value);
+                      setSelectedSystem(value);
+                    }}
+                    value={field.value}
+                  >
+                    <FormControl>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Seleccionar sistema" />
+                      </SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
+                      {systems.map((system) => (
+                        <SelectItem key={system.id} value={system.id}>
+                          {system.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <FormMessage />
+                </FormItem>
+              )}
             />
-          </div>
-          
-          <div className="flex justify-end space-x-2 pt-4">
-            <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
-              Cancelar
-            </Button>
-            <Button type="submit" disabled={loading}>
-              {loading ? "Guardando..." : isEditMode ? "Actualizar" : "Crear"}
-            </Button>
-          </div>
-        </form>
+
+            <FormField
+              control={form.control}
+              name="subsistema"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Subsistema</FormLabel>
+                  <Select
+                    disabled={loading || !selectedSystem}
+                    onValueChange={(value) => {
+                      field.onChange(value);
+                      setSelectedSubsystem(value);
+                    }}
+                    value={field.value}
+                  >
+                    <FormControl>
+                      <SelectTrigger>
+                        <SelectValue placeholder={selectedSystem ? "Seleccionar subsistema" : "Primero seleccione un sistema"} />
+                      </SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
+                      {subsystems.map((subsystem) => (
+                        <SelectItem key={subsystem.id} value={subsystem.id}>
+                          {subsystem.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            <FormField
+              control={form.control}
+              name="itr_asociado"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>ITR Asociado</FormLabel>
+                  <Select
+                    disabled={loading || !selectedSubsystem}
+                    onValueChange={field.onChange}
+                    value={field.value}
+                  >
+                    <FormControl>
+                      <SelectTrigger>
+                        <SelectValue placeholder={selectedSubsystem ? "Seleccionar ITR" : "Primero seleccione un subsistema"} />
+                      </SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
+                      {itrs.map((itr) => (
+                        <SelectItem key={itr.id} value={itr.id}>
+                          {itr.name} ({itr.quantity} TAGs)
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            <FormField
+              control={form.control}
+              name="nombre_paquete"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Nombre del Test Pack</FormLabel>
+                  <FormControl>
+                    <Input {...field} disabled={loading} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            <FormField
+              control={form.control}
+              name="tagsCount"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Cantidad de TAGs</FormLabel>
+                  <FormControl>
+                    <Input type="number" min={1} max={50} {...field} disabled={loading || !!testPack} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            <div className="flex justify-end space-x-2 pt-4">
+              <Button type="button" variant="outline" onClick={() => onOpenChange(false)} disabled={loading}>
+                Cancelar
+              </Button>
+              <Button type="submit" disabled={loading}>
+                {loading ? "Guardando..." : (testPack ? "Actualizar" : "Crear")}
+              </Button>
+            </div>
+          </form>
+        </Form>
       </DialogContent>
     </Dialog>
   );
