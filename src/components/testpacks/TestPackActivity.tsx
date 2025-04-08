@@ -2,7 +2,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { DatabaseActivityTimeline } from "@/components/DatabaseActivityTimeline";
-import { getActionLogs } from "@/services/testPackService";
+import { getActionLogs, ActionLog } from "@/services/testPackService";
 
 const TestPackActivity = () => {
   const { data: actionLogs, isLoading } = useQuery({
@@ -27,7 +27,7 @@ const TestPackActivity = () => {
               <h3 className="font-medium mb-4">Acciones sobre TAGs</h3>
               {actionLogs && actionLogs.length > 0 ? (
                 <div className="space-y-4">
-                  {actionLogs.map((log) => (
+                  {actionLogs.map((log: ActionLog) => (
                     <div key={log.id} className="border rounded-md p-3">
                       <div className="flex justify-between items-start">
                         <div>
