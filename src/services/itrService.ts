@@ -3,7 +3,6 @@ import { getITRs, getSubsystems, getSystemsByProjectId, ITR, Subsystem, System }
 import { ITRWithDetails } from "@/types/itr-types";
 import { createITR } from "@/services/itrDataService";
 import { supabase } from "@/integrations/supabase/client";
-import { ITRWithSystem } from "@/services/types";
 
 export const fetchITRsWithDetails = async (selectedProjectId: string | null): Promise<ITRWithDetails[]> => {
   try {
@@ -160,112 +159,6 @@ export const createTestITRs = async (): Promise<{ success: boolean; message: str
     return { 
       success: false, 
       message: `Error al crear ITRs de prueba: ${error instanceof Error ? error.message : error}`, 
-    };
-  }
-};
-
-// New function to fetch all ITRs with system and project info
-export const fetchAllITRsWithSystemInfo = async (): Promise<ITRWithSystem[]> => {
-  try {
-    console.log("Fetching all ITRs with system information");
-    
-    // Fetch all required data
-    const { data: itrs, error: itrsError } = await supabase
-      .from('itrs')
-      .select('*');
-      
-    if (itrsError) {
-      throw itrsError;
-    }
-    
-    const { data: subsystems, error: subsystemsError } = await supabase
-      .from('subsystems')
-      .select('*, systems(*, projects(*))');
-      
-    if (subsystemsError) {
-      throw subsystemsError;
-    }
-    
-    // Enrich ITRs with system and project information
-    const enrichedITRs = itrs.map(itr => {
-      const relatedSubsystem = subsystems.find(sub => sub.id === itr.subsystem_id);
-      
-      return {
-        ...itr,
-        subsystemName: relatedSubsystem?.name || 'Subsistema Desconocido',
-        systemName: relatedSubsystem?.systems?.name || 'Sistema Desconocido',
-        projectName: relatedSubsystem?.systems?.projects?.name || 'Proyecto Desconocido',
-        selected: false
-      } as ITRWithSystem;
-    });
-    
-    console.log(`Fetched ${enrichedITRs.length} ITRs with system info`);
-    return enrichedITRs;
-  } catch (error) {
-    console.error("Error fetching ITRs with system info:", error);
-    throw error;
-  }
-};
-
-// Function to clone selected ITRs to target subsystems
-export const cloneITRsToSubsystems = async (
-  selectedITRs: ITRWithSystem[],
-  targetSubsystemIds: string[]
-): Promise<{ success: boolean; count: number; message: string }> => {
-  try {
-    if (!selectedITRs.length || !targetSubsystemIds.length) {
-      return { 
-        success: false, 
-        count: 0, 
-        message: "No se seleccionaron ITRs o subsistemas destino" 
-      };
-    }
-    
-    console.log(`Clonando ${selectedITRs.length} ITRs a ${targetSubsystemIds.length} subsistemas`);
-    
-    const clonePromises = [];
-    
-    // For each ITR and each target subsystem, create a clone
-    for (const itr of selectedITRs) {
-      for (const subsystemId of targetSubsystemIds) {
-        // Skip if we're trying to clone to the same subsystem
-        if (itr.subsystem_id === subsystemId) {
-          console.log(`Saltando clonación del ITR ${itr.id} al mismo subsistema ${subsystemId}`);
-          continue;
-        }
-        
-        // Prepare data for the new ITR
-        const newITRData = {
-          name: itr.name,
-          subsystem_id: subsystemId,
-          status: itr.status,
-          progress: itr.progress,
-          start_date: itr.start_date,
-          end_date: itr.end_date,
-          assigned_to: itr.assigned_to,
-          quantity: itr.quantity
-        };
-        
-        // Create the cloned ITR
-        clonePromises.push(createITR(newITRData));
-      }
-    }
-    
-    const results = await Promise.allSettled(clonePromises);
-    const succeeded = results.filter(r => r.status === 'fulfilled').length;
-    const failed = results.filter(r => r.status === 'rejected').length;
-    
-    return {
-      success: succeeded > 0,
-      count: succeeded,
-      message: `Se clonaron ${succeeded} ITRs con éxito${failed > 0 ? `, ${failed} fallaron` : ''}`
-    };
-  } catch (error) {
-    console.error("Error cloning ITRs:", error);
-    return {
-      success: false,
-      count: 0,
-      message: `Error al clonar ITRs: ${error instanceof Error ? error.message : String(error)}`
     };
   }
 };

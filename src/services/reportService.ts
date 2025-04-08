@@ -3,7 +3,6 @@ import { supabase } from "@/integrations/supabase/client";
 import { jsPDF } from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import * as XLSX from 'xlsx';
-import { getDashboardStats } from "@/services/dashboardService";
 
 const translateStatus = (status: string): string => {
   switch (status) {
@@ -38,8 +37,6 @@ export const generateReport = async (reportType: string, projectId: string | nul
         fileName = `reporte_${project.name.replace(/\s+/g, '_').toLowerCase()}_${Date.now()}.pdf`;
       }
     }
-    
-    const dashboardStats = await getDashboardStats(projectId);
     
     switch (reportType) {
       case 'project_status': {
@@ -77,12 +74,12 @@ export const generateReport = async (reportType: string, projectId: string | nul
           project: projectInfo,
           systems: systems || [],
           itrs: itrs || [],
-          summary: dashboardStats.summary,
-          kpiData: {
-            totalProjects: dashboardStats.totalProjects,
-            totalSystems: dashboardStats.totalSystems,
-            totalITRs: dashboardStats.totalITRs,
-            completionRate: dashboardStats.completionRate
+          summary: {
+            totalSystems: systems?.length || 0,
+            totalITRs: itrs?.length || 0,
+            completedITRs: itrs?.filter(itr => itr.status === 'complete').length || 0,
+            inProgressITRs: itrs?.filter(itr => itr.status === 'inprogress').length || 0,
+            delayedITRs: itrs?.filter(itr => itr.status === 'delayed').length || 0,
           }
         };
         
@@ -128,12 +125,11 @@ export const generateReport = async (reportType: string, projectId: string | nul
         reportData = {
           project: projectInfo,
           itrs: itrs || [],
-          summary: dashboardStats.summary,
-          kpiData: {
-            totalProjects: dashboardStats.totalProjects,
-            totalSystems: dashboardStats.totalSystems,
-            totalITRs: dashboardStats.totalITRs,
-            completionRate: dashboardStats.completionRate
+          summary: {
+            totalITRs: itrs?.length || 0,
+            completedITRs: itrs?.filter(itr => itr.status === 'complete').length || 0,
+            inProgressITRs: itrs?.filter(itr => itr.status === 'inprogress').length || 0,
+            delayedITRs: itrs?.filter(itr => itr.status === 'delayed').length || 0,
           }
         };
         
@@ -179,12 +175,11 @@ export const generateReport = async (reportType: string, projectId: string | nul
         reportData = {
           project: projectInfo,
           tasks: tasks || [],
-          summary: dashboardStats.summary,
-          kpiData: {
-            totalProjects: dashboardStats.totalProjects,
-            totalSystems: dashboardStats.totalSystems,
-            totalITRs: dashboardStats.totalITRs,
-            completionRate: dashboardStats.completionRate
+          summary: {
+            totalTasks: tasks?.length || 0,
+            completedTasks: tasks?.filter(task => task.status === 'complete').length || 0,
+            inProgressTasks: tasks?.filter(task => task.status === 'inprogress').length || 0,
+            pendingTasks: tasks?.filter(task => task.status === 'pending').length || 0,
           }
         };
         
@@ -206,37 +201,15 @@ export const generateReport = async (reportType: string, projectId: string | nul
     doc.setFontSize(10);
     doc.text(`Fecha: ${currentDate}`, pageWidth / 2, 28, { align: 'center' });
     
-    doc.setFontSize(14);
-    doc.text('Indicadores Clave de Rendimiento (KPIs)', 14, 40);
-    
-    doc.setFontSize(10);
-    doc.text(`Total de Proyectos: ${reportData.kpiData.totalProjects}`, 20, 50);
-    doc.text(`Total de Sistemas: ${reportData.kpiData.totalSystems}`, 20, 56);
-    doc.text(`Total de ITRs: ${reportData.kpiData.totalITRs}`, 20, 62);
-    doc.text(`Tasa de Cumplimiento: ${reportData.kpiData.completionRate}%`, 20, 68);
-    
-    if (reportData.summary) {
-      doc.text(`ITRs Completados: ${reportData.summary.completedITRs || 0}`, 120, 50);
-      doc.text(`ITRs En Progreso: ${reportData.summary.inProgressITRs || 0}`, 120, 56);
-      doc.text(`ITRs Retrasados: ${reportData.summary.delayedITRs || 0}`, 120, 62);
-    }
-    
-    let yPos = 80;
-    
     if (projectInfo) {
-      doc.setFontSize(14);
-      doc.text('Información del Proyecto', 14, yPos);
-      yPos += 10;
+      doc.setFontSize(12);
+      doc.text('Información del Proyecto', 14, 40);
       
       doc.setFontSize(10);
-      doc.text(`Nombre: ${projectInfo.name}`, 20, yPos);
-      yPos += 6;
-      doc.text(`Ubicación: ${projectInfo.location || 'No especificada'}`, 20, yPos);
-      yPos += 6;
-      doc.text(`Estado: ${translateStatus(projectInfo.status)}`, 20, yPos);
-      yPos += 6;
-      doc.text(`Progreso: ${projectInfo.progress || 0}%`, 20, yPos);
-      yPos += 6;
+      doc.text(`Nombre: ${projectInfo.name}`, 20, 48);
+      doc.text(`Ubicación: ${projectInfo.location || 'No especificada'}`, 20, 54);
+      doc.text(`Estado: ${translateStatus(projectInfo.status)}`, 20, 60);
+      doc.text(`Progreso: ${projectInfo.progress || 0}%`, 20, 66);
       
       let startDate = 'No especificada';
       if (projectInfo.start_date) {
@@ -248,55 +221,58 @@ export const generateReport = async (reportType: string, projectId: string | nul
         endDate = new Date(projectInfo.end_date).toLocaleDateString('es-ES');
       }
       
-      doc.text(`Fecha inicio: ${startDate}`, 20, yPos);
-      yPos += 6;
-      doc.text(`Fecha fin: ${endDate}`, 20, yPos);
-      yPos += 10;
+      doc.text(`Fecha inicio: ${startDate}`, 20, 72);
+      doc.text(`Fecha fin: ${endDate}`, 20, 78);
     }
     
+    let yPos = projectInfo ? 90 : 40;
+    
+    // Resumen
     if (reportData.summary) {
-      doc.setFontSize(14);
-      doc.text('Resumen Detallado', 14, yPos);
-      yPos += 10;
+      doc.setFontSize(12);
+      doc.text('Resumen', 14, yPos);
+      yPos += 8;
       
       doc.setFontSize(10);
       
-      if (reportData.summary.totalProjects !== undefined) {
-        doc.text(`Total de proyectos: ${reportData.summary.totalProjects}`, 20, yPos);
+      if (reportData.summary.totalSystems !== undefined) {
+        doc.text(`Total de sistemas: ${reportData.summary.totalSystems}`, 20, yPos);
         yPos += 6;
-        if (reportData.summary.completedProjects !== undefined) {
-          doc.text(`Proyectos completados: ${reportData.summary.completedProjects}`, 30, yPos);
-          yPos += 6;
-          doc.text(`Proyectos en progreso: ${reportData.summary.inProgressProjects}`, 30, yPos);
-          yPos += 6;
-          doc.text(`Proyectos retrasados: ${reportData.summary.delayedProjects}`, 30, yPos);
-          yPos += 6;
-        }
       }
       
       if (reportData.summary.totalITRs !== undefined) {
         doc.text(`Total de ITRs: ${reportData.summary.totalITRs}`, 20, yPos);
         yPos += 6;
-        doc.text(`ITRs completados: ${reportData.summary.completedITRs}`, 30, yPos);
-        yPos += 6;
-        doc.text(`ITRs en progreso: ${reportData.summary.inProgressITRs}`, 30, yPos);
-        yPos += 6;
-        doc.text(`ITRs retrasados: ${reportData.summary.delayedITRs}`, 30, yPos);
+      }
+      
+      if (reportData.summary.completedITRs !== undefined) {
+        doc.text(`ITRs completados: ${reportData.summary.completedITRs}`, 20, yPos);
         yPos += 6;
       }
       
-      yPos += 10;
+      if (reportData.summary.inProgressITRs !== undefined) {
+        doc.text(`ITRs en progreso: ${reportData.summary.inProgressITRs}`, 20, yPos);
+        yPos += 6;
+      }
+      
+      if (reportData.summary.delayedITRs !== undefined) {
+        doc.text(`ITRs retrasados: ${reportData.summary.delayedITRs}`, 20, yPos);
+        yPos += 6;
+      }
+      
+      if (reportData.summary.totalTasks !== undefined) {
+        doc.text(`Total de tareas: ${reportData.summary.totalTasks}`, 20, yPos);
+        yPos += 6;
+      }
+      
+      yPos += 8;
     }
     
+    // Tabla de sistemas
     if (reportData.systems && reportData.systems.length > 0) {
-      if (yPos > 230) {
-        doc.addPage();
-        yPos = 20;
-      }
-      
-      doc.setFontSize(14);
+      doc.setFontSize(12);
       doc.text('Sistemas', 14, yPos);
-      yPos += 10;
+      yPos += 8;
       
       const systemsTableData = reportData.systems.map((system: any) => [
         system.name,
@@ -318,15 +294,17 @@ export const generateReport = async (reportType: string, projectId: string | nul
       yPos = (doc as any).lastAutoTable.finalY + 10;
     }
     
+    // Tabla de ITRs
     if (reportData.itrs && reportData.itrs.length > 0) {
+      // Nueva página si es necesario
       if (yPos > 220) {
         doc.addPage();
         yPos = 20;
       }
       
-      doc.setFontSize(14);
+      doc.setFontSize(12);
       doc.text('ITRs', 14, yPos);
-      yPos += 10;
+      yPos += 8;
       
       const itrsTableData = reportData.itrs.map((itr: any) => {
         const subsystemName = itr.subsystems ? itr.subsystems.name : 'N/A';
@@ -339,14 +317,13 @@ export const generateReport = async (reportType: string, projectId: string | nul
           translateStatus(itr.status),
           `${itr.progress || 0}%`,
           itr.start_date ? new Date(itr.start_date).toLocaleDateString('es-ES') : 'N/A',
-          itr.end_date ? new Date(itr.end_date).toLocaleDateString('es-ES') : 'N/A',
-          itr.quantity || 1
+          itr.end_date ? new Date(itr.end_date).toLocaleDateString('es-ES') : 'N/A'
         ];
       });
       
       autoTable(doc, {
         startY: yPos,
-        head: [['Nombre', 'Subsistema', 'Sistema', 'Estado', 'Progreso', 'Inicio', 'Fin', 'Cantidad']],
+        head: [['Nombre', 'Subsistema', 'Sistema', 'Estado', 'Progreso', 'Inicio', 'Fin']],
         body: itrsTableData,
         theme: 'striped',
         styles: { fontSize: 8 },
@@ -356,15 +333,17 @@ export const generateReport = async (reportType: string, projectId: string | nul
       yPos = (doc as any).lastAutoTable.finalY + 10;
     }
     
+    // Tabla de tareas
     if (reportData.tasks && reportData.tasks.length > 0) {
+      // Nueva página si es necesario
       if (yPos > 220) {
         doc.addPage();
         yPos = 20;
       }
       
-      doc.setFontSize(14);
+      doc.setFontSize(12);
       doc.text('Tareas', 14, yPos);
-      yPos += 10;
+      yPos += 8;
       
       const tasksTableData = reportData.tasks.map((task: any) => {
         const subsystemName = task.subsystems ? task.subsystems.name : 'N/A';
@@ -389,6 +368,7 @@ export const generateReport = async (reportType: string, projectId: string | nul
       });
     }
     
+    // Exportar a BLOB
     const pdfBlob = doc.output('blob');
     const url = URL.createObjectURL(pdfBlob);
     return url;
@@ -398,6 +378,7 @@ export const generateReport = async (reportType: string, projectId: string | nul
   }
 };
 
+// Excel export function
 export const exportToExcel = (
   data: any[],
   sheetName: string = 'Sheet1',
