@@ -1,3 +1,4 @@
+
 import { supabase } from "@/integrations/supabase/client";
 import * as XLSX from 'xlsx';
 
@@ -389,8 +390,8 @@ export const importFromExcel = async (excelBuffer: ArrayBuffer): Promise<{ succe
         estado: 'pendiente' as 'pendiente' | 'listo'
       };
 
-      // Create test pack with tags
-      await createTestPack(testPackData, Number(row.tags_count) || 4);
+      // Create test pack
+      await createTestPack(testPackData);
       importedCount++;
     }
 
