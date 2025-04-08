@@ -12,8 +12,8 @@ interface DatabaseActivity {
   created_at: string;
   table_name: string;
   action: string;
-  user_id: string;
-  record_id: string;
+  user_id: string | null;
+  record_id: string | null;
   details?: any;
   userName?: string;
 }
@@ -26,6 +26,7 @@ export const DatabaseActivityTimeline = () => {
     const fetchActivities = async () => {
       try {
         setLoading(true);
+        // We need to use a custom query since db_activity_log is not in the type definition
         const { data, error } = await supabase
           .from('db_activity_log')
           .select('*')
@@ -38,7 +39,7 @@ export const DatabaseActivityTimeline = () => {
         }
 
         // Enrich with user names
-        const enrichedActivities = await Promise.all((data || []).map(async (activity) => {
+        const enrichedActivities = await Promise.all((data || []).map(async (activity: DatabaseActivity) => {
           if (activity.user_id) {
             try {
               const profile = await getUserProfile(activity.user_id);
@@ -60,7 +61,7 @@ export const DatabaseActivityTimeline = () => {
           };
         }));
 
-        setActivities(enrichedActivities);
+        setActivities(enrichedActivities as DatabaseActivity[]);
       } catch (error) {
         console.error('Error:', error);
       } finally {

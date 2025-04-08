@@ -9,6 +9,7 @@ import { ITRList } from "@/components/itr/ITRList";
 import { fetchITRsWithDetails, createTestITRs } from "@/services/itrService";
 import { addSampleITRs } from "@/scripts/addSampleData";
 import { DatabaseActivityTimeline } from "@/components/DatabaseActivityTimeline";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 const ITRs = () => {
   const [itrs, setITRs] = useState<ITRWithDetails[]>([]);
@@ -17,6 +18,7 @@ const ITRs = () => {
   const [loading, setLoading] = useState(true);
   const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null);
   const [addingSampleData, setAddingSampleData] = useState(false);
+  const [activeTab, setActiveTab] = useState("itrs");
   const { toast } = useToast();
 
   const fetchData = async () => {
@@ -114,18 +116,29 @@ const ITRs = () => {
         </div>
       </div>
 
-      <ITRList 
-        itrs={itrs}
-        subsystems={subsystems}
-        systems={systems}
-        loading={loading}
-        selectedProjectId={selectedProjectId}
-        onRefresh={fetchData}
-        onAddSampleData={handleAddSampleData}
-        addingSampleData={addingSampleData}
-      />
-      
-      <DatabaseActivityTimeline />
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+        <TabsList className="grid w-full md:w-[400px] grid-cols-2">
+          <TabsTrigger value="itrs">ITRs</TabsTrigger>
+          <TabsTrigger value="activity">Actividad Reciente</TabsTrigger>
+        </TabsList>
+        
+        <TabsContent value="itrs" className="mt-6">
+          <ITRList 
+            itrs={itrs}
+            subsystems={subsystems}
+            systems={systems}
+            loading={loading}
+            selectedProjectId={selectedProjectId}
+            onRefresh={fetchData}
+            onAddSampleData={handleAddSampleData}
+            addingSampleData={addingSampleData}
+          />
+        </TabsContent>
+        
+        <TabsContent value="activity" className="mt-6">
+          <DatabaseActivityTimeline />
+        </TabsContent>
+      </Tabs>
     </div>
   );
 };

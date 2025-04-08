@@ -163,12 +163,29 @@ interface ActivityLogData {
 
 export const logDatabaseActivity = async (data: ActivityLogData): Promise<void> => {
   try {
+    // Use rpc or direct SQL query instead since the db_activity_log table is not in the TypeScript types
     const { error } = await supabase
-      .from('db_activity_log')
-      .insert(data);
+      .rpc('log_activity', {
+        p_table_name: data.table_name,
+        p_action: data.action,
+        p_user_id: data.user_id,
+        p_record_id: data.record_id,
+        p_details: data.details || {}
+      });
     
     if (error) {
-      console.error("Error logging database activity:", error);
+      // Fall back to direct insert if RPC fails or doesn't exist
+      const { error: insertError } = await supabase.from('db_activity_log').insert({
+        table_name: data.table_name,
+        action: data.action,
+        user_id: data.user_id,
+        record_id: data.record_id,
+        details: data.details || {}
+      });
+      
+      if (insertError) {
+        console.error("Error logging database activity:", insertError);
+      }
     }
   } catch (e) {
     console.error("Error logging database activity:", e);

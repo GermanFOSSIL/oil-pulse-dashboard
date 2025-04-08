@@ -14,7 +14,7 @@ import { Edit, Trash } from "lucide-react";
 interface DataTableProps<T extends Record<string, any>> {
   columns: {
     header: string;
-    accessorKey: keyof T;
+    accessorKey: keyof T | string;
     cell?: (item: T) => React.ReactNode;
   }[];
   data: T[];
@@ -67,7 +67,7 @@ export function DataTable<T extends Record<string, any>>({
                 <TableCell key={colIndex}>
                   {column.cell
                     ? column.cell(item)
-                    : String(item[column.accessorKey] || "")}
+                    : String(item[column.accessorKey as keyof T] || "")}
                 </TableCell>
               ))}
               {(onEdit || onDelete) && (

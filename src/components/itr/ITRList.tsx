@@ -17,15 +17,6 @@ import { ITRFormModal } from "@/components/modals/ITRFormModal";
 import { Subsystem, deleteITR, updateITR } from "@/services/supabaseService";
 import { useToast } from "@/hooks/use-toast";
 import { System } from "@/services/types";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuGroup,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
 
 interface ITRListProps {
   itrs: ITRWithDetails[];
@@ -56,44 +47,47 @@ export const ITRList = ({
   const [markingComplete, setMarkingComplete] = useState<string | null>(null);
   const { toast } = useToast();
 
+  // Modify the ITRWithDetails type to include actions dynamically
+  type ITRWithActions = ITRWithDetails & { actions?: string };
+
   const columns = [
     {
       header: "Nombre ITR",
-      accessorKey: "name" as const,
+      accessorKey: "name" as keyof ITRWithActions,
     },
     {
       header: "Subsistema",
-      accessorKey: "subsystemName" as const,
+      accessorKey: "subsystemName" as keyof ITRWithActions,
     },
     {
       header: "Sistema",
-      accessorKey: "systemName" as const,
-      cell: (item: ITRWithDetails) => <span>{item.systemName || 'No disponible'}</span>,
+      accessorKey: "systemName" as keyof ITRWithActions,
+      cell: (item: ITRWithActions) => <span>{item.systemName || 'No disponible'}</span>,
     },
     {
       header: "Asignado a",
-      accessorKey: "assigned_to" as const,
-      cell: (item: ITRWithDetails) => <span>{item.assigned_to || 'No Asignado'}</span>,
+      accessorKey: "assigned_to" as keyof ITRWithActions,
+      cell: (item: ITRWithActions) => <span>{item.assigned_to || 'No Asignado'}</span>,
     },
     {
       header: "Fecha Inicio",
-      accessorKey: "start_date" as const,
-      cell: (item: ITRWithDetails) => <span>{item.start_date ? new Date(item.start_date).toLocaleDateString('es-ES') : 'Sin Fecha'}</span>,
+      accessorKey: "start_date" as keyof ITRWithActions,
+      cell: (item: ITRWithActions) => <span>{item.start_date ? new Date(item.start_date).toLocaleDateString('es-ES') : 'Sin Fecha'}</span>,
     },
     {
       header: "Fecha Límite",
-      accessorKey: "end_date" as const,
-      cell: (item: ITRWithDetails) => <span>{item.end_date ? new Date(item.end_date).toLocaleDateString('es-ES') : 'Sin Fecha'}</span>,
+      accessorKey: "end_date" as keyof ITRWithActions,
+      cell: (item: ITRWithActions) => <span>{item.end_date ? new Date(item.end_date).toLocaleDateString('es-ES') : 'Sin Fecha'}</span>,
     },
     {
       header: "Estado",
-      accessorKey: "status" as const,
-      cell: (item: ITRWithDetails) => <StatusBadge status={item.status} />,
+      accessorKey: "status" as keyof ITRWithActions,
+      cell: (item: ITRWithActions) => <StatusBadge status={item.status} />,
     },
     {
       header: "Progreso",
-      accessorKey: "progress" as const,
-      cell: (item: ITRWithDetails) => (
+      accessorKey: "progress" as keyof ITRWithActions,
+      cell: (item: ITRWithActions) => (
         <div className="w-full bg-secondary/10 rounded-full h-2.5">
           <div
             className={`h-2.5 rounded-full ${
@@ -110,8 +104,8 @@ export const ITRList = ({
     },
     {
       header: "Acciones",
-      accessorKey: "actions" as const,
-      cell: (item: ITRWithDetails) => (
+      accessorKey: "id" as keyof ITRWithActions, // Use id instead of actions
+      cell: (item: ITRWithActions) => (
         <div className="flex items-center space-x-2">
           <Button 
             variant="outline" 

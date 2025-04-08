@@ -9,6 +9,36 @@ export type Json =
 export type Database = {
   public: {
     Tables: {
+      db_activity_log: {
+        Row: {
+          action: string
+          created_at: string
+          details: Json | null
+          id: string
+          record_id: string | null
+          table_name: string
+          user_id: string | null
+        }
+        Insert: {
+          action: string
+          created_at?: string
+          details?: Json | null
+          id?: string
+          record_id?: string | null
+          table_name: string
+          user_id?: string | null
+        }
+        Update: {
+          action?: string
+          created_at?: string
+          details?: Json | null
+          id?: string
+          record_id?: string | null
+          table_name?: string
+          user_id?: string | null
+        }
+        Relationships: []
+      }
       itrs: {
         Row: {
           assigned_to: string | null
@@ -62,6 +92,7 @@ export type Database = {
           created_at: string
           full_name: string | null
           id: string
+          permissions: string[] | null
           role: string | null
           updated_at: string
         }
@@ -70,6 +101,7 @@ export type Database = {
           created_at?: string
           full_name?: string | null
           id: string
+          permissions?: string[] | null
           role?: string | null
           updated_at?: string
         }
@@ -78,6 +110,7 @@ export type Database = {
           created_at?: string
           full_name?: string | null
           id?: string
+          permissions?: string[] | null
           role?: string | null
           updated_at?: string
         }
