@@ -1,4 +1,3 @@
-
 import React, { useEffect, useRef, useState } from 'react';
 import { gantt } from 'dhtmlx-gantt';
 import 'dhtmlx-gantt/codebase/dhtmlxgantt.css';
@@ -332,24 +331,32 @@ export const EnhancedGanttChart: React.FC<EnhancedGanttProps> = ({ data }) => {
   // Actualizar los datos cuando cambian o al cambiar la fecha/vista
   useEffect(() => {
     if (initialized && data.length > 0) {
-      // Preparar los datos con el formato requerido por dhtmlxGantt
-      const tasks = {
-        data: data.map(item => ({
+      // Ensure all dates are valid
+      const processedData = data.map(item => {
+        // Create valid dates or default to now() for start and one week later for end
+        const startDate = item.start ? new Date(item.start) : new Date();
+        const endDate = item.end ? new Date(item.end) : new Date(startDate);
+        
+        // If end date is before or same as start date, set it to one week later
+        if (endDate <= startDate) {
+          endDate.setDate(startDate.getDate() + 7);
+        }
+        
+        return {
           id: item.id,
           text: item.task,
-          start_date: new Date(item.start),
-          end_date: new Date(item.end),
+          start_date: startDate,
+          end_date: endDate,
           progress: item.progress / 100, // Convert from percentage to decimal
           parent: item.parent || 0,
           type: item.type,
           status: item.status,
           open: true,
-          duration: Math.ceil((new Date(item.end).getTime() - new Date(item.start).getTime()) / (24 * 60 * 60 * 1000))
-        })),
-        links: []
-      };
-      
-      // Actualizar escala temporal según la vista seleccionada
+          duration: Math.ceil((endDate.getTime() - startDate.getTime()) / (24 * 60 * 60 * 1000))
+        };
+      });
+
+      // Configurar escala temporal según la vista seleccionada
       if (viewMode === "month") {
         gantt.config.scales = [
           { unit: "month", step: 1, format: "%F %Y" },
@@ -369,7 +376,10 @@ export const EnhancedGanttChart: React.FC<EnhancedGanttProps> = ({ data }) => {
       
       // Cargar datos y mostrar fecha actual
       gantt.clearAll();
-      gantt.parse(tasks);
+      gantt.parse({
+        data: processedData,
+        links: []
+      });
       gantt.showDate(currentDate);
       
       // Expandir todos los nodos

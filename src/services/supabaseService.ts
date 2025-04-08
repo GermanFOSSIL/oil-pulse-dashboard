@@ -1,3 +1,4 @@
+
 import { supabase } from "@/integrations/supabase/client";
 import { Database } from "@/integrations/supabase/types";
 import { toast } from "@/hooks/use-toast";
@@ -13,6 +14,8 @@ export type Project = {
   location: string | null;
   status: "complete" | "inprogress" | "delayed";
   progress: number | null;
+  start_date: string | null;
+  end_date: string | null;
 };
 
 export type System = {
@@ -22,6 +25,8 @@ export type System = {
   name: string;
   project_id: string;
   completion_rate: number | null;
+  start_date: string | null;
+  end_date: string | null;
 };
 
 export type Subsystem = {
@@ -31,6 +36,8 @@ export type Subsystem = {
   name: string;
   system_id: string;
   completion_rate: number | null;
+  start_date: string | null;
+  end_date: string | null;
 };
 
 export type ITR = {
@@ -41,7 +48,8 @@ export type ITR = {
   subsystem_id: string;
   status: "complete" | "inprogress" | "delayed";
   progress: number | null;
-  due_date: string | null;
+  start_date: string | null;
+  end_date: string | null;
   assigned_to: string | null;
 };
 

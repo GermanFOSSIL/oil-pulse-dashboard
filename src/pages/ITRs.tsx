@@ -119,9 +119,14 @@ const ITRs = () => {
       cell: (itr: ITRWithDetails) => <span>{itr.assigned_to || 'No Asignado'}</span>,
     },
     {
+      header: "Fecha Inicio",
+      accessorKey: "start_date" as const,
+      cell: (itr: ITRWithDetails) => <span>{itr.start_date ? new Date(itr.start_date).toLocaleDateString('es-ES') : 'Sin Fecha'}</span>,
+    },
+    {
       header: "Fecha Límite",
-      accessorKey: "due_date" as const,
-      cell: (itr: ITRWithDetails) => <span>{itr.due_date ? new Date(itr.due_date).toLocaleDateString('es-ES') : 'Sin Fecha'}</span>,
+      accessorKey: "end_date" as const,
+      cell: (itr: ITRWithDetails) => <span>{itr.end_date ? new Date(itr.end_date).toLocaleDateString('es-ES') : 'Sin Fecha'}</span>,
     },
     {
       header: "Estado",

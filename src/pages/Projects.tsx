@@ -41,6 +41,20 @@ const Projects = () => {
       accessorKey: "location" as const,
     },
     {
+      header: "Fecha Inicio",
+      accessorKey: "start_date" as const,
+      cell: (project: Project) => (
+        <span>{project.start_date ? new Date(project.start_date).toLocaleDateString('es-ES') : 'Sin Fecha'}</span>
+      ),
+    },
+    {
+      header: "Fecha Fin",
+      accessorKey: "end_date" as const,
+      cell: (project: Project) => (
+        <span>{project.end_date ? new Date(project.end_date).toLocaleDateString('es-ES') : 'Sin Fecha'}</span>
+      ),
+    },
+    {
       header: "Estado",
       accessorKey: "status" as const,
       cell: (project: Project) => (
@@ -53,8 +67,14 @@ const Projects = () => {
       cell: (project: Project) => (
         <div className="w-full bg-secondary/10 rounded-full h-2.5">
           <div
-            className="bg-secondary h-2.5 rounded-full"
-            style={{ width: `${project.progress}%` }}
+            className={`h-2.5 rounded-full ${
+              project.status === "complete"
+                ? "bg-status-complete"
+                : project.status === "delayed"
+                ? "bg-status-delayed"
+                : "bg-status-inprogress"
+            }`}
+            style={{ width: `${project.progress || 0}%` }}
           ></div>
         </div>
       ),

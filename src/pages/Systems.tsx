@@ -55,6 +55,20 @@ const Systems = () => {
       ),
     },
     {
+      header: "Fecha Inicio",
+      accessorKey: "start_date" as const,
+      cell: (system: System) => (
+        <span>{system.start_date ? new Date(system.start_date).toLocaleDateString('es-ES') : 'Sin Fecha'}</span>
+      ),
+    },
+    {
+      header: "Fecha Fin",
+      accessorKey: "end_date" as const,
+      cell: (system: System) => (
+        <span>{system.end_date ? new Date(system.end_date).toLocaleDateString('es-ES') : 'Sin Fecha'}</span>
+      ),
+    },
+    {
       header: "Tasa de Completado",
       accessorKey: "completion_rate" as const,
       cell: (system: System) => (

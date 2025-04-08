@@ -13,10 +13,11 @@ export type Database = {
         Row: {
           assigned_to: string | null
           created_at: string
-          due_date: string | null
+          end_date: string | null
           id: string
           name: string
           progress: number | null
+          start_date: string | null
           status: string
           subsystem_id: string
           updated_at: string
@@ -24,10 +25,11 @@ export type Database = {
         Insert: {
           assigned_to?: string | null
           created_at?: string
-          due_date?: string | null
+          end_date?: string | null
           id?: string
           name: string
           progress?: number | null
+          start_date?: string | null
           status?: string
           subsystem_id: string
           updated_at?: string
@@ -35,10 +37,11 @@ export type Database = {
         Update: {
           assigned_to?: string | null
           created_at?: string
-          due_date?: string | null
+          end_date?: string | null
           id?: string
           name?: string
           progress?: number | null
+          start_date?: string | null
           status?: string
           subsystem_id?: string
           updated_at?: string
@@ -83,28 +86,34 @@ export type Database = {
       projects: {
         Row: {
           created_at: string
+          end_date: string | null
           id: string
           location: string | null
           name: string
           progress: number | null
+          start_date: string | null
           status: string
           updated_at: string
         }
         Insert: {
           created_at?: string
+          end_date?: string | null
           id?: string
           location?: string | null
           name: string
           progress?: number | null
+          start_date?: string | null
           status?: string
           updated_at?: string
         }
         Update: {
           created_at?: string
+          end_date?: string | null
           id?: string
           location?: string | null
           name?: string
           progress?: number | null
+          start_date?: string | null
           status?: string
           updated_at?: string
         }
@@ -114,24 +123,30 @@ export type Database = {
         Row: {
           completion_rate: number | null
           created_at: string
+          end_date: string | null
           id: string
           name: string
+          start_date: string | null
           system_id: string
           updated_at: string
         }
         Insert: {
           completion_rate?: number | null
           created_at?: string
+          end_date?: string | null
           id?: string
           name: string
+          start_date?: string | null
           system_id: string
           updated_at?: string
         }
         Update: {
           completion_rate?: number | null
           created_at?: string
+          end_date?: string | null
           id?: string
           name?: string
+          start_date?: string | null
           system_id?: string
           updated_at?: string
         }
@@ -149,25 +164,31 @@ export type Database = {
         Row: {
           completion_rate: number | null
           created_at: string
+          end_date: string | null
           id: string
           name: string
           project_id: string
+          start_date: string | null
           updated_at: string
         }
         Insert: {
           completion_rate?: number | null
           created_at?: string
+          end_date?: string | null
           id?: string
           name: string
           project_id: string
+          start_date?: string | null
           updated_at?: string
         }
         Update: {
           completion_rate?: number | null
           created_at?: string
+          end_date?: string | null
           id?: string
           name?: string
           project_id?: string
+          start_date?: string | null
           updated_at?: string
         }
         Relationships: [
