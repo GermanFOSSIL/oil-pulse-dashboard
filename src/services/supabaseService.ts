@@ -59,11 +59,11 @@ export const generateImportTemplate = async () => {
     return wbout;
   } catch (error) {
     console.error("Error generating import template:", error);
-    return new ArrayBuffer(0); // Return empty buffer on error
+    return null; // Return null on error instead of empty buffer
   }
 };
 
-export const importDataFromExcel = async (data?: ArrayBuffer) => {
+export const importDataFromExcel = async (data: ArrayBuffer) => {
   try {
     if (!data) {
       console.log("No data provided for import");

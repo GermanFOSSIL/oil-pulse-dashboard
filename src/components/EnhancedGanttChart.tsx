@@ -3,7 +3,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { gantt } from 'dhtmlx-gantt';
 import 'dhtmlx-gantt/codebase/dhtmlxgantt.css';
 import { Button } from '@/components/ui/button';
-import { Download, ChevronLeft, ChevronRight, Calendar, Search } from 'lucide-react';
+import { Download, ChevronLeft, ChevronRight, Calendar, Search, FileText } from 'lucide-react';
 import { format, addMonths, subMonths } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { 
@@ -14,6 +14,9 @@ import {
   SelectValue
 } from '@/components/ui/select';
 import * as XLSX from 'xlsx';
+import { jsPDF } from 'jspdf';
+import 'jspdf-autotable';
+import html2canvas from 'html2canvas';
 
 interface GanttItem {
   id: string;
@@ -33,6 +36,7 @@ interface EnhancedGanttProps {
 
 export const EnhancedGanttChart: React.FC<EnhancedGanttProps> = ({ data }) => {
   const containerRef = useRef<HTMLDivElement>(null);
+  const ganttChartRef = useRef<HTMLDivElement>(null);
   const [currentDate, setCurrentDate] = useState(new Date());
   const [viewMode, setViewMode] = useState<string>("month");
   const [initialized, setInitialized] = useState(false);
@@ -86,6 +90,60 @@ export const EnhancedGanttChart: React.FC<EnhancedGanttProps> = ({ data }) => {
       XLSX.writeFile(wb, `Cronograma_${format(new Date(), 'yyyyMMdd')}.xlsx`);
     } catch (error) {
       console.error("Error exporting data to Excel:", error);
+    }
+  };
+
+  // Function to export Gantt chart as PDF
+  const exportToPDF = async () => {
+    try {
+      if (!ganttChartRef.current) return;
+
+      // Create new landscape A3 PDF
+      const pdf = new jsPDF({
+        orientation: 'landscape',
+        unit: 'mm',
+        format: 'a3'
+      });
+
+      // Get the gantt chart container
+      const ganttContainer = ganttChartRef.current;
+      
+      // Use html2canvas to capture the Gantt chart
+      const canvas = await html2canvas(ganttContainer, {
+        scale: 2, // Higher scale for better quality
+        logging: false,
+        useCORS: true,
+        allowTaint: true,
+        backgroundColor: '#ffffff'
+      });
+      
+      const imgData = canvas.toDataURL('image/jpeg', 0.95);
+      
+      // Add title to PDF
+      pdf.setFontSize(16);
+      pdf.text('Cronograma de ITRs', 20, 15);
+      pdf.setFontSize(10);
+      pdf.text(`Fecha de exportación: ${format(new Date(), 'dd/MM/yyyy')}`, 20, 22);
+      
+      // Calculate dimensions to fit the page while maintaining aspect ratio
+      const pdfWidth = pdf.internal.pageSize.getWidth();
+      const pdfHeight = pdf.internal.pageSize.getHeight();
+      
+      const imgWidth = canvas.width;
+      const imgHeight = canvas.height;
+      
+      const ratio = Math.min(pdfWidth / imgWidth, (pdfHeight - 30) / imgHeight);
+      
+      const imgX = (pdfWidth - imgWidth * ratio) / 2;
+      const imgY = 30; // Start after the title
+      
+      // Add the image to the PDF
+      pdf.addImage(imgData, 'JPEG', imgX, imgY, imgWidth * ratio, imgHeight * ratio);
+      
+      // Save the PDF
+      pdf.save(`Cronograma_ITRs_${format(new Date(), 'yyyyMMdd')}.pdf`);
+    } catch (error) {
+      console.error("Error exporting to PDF:", error);
     }
   };
 
@@ -267,39 +325,41 @@ export const EnhancedGanttChart: React.FC<EnhancedGanttProps> = ({ data }) => {
           border-radius: 4px;
         }
         .gantt-task-project {
-          background-color: #a855f7;
-          border-color: #9333ea;
-          color: white;
+          background-color: #a855f7 !important;
+          border-color: #9333ea !important;
+          color: white !important;
           font-weight: bold;
           height: 22px !important;
           line-height: 22px !important;
           margin-top: -3px;
         }
         .gantt-task-system {
-          background-color: #3b82f6;
-          border-color: #2563eb;
-          color: white;
+          background-color: #3b82f6 !important;
+          border-color: #2563eb !important;
+          color: white !important;
           height: 18px !important;
           line-height: 18px !important;
           margin-top: -1px;
         }
         .gantt-task-subsystem {
-          background-color: #22c55e;
-          border-color: #16a34a;
-          color: white;
+          background-color: #22c55e !important;
+          border-color: #16a34a !important;
+          color: white !important;
         }
         .gantt-task-itr {
           background-color: #f97316 !important;
           border-color: #ea580c !important;
-          color: white;
+          color: white !important;
         }
         .gantt-task-complete {
           background-color: #10b981 !important;
           border-color: #059669 !important;
+          color: white !important;
         }
         .gantt-task-delayed {
           background-color: #ef4444 !important;
           border-color: #dc2626 !important;
+          color: white !important;
         }
         .gantt_grid_head_cell {
           font-weight: bold;
@@ -434,7 +494,7 @@ export const EnhancedGanttChart: React.FC<EnhancedGanttProps> = ({ data }) => {
   }, [data, currentDate, viewMode, initialized]);
   
   return (
-    <div className="flex flex-col space-y-4">
+    <div className="flex flex-col space-y-4" ref={ganttChartRef}>
       <div className="flex justify-between items-center px-4 pt-2">
         <div className="flex items-center space-x-2">
           <Button variant="outline" size="icon" onClick={goToPreviousMonth}>
@@ -467,7 +527,11 @@ export const EnhancedGanttChart: React.FC<EnhancedGanttProps> = ({ data }) => {
           </Button>
           <Button variant="outline" onClick={exportToExcel}>
             <Download className="h-4 w-4 mr-2" />
-            Exportar
+            Excel
+          </Button>
+          <Button variant="outline" onClick={exportToPDF}>
+            <FileText className="h-4 w-4 mr-2" />
+            PDF
           </Button>
         </div>
       </div>
