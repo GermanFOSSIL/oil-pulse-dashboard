@@ -11,6 +11,8 @@ import { useTestPacks } from "@/hooks/useTestPacks";
 import { ErrorBoundary } from "react-error-boundary";
 import { Button } from "@/components/ui/button";
 import { AlertTriangle } from "lucide-react";
+import { useParams, useNavigate } from "react-router-dom";
+import { useEffect } from "react";
 
 // Error fallback component
 const ErrorFallback = ({ error, resetErrorBoundary }: { error: Error, resetErrorBoundary: () => void }) => (
@@ -27,6 +29,11 @@ const ErrorFallback = ({ error, resetErrorBoundary }: { error: Error, resetError
 );
 
 const TestPacks = () => {
+  const params = useParams();
+  const navigate = useNavigate();
+  const testPackId = params.id;
+  const isEditMode = params.action === 'edit';
+
   const {
     selectedTab,
     showImportDialog,
@@ -47,8 +54,20 @@ const TestPacks = () => {
     openNewTestPackForm,
     openImportDialog,
     handleFormSuccess,
-    handleImportSuccess
+    handleImportSuccess,
+    openEditTestPackForm
   } = useTestPacks();
+
+  // Handle URL-based editing
+  useEffect(() => {
+    if (isEditMode && testPackId) {
+      const testPack = testPacks?.find(tp => tp.id === testPackId);
+      if (testPack) {
+        openEditTestPackForm(testPack);
+        navigate('/testpacks', { replace: true });
+      }
+    }
+  }, [isEditMode, testPackId, testPacks, navigate, openEditTestPackForm]);
 
   return (
     <div className="container mx-auto py-6 space-y-6">

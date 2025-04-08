@@ -7,7 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { SearchIcon, FilterIcon, X } from "lucide-react";
+import { SearchIcon, FilterIcon, X, Edit, Trash } from "lucide-react";
 import TestPackTags from "./TestPackTags";
 
 interface TestPackListProps {
@@ -182,9 +182,21 @@ const TestPackList = ({
                       ITR: {testPack.itr_name || testPack.itr_asociado} | Sistema: {testPack.sistema} | Subsistema: {testPack.subsistema}
                     </CardDescription>
                   </div>
-                  <Badge variant={testPack.estado === 'listo' ? 'default' : 'outline'}>
-                    {testPack.estado === 'listo' ? 'Listo' : 'Pendiente'}
-                  </Badge>
+                  <div className="flex items-center space-x-2">
+                    <Badge variant={testPack.estado === 'listo' ? 'default' : 'outline'}>
+                      {testPack.estado === 'listo' ? 'Listo' : 'Pendiente'}
+                    </Badge>
+                    {userRole === 'admin' && (
+                      <div className="flex space-x-1">
+                        <Button variant="outline" size="icon" className="h-8 w-8" onClick={() => window.location.href = `/testpacks/edit/${testPack.id}`}>
+                          <Edit className="h-4 w-4" />
+                        </Button>
+                        <Button variant="outline" size="icon" className="h-8 w-8 text-destructive hover:bg-destructive hover:text-white">
+                          <Trash className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    )}
+                  </div>
                 </div>
               </CardHeader>
               

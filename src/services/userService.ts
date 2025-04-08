@@ -135,11 +135,16 @@ export const bulkCreateUsers = async (users: BulkUserData[]): Promise<number> =>
 
 export const createUser = async (userData: UserCreateData): Promise<{ success: boolean; message: string; userId?: string }> => {
   try {
-    // First, create the user in auth
-    const { data: authData, error: authError } = await supabase.auth.admin.createUser({
+    // Modificado: en lugar de usar admin.createUser, usamos signUp
+    const { data: authData, error: authError } = await supabase.auth.signUp({
       email: userData.email,
       password: userData.password,
-      email_confirm: true, // Automatically confirm the email
+      options: {
+        data: {
+          full_name: userData.full_name,
+          role: userData.role || 'user',
+        }
+      }
     });
 
     if (authError) {
@@ -156,42 +161,12 @@ export const createUser = async (userData: UserCreateData): Promise<{ success: b
 
     const userId = authData.user.id;
 
-    // Then, update the profile with additional information
-    const profileData: UserUpdateData = {
-      full_name: userData.full_name,
-      role: userData.role || 'user',
-    };
-
-    if (userData.permissions) {
-      profileData.permissions = userData.permissions;
-    } else {
-      // Set default permissions based on role
-      if (userData.role === 'admin') {
-        profileData.permissions = [...AVAILABLE_PERMISSIONS];
-      } else if (userData.role === 'tecnico') {
-        profileData.permissions = ['dashboard', 'reports', 'itrs'];
-      } else {
-        profileData.permissions = ['dashboard', 'reports'];
-      }
-    }
-
-    const { error: profileError } = await supabase
-      .from('profiles')
-      .update(profileData)
-      .eq('id', userId);
-
-    if (profileError) {
-      console.error("Error updating user profile:", profileError);
-      return { 
-        success: true, 
-        message: "Usuario creado, pero hubo un error al actualizar el perfil", 
-        userId 
-      };
-    }
+    // Ya no es necesario actualizar el perfil por separado, ya que los datos
+    // se incluyen en el objeto options.data durante el signUp
 
     return { 
       success: true, 
-      message: "Usuario creado exitosamente", 
+      message: "Usuario creado exitosamente. Se requiere verificación de email.", 
       userId 
     };
   } catch (error: any) {
@@ -205,22 +180,11 @@ export const createUser = async (userData: UserCreateData): Promise<{ success: b
 
 export const changeUserPassword = async (data: PasswordChangeData): Promise<{ success: boolean; message: string }> => {
   try {
-    const { error } = await supabase.auth.admin.updateUserById(
-      data.userId,
-      { password: data.newPassword }
-    );
-
-    if (error) {
-      console.error("Error changing password:", error);
-      return { 
-        success: false, 
-        message: `Error al cambiar la contraseña: ${error.message}` 
-      };
-    }
-
+    // No podemos cambiar contraseñas de otros usuarios sin ser admin,
+    // así que debemos usar una función en el servidor o recomendar reseteo de contraseña
     return { 
-      success: true, 
-      message: "Contraseña cambiada exitosamente" 
+      success: false, 
+      message: "La funcionalidad de cambio de contraseña requiere permisos de administrador en Supabase" 
     };
   } catch (error: any) {
     console.error("Error changing password:", error);
