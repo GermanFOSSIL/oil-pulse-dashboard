@@ -342,7 +342,9 @@ const ITRs = () => {
           onClose={handleModalClose}
           onSuccess={handleModalSuccess}
           itr={selectedITR}
-          subsystems={subsystems.filter(subsystem => systems.some(system => system.id === subsystem.system_id))}
+          subsystems={subsystems.filter(subsystem => 
+            systems.some(system => system.id === subsystem.system_id)
+          )}
         />
       )}
     </div>

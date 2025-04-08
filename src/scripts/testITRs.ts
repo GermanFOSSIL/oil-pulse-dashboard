@@ -28,7 +28,7 @@ export const createTestITRs = async () => {
           subsystem_id: subsystemId,
           status: i % 3 === 0 ? "delayed" : i % 2 === 0 ? "complete" : "inprogress",
           progress: i * 25, // 25, 50, 75, 100
-          assigned_to: `Técnico ${i}`,
+          assigned_to: `Técnico ${i}`, // Ahora esto es un string, no un UUID
           start_date: startDate.toISOString().split('T')[0],
           end_date: endDate.toISOString().split('T')[0]
         })

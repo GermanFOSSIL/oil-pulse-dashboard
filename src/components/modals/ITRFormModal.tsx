@@ -65,14 +65,13 @@ export const ITRFormModal = ({
       // Depurar los datos enviados
       console.log("Enviando datos a Supabase:", {
         ...formData,
-        // Convertir assigned_to a null si está vacío
+        // Ahora assigned_to es un string, no un UUID, así que lo dejamos tal cual
         assigned_to: formData.assigned_to || null
       });
       
       if (isEditMode && itr) {
         await updateITR(itr.id, {
           ...formData,
-          // Convertir assigned_to a null si está vacío
           assigned_to: formData.assigned_to || null
         });
         toast({
@@ -82,7 +81,6 @@ export const ITRFormModal = ({
       } else {
         await createITR({
           ...formData,
-          // Convertir assigned_to a null si está vacío
           assigned_to: formData.assigned_to || null
         });
         toast({
