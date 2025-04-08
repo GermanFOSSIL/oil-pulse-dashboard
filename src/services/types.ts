@@ -106,3 +106,10 @@ export type DBActivity = {
   details?: any;
   userName?: string;
 };
+
+export type ITRWithSystem = ITR & {
+  subsystemName: string;
+  systemName: string;
+  projectName?: string;
+  selected?: boolean;
+};

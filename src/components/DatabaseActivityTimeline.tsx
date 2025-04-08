@@ -7,6 +7,7 @@ import { Separator } from "@/components/ui/separator";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import { DBActivity } from "@/services/types";
+import { Calendar } from "lucide-react";
 
 export const DatabaseActivityTimeline = () => {
   const [activities, setActivities] = useState<DBActivity[]>([]);
@@ -154,7 +155,7 @@ export const DatabaseActivityTimeline = () => {
                     {getActionText(activity)}
                   </p>
                   <div className="mt-2 flex items-center text-xs text-muted-foreground">
-                    <CalendarIcon className="mr-1 h-3 w-3" />
+                    <Calendar className="mr-1 h-3 w-3" />
                     <span>
                       Responsable: {activity.userName}
                     </span>
