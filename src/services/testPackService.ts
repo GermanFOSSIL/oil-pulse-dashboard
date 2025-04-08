@@ -155,6 +155,8 @@ export const getTestPackWithTags = async (testPackId: string): Promise<TestPack 
 // Create a new test pack
 export const createTestPack = async (testPackData: Omit<TestPack, "id" | "created_at" | "updated_at">, tagsCount: number = 0): Promise<TestPack> => {
   try {
+    console.log("Creating test pack with data:", testPackData, "and tags count:", tagsCount);
+    
     // Create the test pack
     const { data, error } = await supabase
       .from('test_packs')
@@ -168,6 +170,7 @@ export const createTestPack = async (testPackData: Omit<TestPack, "id" | "create
     }
 
     const newTestPack = data as TestPack;
+    console.log("New test pack created:", newTestPack);
 
     // Create the tags if tagsCount > 0
     if (tagsCount > 0) {
@@ -182,7 +185,13 @@ export const createTestPack = async (testPackData: Omit<TestPack, "id" | "create
         return createTag(tagData);
       });
 
-      await Promise.all(tagPromises);
+      try {
+        await Promise.all(tagPromises);
+        console.log(`${tagsCount} tags created successfully`);
+      } catch (tagError) {
+        console.error("Error creating tags:", tagError);
+        // Continue despite tag creation errors
+      }
     }
 
     return newTestPack;
@@ -235,11 +244,19 @@ export const createTag = async (tagData: Omit<Tag, "id" | "created_at" | "update
     }
 
     // Log the tag creation action
-    await logTagAction({
-      usuario_id: 'system', // This should be the current user's ID in a real application
-      tag_id: data.id,
-      accion: 'creó'
-    });
+    try {
+      const { data: session } = await supabase.auth.getSession();
+      const userId = session.session?.user.id || 'system';
+      
+      await logTagAction({
+        usuario_id: userId,
+        tag_id: data.id,
+        accion: 'creó'
+      });
+    } catch (err) {
+      console.error("Error logging tag action:", err);
+      // Don't throw here, just log the error
+    }
 
     return data as Tag;
   } catch (error) {
@@ -402,102 +419,114 @@ export const getTestPacksStats = async (): Promise<any> => {
     const releasedTags = tags.filter(tag => tag.estado === 'liberado').length;
     const tagsProgress = totalTags > 0 ? Math.round((releasedTags / totalTags) * 100) : 0;
 
-    // Group by system
-    const systemMap = new Map<string, { count: number; completed: number; name: string }>();
-    testPacks.forEach(tp => {
-      if (!systemMap.has(tp.sistema)) {
-        systemMap.set(tp.sistema, { 
-          count: 0, 
-          completed: 0,
-          name: tp.sistema
+    // Initialize empty arrays to avoid null/undefined issues
+    const systems = [];
+    const itrs = [];
+    const subsystems = [];
+
+    // Only process the data if we have test packs
+    if (testPacks.length > 0) {
+      // Group by system
+      const systemMap = new Map<string, { count: number; completed: number; name: string }>();
+      testPacks.forEach(tp => {
+        if (!systemMap.has(tp.sistema)) {
+          systemMap.set(tp.sistema, { 
+            count: 0, 
+            completed: 0,
+            name: tp.sistema
+          });
+        }
+        
+        const existing = systemMap.get(tp.sistema)!;
+        existing.count += 1;
+        if (tp.estado === 'listo') {
+          existing.completed += 1;
+        }
+      });
+
+      // Group by subsystem
+      const subsystemMap = new Map<string, { 
+        count: number; 
+        completed: number; 
+        name: string;
+        system: string;
+        progress: number;
+      }>();
+      
+      testPacks.forEach(tp => {
+        if (!subsystemMap.has(tp.subsistema)) {
+          subsystemMap.set(tp.subsistema, { 
+            count: 0, 
+            completed: 0,
+            name: tp.subsistema,
+            system: tp.sistema,
+            progress: 0
+          });
+        }
+        
+        const existing = subsystemMap.get(tp.subsistema)!;
+        existing.count += 1;
+        if (tp.estado === 'listo') {
+          existing.completed += 1;
+        }
+        existing.progress = Math.round((existing.completed / existing.count) * 100);
+      });
+
+      // Group by ITR
+      const itrMap = new Map<string, { 
+        count: number; 
+        completed: number;
+        name: string;
+        progress: number;
+      }>();
+      
+      testPacks.forEach(tp => {
+        if (!itrMap.has(tp.itr_asociado)) {
+          itrMap.set(tp.itr_asociado, { 
+            count: 0, 
+            completed: 0,
+            name: tp.itr_asociado,
+            progress: 0
+          });
+        }
+        
+        const existing = itrMap.get(tp.itr_asociado)!;
+        existing.count += 1;
+        if (tp.estado === 'listo') {
+          existing.completed += 1;
+        }
+        existing.progress = existing.count > 0 ? Math.round((existing.completed / existing.count) * 100) : 0;
+      });
+
+      // Create arrays with progress
+      for (const [name, stats] of systemMap.entries()) {
+        systems.push({
+          name,
+          total: stats.count,
+          completed: stats.completed,
+          progress: stats.count > 0 ? Math.round((stats.completed / stats.count) * 100) : 0
         });
       }
-      
-      const existing = systemMap.get(tp.sistema)!;
-      existing.count += 1;
-      if (tp.estado === 'listo') {
-        existing.completed += 1;
-      }
-    });
 
-    // Group by subsystem
-    const subsystemMap = new Map<string, { 
-      count: number; 
-      completed: number; 
-      name: string;
-      system: string;
-      progress: number;
-    }>();
-    
-    testPacks.forEach(tp => {
-      if (!subsystemMap.has(tp.subsistema)) {
-        subsystemMap.set(tp.subsistema, { 
-          count: 0, 
-          completed: 0,
-          name: tp.subsistema,
-          system: tp.sistema,
-          progress: 0
+      for (const [name, stats] of itrMap.entries()) {
+        itrs.push({
+          name,
+          total: stats.count,
+          completed: stats.completed,
+          progress: stats.progress
         });
       }
-      
-      const existing = subsystemMap.get(tp.subsistema)!;
-      existing.count += 1;
-      if (tp.estado === 'listo') {
-        existing.completed += 1;
-      }
-      existing.progress = Math.round((existing.completed / existing.count) * 100);
-    });
 
-    // Group by ITR
-    const itrMap = new Map<string, { 
-      count: number; 
-      completed: number;
-      name: string;
-      progress: number;
-    }>();
-    
-    testPacks.forEach(tp => {
-      if (!itrMap.has(tp.itr_asociado)) {
-        itrMap.set(tp.itr_asociado, { 
-          count: 0, 
-          completed: 0,
-          name: tp.itr_asociado,
-          progress: 0
+      for (const [name, stats] of subsystemMap.entries()) {
+        subsystems.push({
+          name,
+          system: stats.system,
+          total: stats.count,
+          completed: stats.completed,
+          progress: stats.progress
         });
       }
-      
-      const existing = itrMap.get(tp.itr_asociado)!;
-      existing.count += 1;
-      if (tp.estado === 'listo') {
-        existing.completed += 1;
-      }
-      existing.progress = existing.count > 0 ? Math.round((existing.completed / existing.count) * 100) : 0;
-    });
-
-    // Create Systems array with progress
-    const systems = Array.from(systemMap.entries()).map(([name, stats]) => ({
-      name,
-      total: stats.count,
-      completed: stats.completed,
-      progress: stats.count > 0 ? Math.round((stats.completed / stats.count) * 100) : 0
-    }));
-
-    // Create ITRs array with progress
-    const itrs = Array.from(itrMap.entries()).map(([name, stats]) => ({
-      name,
-      total: stats.count,
-      completed: stats.completed,
-      progress: stats.progress
-    }));
-
-    // Create Subsystems array
-    const subsystems = Array.from(subsystemMap.entries()).map(([name, stats]) => ({
-      name,
-      system: stats.system,
-      total: stats.count,
-      completed: stats.completed,
-      progress: stats.progress
-    }));
+    }
 
     return {
       testPacks: {

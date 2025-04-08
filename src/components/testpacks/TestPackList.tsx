@@ -21,7 +21,6 @@ interface TestPackListProps {
 const TestPackList = ({ 
   testPacks, 
   isLoading,
-
   onTagRelease,
   userRole,
   onClearFilters
@@ -120,7 +119,7 @@ const TestPackList = ({
                 <SelectValue placeholder="Sistema" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="">Todos los sistemas</SelectItem>
+                <SelectItem value="all">Todos los sistemas</SelectItem>
                 {systems.map(system => (
                   <SelectItem key={system} value={system}>{system}</SelectItem>
                 ))}
@@ -130,13 +129,13 @@ const TestPackList = ({
             <Select
               value={filter.subsistema}
               onValueChange={value => setFilter({...filter, subsistema: value})}
-              disabled={!filter.sistema}
+              disabled={!filter.sistema || filter.sistema === "all"}
             >
               <SelectTrigger>
-                <SelectValue placeholder={filter.sistema ? "Subsistema" : "Primero seleccione un sistema"} />
+                <SelectValue placeholder={filter.sistema && filter.sistema !== "all" ? "Subsistema" : "Primero seleccione un sistema"} />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="">Todos los subsistemas</SelectItem>
+                <SelectItem value="all">Todos los subsistemas</SelectItem>
                 {subsystems.map(subsystem => (
                   <SelectItem key={subsystem} value={subsystem}>{subsystem}</SelectItem>
                 ))}
@@ -151,7 +150,7 @@ const TestPackList = ({
                 <SelectValue placeholder="Estado" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="">Todos los estados</SelectItem>
+                <SelectItem value="all">Todos los estados</SelectItem>
                 <SelectItem value="pendiente">Pendiente</SelectItem>
                 <SelectItem value="listo">Listo</SelectItem>
               </SelectContent>

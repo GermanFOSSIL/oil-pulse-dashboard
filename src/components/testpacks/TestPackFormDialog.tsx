@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
@@ -120,6 +121,10 @@ const TestPackFormDialog = ({ open, onOpenChange, testPack, onSuccess }: TestPac
         itr_asociado: testPack.itr_asociado,
         tagsCount: 10
       });
+      
+      // Set selected values for dropdowns
+      setSelectedSystem(testPack.sistema);
+      setSelectedSubsystem(testPack.subsistema);
     }
   }, [testPack, form]);
 
@@ -256,11 +261,15 @@ const TestPackFormDialog = ({ open, onOpenChange, testPack, onSuccess }: TestPac
                       </SelectTrigger>
                     </FormControl>
                     <SelectContent>
-                      {itrs.map((itr) => (
-                        <SelectItem key={itr.id} value={itr.id}>
-                          {itr.name} ({itr.quantity} TAGs)
-                        </SelectItem>
-                      ))}
+                      {itrs.length > 0 ? (
+                        itrs.map((itr) => (
+                          <SelectItem key={itr.id} value={itr.id}>
+                            {itr.name} ({itr.quantity} TAGs)
+                          </SelectItem>
+                        ))
+                      ) : (
+                        <SelectItem value="no-itrs" disabled>No hay ITRs disponibles</SelectItem>
+                      )}
                     </SelectContent>
                   </Select>
                   <FormMessage />

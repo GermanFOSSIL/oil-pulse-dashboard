@@ -72,19 +72,30 @@ export const useTestPacks = () => {
   } = useQuery({
     queryKey: ['testPacks'],
     queryFn: getTestPacks,
+    retry: 3,
+    retryDelay: 1000
   });
 
   const { 
     data: stats, 
     isLoading: isLoadingStats,
-    error: statsError
+    error: statsError,
+    refetch: refetchStats
   } = useQuery({
     queryKey: ['testPacksStats'],
     queryFn: getTestPacksStats,
     enabled: selectedTab === 'dashboard',
     retry: 3,
-    retryDelay: 1000
+    retryDelay: 1000,
+    staleTime: 60000 // 1 minute
   });
+
+  // Refetch stats when tab changes to dashboard
+  useEffect(() => {
+    if (selectedTab === 'dashboard') {
+      refetchStats();
+    }
+  }, [selectedTab, refetchStats]);
 
   // Log errors for debugging
   useEffect(() => {
@@ -193,6 +204,7 @@ export const useTestPacks = () => {
 
   const handleFormSuccess = () => {
     refetchTestPacks();
+    queryClient.invalidateQueries({ queryKey: ['testPacksStats'] });
     setSelectedTestPack(null);
     setShowFormDialog(false);
   };
@@ -200,6 +212,7 @@ export const useTestPacks = () => {
   const handleImportSuccess = () => {
     setShowImportDialog(false);
     refetchTestPacks();
+    queryClient.invalidateQueries({ queryKey: ['testPacksStats'] });
   };
 
   return {

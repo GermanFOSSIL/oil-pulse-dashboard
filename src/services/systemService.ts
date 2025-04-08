@@ -1,4 +1,3 @@
-
 import { supabase } from "@/integrations/supabase/client";
 import { System, Subsystem } from "@/services/types";
 
@@ -144,26 +143,23 @@ export const getProjectsHierarchy = async (): Promise<any[]> => {
   }
 };
 
-// Add the missing getAvailableITRs function
-export const getAvailableITRs = async (subsystemId: string): Promise<any[]> => {
+// Get available ITRs for a specific subsystem
+export const getAvailableITRs = async (subsystemId: string) => {
   try {
-    console.log(`Obteniendo ITRs disponibles para el subsistema: ${subsystemId}`);
-    
     const { data, error } = await supabase
       .from('itrs')
       .select('id, name, quantity')
       .eq('subsystem_id', subsystemId)
       .order('name');
-    
+      
     if (error) {
-      console.error("Error al obtener ITRs:", error);
+      console.error("Error fetching ITRs:", error);
       throw error;
     }
     
-    console.log(`Se encontraron ${data?.length || 0} ITRs disponibles`);
     return data || [];
   } catch (error) {
-    console.error("Error en getAvailableITRs:", error);
-    return [];
+    console.error("Error in getAvailableITRs:", error);
+    return []; // Return empty array instead of throwing
   }
 };
