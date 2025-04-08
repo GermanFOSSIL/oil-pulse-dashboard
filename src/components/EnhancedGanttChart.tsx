@@ -1,4 +1,3 @@
-
 import React, { useEffect, useRef, useState } from 'react';
 import { gantt } from 'dhtmlx-gantt';
 import 'dhtmlx-gantt/codebase/dhtmlxgantt.css';
@@ -54,10 +53,8 @@ export const EnhancedGanttChart: React.FC<EnhancedGanttProps> = ({ data }) => {
     setCurrentDate(new Date());
   };
 
-  // Function to export Gantt data to Excel
   const exportToExcel = () => {
     try {
-      // Format data for export
       const exportData = data.map(item => {
         return {
           'Tarea': item.task,
@@ -69,48 +66,41 @@ export const EnhancedGanttChart: React.FC<EnhancedGanttProps> = ({ data }) => {
         };
       });
       
-      // Create workbook and add the data
       const wb = XLSX.utils.book_new();
       const ws = XLSX.utils.json_to_sheet(exportData);
       
-      // Set column widths
       const colWidths = [
-        { wch: 30 }, // Tarea
-        { wch: 15 }, // Tipo
-        { wch: 15 }, // Inicio
-        { wch: 15 }, // Fin
-        { wch: 15 }, // Progreso
-        { wch: 15 }, // Estado
+        { wch: 30 },
+        { wch: 15 },
+        { wch: 15 },
+        { wch: 15 },
+        { wch: 15 },
+        { wch: 15 }
       ];
       ws['!cols'] = colWidths;
       
       XLSX.utils.book_append_sheet(wb, ws, "Cronograma");
       
-      // Generate Excel file and trigger download
       XLSX.writeFile(wb, `Cronograma_${format(new Date(), 'yyyyMMdd')}.xlsx`);
     } catch (error) {
       console.error("Error exporting data to Excel:", error);
     }
   };
 
-  // Function to export Gantt chart as PDF
   const exportToPDF = async () => {
     try {
       if (!ganttChartRef.current) return;
 
-      // Create new landscape A3 PDF
       const pdf = new jsPDF({
         orientation: 'landscape',
         unit: 'mm',
         format: 'a3'
       });
 
-      // Get the gantt chart container
       const ganttContainer = ganttChartRef.current;
       
-      // Use html2canvas to capture the Gantt chart
       const canvas = await html2canvas(ganttContainer, {
-        scale: 2, // Higher scale for better quality
+        scale: 2,
         logging: false,
         useCORS: true,
         allowTaint: true,
@@ -119,13 +109,11 @@ export const EnhancedGanttChart: React.FC<EnhancedGanttProps> = ({ data }) => {
       
       const imgData = canvas.toDataURL('image/jpeg', 0.95);
       
-      // Add title to PDF
       pdf.setFontSize(16);
       pdf.text('Cronograma de ITRs', 20, 15);
       pdf.setFontSize(10);
       pdf.text(`Fecha de exportación: ${format(new Date(), 'dd/MM/yyyy')}`, 20, 22);
       
-      // Calculate dimensions to fit the page while maintaining aspect ratio
       const pdfWidth = pdf.internal.pageSize.getWidth();
       const pdfHeight = pdf.internal.pageSize.getHeight();
       
@@ -135,23 +123,19 @@ export const EnhancedGanttChart: React.FC<EnhancedGanttProps> = ({ data }) => {
       const ratio = Math.min(pdfWidth / imgWidth, (pdfHeight - 30) / imgHeight);
       
       const imgX = (pdfWidth - imgWidth * ratio) / 2;
-      const imgY = 30; // Start after the title
+      const imgY = 30;
       
-      // Add the image to the PDF
       pdf.addImage(imgData, 'JPEG', imgX, imgY, imgWidth * ratio, imgHeight * ratio);
       
-      // Save the PDF
       pdf.save(`Cronograma_ITRs_${format(new Date(), 'yyyyMMdd')}.pdf`);
     } catch (error) {
       console.error("Error exporting to PDF:", error);
     }
   };
 
-  // Function to add today marker
   const updateTodayMarker = () => {
     if (!containerRef.current) return;
     
-    // Remove existing marker if any
     if (todayMarkerRef.current) {
       todayMarkerRef.current.remove();
     }
@@ -159,13 +143,12 @@ export const EnhancedGanttChart: React.FC<EnhancedGanttProps> = ({ data }) => {
     const today = new Date();
     const todayPos = gantt.posFromDate(today);
     
-    if (isNaN(todayPos)) return; // Skip if position is not valid
+    if (isNaN(todayPos)) return;
     
     const line = document.createElement('div');
     line.className = 'today-line';
     line.style.left = todayPos + 'px';
     
-    // Get the task area to append the marker
     const taskArea = containerRef.current.querySelector('.gantt_task');
     if (taskArea) {
       taskArea.appendChild(line);
@@ -175,7 +158,6 @@ export const EnhancedGanttChart: React.FC<EnhancedGanttProps> = ({ data }) => {
 
   useEffect(() => {
     if (containerRef.current && !initialized) {
-      // Configuraciones generales
       gantt.config.date_format = "%Y-%m-%d";
       gantt.config.row_height = 30;
       gantt.config.min_column_width = 20;
@@ -189,13 +171,11 @@ export const EnhancedGanttChart: React.FC<EnhancedGanttProps> = ({ data }) => {
       gantt.config.show_progress = true;
       gantt.config.fit_tasks = true;
       
-      // Habilitar soporte para tareas con estructura jerárquica
       gantt.config.open_tree_initially = true;
       gantt.config.show_task_cells = true;
       gantt.config.smart_rendering = true;
       gantt.config.indent_size = 15;
       
-      // Columnas para la tabla lateral
       gantt.config.columns = [
         { name: "text", label: "Tarea", tree: true, width: 280, resize: true },
         { 
@@ -226,14 +206,11 @@ export const EnhancedGanttChart: React.FC<EnhancedGanttProps> = ({ data }) => {
         }
       ];
       
-      // Personalizar la leyenda
       gantt.templates.progress_text = function(start, end, task) {
         return "<span style='text-align:center;'>" + Math.round(task.progress * 100) + "% </span>";
       };
 
-      // Personalizar apariencia de las barras según el tipo y estado
       gantt.templates.task_class = function(start, end, task) {
-        // First check the type
         if (task.type === "project") {
           return "gantt-task-project";
         } else if (task.type === "system") {
@@ -241,18 +218,16 @@ export const EnhancedGanttChart: React.FC<EnhancedGanttProps> = ({ data }) => {
         } else if (task.type === "subsystem") {
           return "gantt-task-subsystem";
         } else {
-          // For ITRs, check status
           if (task.status === "complete") {
             return "gantt-task-complete";
           } else if (task.status === "delayed") {
             return "gantt-task-delayed";
           } else {
-            return "gantt-task-itr"; // ITRs normales
+            return "gantt-task-itr";
           }
         }
       };
       
-      // Personalizar tooltip
       gantt.templates.tooltip_text = function(start, end, task) {
         let statusText = "";
         if (task.status === "complete") statusText = "Completado";
@@ -271,7 +246,6 @@ export const EnhancedGanttChart: React.FC<EnhancedGanttProps> = ({ data }) => {
         return tooltipText;
       };
       
-      // Establecer idioma español
       gantt.i18n.setLocale({
         date: {
           month_full: ["Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"],
@@ -285,19 +259,16 @@ export const EnhancedGanttChart: React.FC<EnhancedGanttProps> = ({ data }) => {
           section_time: "Tiempo",
           section_type: "Tipo",
           
-          /* grid columns */
           column_text: "Nombre de tarea",
           column_start_date: "Fecha inicio",
           column_duration: "Duración",
           column_progress: "Progreso",
           
-          /* Other labels */
           confirm_deleting: "¿Confirma eliminación?",
           section_priority: "Prioridad"
         }
       });
       
-      // Configurar la escala de tiempo según la vista
       const configureTimeScale = () => {
         if (viewMode === "month") {
           gantt.config.scales = [
@@ -319,7 +290,6 @@ export const EnhancedGanttChart: React.FC<EnhancedGanttProps> = ({ data }) => {
       
       configureTimeScale();
       
-      // Estilos CSS personalizados con colores actualizados
       const customStyles = `
         .gantt_task_line {
           border-radius: 4px;
@@ -399,26 +369,23 @@ export const EnhancedGanttChart: React.FC<EnhancedGanttProps> = ({ data }) => {
         }
       `;
       
-      const styleElement = document.createElement('style');
-      styleElement.innerHTML = customStyles;
-      document.head.appendChild(styleElement);
+      const styleId = 'gantt-custom-styles';
+      if (!document.getElementById(styleId)) {
+        const styleElement = document.createElement('style');
+        styleElement.id = styleId;
+        styleElement.innerHTML = customStyles;
+        document.head.appendChild(styleElement);
+      }
       
-      // Inicializar gantt
       gantt.init(containerRef.current);
       setInitialized(true);
       
-      // Register event listener for rendering complete to add today marker
       gantt.attachEvent("onGanttRender", updateTodayMarker);
       
       return () => {
-        // Limpiar
-        styleElement.remove();
         gantt.clearAll();
-        
-        // Detach event listeners
         gantt.detachEvent("onGanttRender");
         
-        // Remove today marker if exists
         if (todayMarkerRef.current) {
           todayMarkerRef.current.remove();
         }
@@ -426,16 +393,12 @@ export const EnhancedGanttChart: React.FC<EnhancedGanttProps> = ({ data }) => {
     }
   }, [initialized]);
   
-  // Actualizar los datos cuando cambian o al cambiar la fecha/vista
   useEffect(() => {
     if (initialized && data.length > 0) {
-      // Ensure all dates are valid
       const processedData = data.map(item => {
-        // Create valid dates or default to now() for start and one week later for end
         const startDate = item.start ? new Date(item.start) : new Date();
         const endDate = item.end ? new Date(item.end) : new Date(startDate);
         
-        // If end date is before or same as start date, set it to one week later
         if (endDate <= startDate) {
           endDate.setDate(startDate.getDate() + 7);
         }
@@ -445,34 +408,29 @@ export const EnhancedGanttChart: React.FC<EnhancedGanttProps> = ({ data }) => {
           text: item.task,
           start_date: startDate,
           end_date: endDate,
-          progress: item.progress / 100, // Convert from percentage to decimal
+          progress: item.progress / 100,
           parent: item.parent || 0,
           type: item.type,
           status: item.status,
           open: true,
-          duration: Math.ceil((endDate.getTime() - startDate.getTime()) / (24 * 60 * 60 * 1000))
+          duration: Math.ceil((endDate.getTime() - startDate.getTime()) / (24 * 60 * 60 * 1000)),
+          color_class: item.type === "project" ? "gantt-task-project" : 
+                      item.type === "system" ? "gantt-task-system" : 
+                      item.type === "subsystem" ? "gantt-task-subsystem" : 
+                      item.status === "complete" ? "gantt-task-complete" : 
+                      item.status === "delayed" ? "gantt-task-delayed" : "gantt-task-itr"
         };
       });
 
-      // Configurar escala temporal según la vista seleccionada
-      if (viewMode === "month") {
-        gantt.config.scales = [
-          { unit: "month", step: 1, format: "%F %Y" },
-          { unit: "day", step: 1, format: "%j" }
-        ];
-      } else if (viewMode === "week") {
-        gantt.config.scales = [
-          { unit: "week", step: 1, format: "Semana #%W" },
-          { unit: "day", step: 1, format: "%j %D" }
-        ];
-      } else if (viewMode === "day") {
-        gantt.config.scales = [
-          { unit: "day", step: 1, format: "%j %D" },
-          { unit: "hour", step: 2, format: "%H:00" }
-        ];
-      }
+      gantt.config.scales = [
+        { unit: "month", step: 1, format: "%F %Y" },
+        { unit: "day", step: 1, format: "%j" }
+      ];
       
-      // Cargar datos y mostrar fecha actual
+      gantt.templates.task_class = (start, end, task) => {
+        return task.color_class || "gantt-task-itr";
+      };
+      
       gantt.clearAll();
       gantt.parse({
         data: processedData,
@@ -480,15 +438,11 @@ export const EnhancedGanttChart: React.FC<EnhancedGanttProps> = ({ data }) => {
       });
       gantt.showDate(currentDate);
       
-      // Expandir todos los nodos
       gantt.eachTask(function(task) {
         gantt.open(task.id);
       });
       
-      // Ajustar la vista completa si es necesario
       gantt.render();
-      
-      // Update today marker after data is loaded
       setTimeout(updateTodayMarker, 100);
     }
   }, [data, currentDate, viewMode, initialized]);

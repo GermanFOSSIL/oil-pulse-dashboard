@@ -19,7 +19,9 @@ import {
   Legend, 
   CartesianGrid,
   AreaChart as RechartsAreaChart,
-  Area
+  Area,
+  Cell,
+  LabelList
 } from "recharts";
 import { Button } from "@/components/ui/button";
 import * as XLSX from 'xlsx';
@@ -176,7 +178,9 @@ const Dashboard = () => {
       if (stats.chartData && stats.chartData.length > 0) {
         const chartExportData = stats.chartData.map((item: any) => ({
           'Sistema': item.name,
-          'Progreso': `${item.value}%`
+          'Progreso': `${item.value}%`,
+          'ITRs Completados': item.completedITRs,
+          'Total ITRs': item.totalITRs
         }));
         
         const chartWs = XLSX.utils.json_to_sheet(chartExportData);
@@ -214,6 +218,21 @@ const Dashboard = () => {
     } catch (error) {
       console.error("Error exporting dashboard data:", error);
     }
+  };
+
+  // Custom tooltip for the chart that shows ITR completion information
+  const CustomBarTooltip = ({ active, payload }: any) => {
+    if (active && payload && payload.length) {
+      const data = payload[0].payload;
+      return (
+        <div className="bg-white p-3 border shadow-sm rounded-md">
+          <p className="font-semibold">{data.name}</p>
+          <p className="text-sm">Progreso: {data.value}%</p>
+          <p className="text-sm">ITRs Completados: {data.completedITRs || 0}/{data.totalITRs || 0}</p>
+        </div>
+      );
+    }
+    return null;
   };
 
   return (
@@ -294,7 +313,7 @@ const Dashboard = () => {
                   <CardHeader>
                     <CardTitle>Progreso del Proyecto</CardTitle>
                     <CardDescription>
-                      Tasas de finalización mensuales en todos los proyectos
+                      Completitud de ITRs por sistema
                     </CardDescription>
                   </CardHeader>
                   <CardContent>
@@ -302,15 +321,24 @@ const Dashboard = () => {
                       <BarChart data={stats.chartData}>
                         <XAxis dataKey="name" stroke="#888888" fontSize={12} />
                         <YAxis stroke="#888888" fontSize={12} />
-                        <Tooltip 
-                          formatter={(value) => [`${value}%`, 'Progreso']}
-                          labelFormatter={(label) => `Mes: ${label}`}
-                        />
+                        <Tooltip content={<CustomBarTooltip />} />
                         <Bar
                           dataKey="value"
-                          fill="hsl(var(--secondary))"
+                          name="Progreso"
                           radius={[4, 4, 0, 0]}
-                        />
+                        >
+                          {stats.chartData && stats.chartData.map((entry: any, index: number) => (
+                            <Cell 
+                              key={`cell-${index}`}
+                              fill="#3b82f6"
+                            />
+                          ))}
+                          <LabelList 
+                            dataKey="value" 
+                            position="top" 
+                            formatter={(value: any) => `${value}%`} 
+                          />
+                        </Bar>
                       </BarChart>
                     </ResponsiveContainer>
                   </CardContent>
