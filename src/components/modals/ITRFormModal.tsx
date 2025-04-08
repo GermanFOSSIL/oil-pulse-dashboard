@@ -1,3 +1,4 @@
+
 import { useState } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
@@ -25,7 +26,6 @@ export const ITRFormModal = ({
   const isEditMode = !!itr;
   const { toast } = useToast();
   
-  // Inside the formData useState, replace due_date with end_date and add start_date:
   const [formData, setFormData] = useState({
     name: itr?.name || "",
     subsystem_id: itr?.subsystem_id || "",
@@ -130,7 +130,6 @@ export const ITRFormModal = ({
             </Select>
           </div>
 
-          {/* Inside the form JSX, update the date fields: */}
           <div className="space-y-2">
             <Label htmlFor="start_date">Fecha de inicio</Label>
             <Input

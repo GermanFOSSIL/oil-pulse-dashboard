@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { DataTable } from "@/components/ui/data-table";
@@ -212,7 +211,6 @@ const ITRs = () => {
           title: "Datos de muestra añadidos",
           description: "Se han añadido ITRs de muestra correctamente",
         });
-        // Set the project id to the one we just created or used
         if (result.data && result.data.project) {
           setSelectedProjectId(result.data.project.id);
         }
@@ -333,7 +331,7 @@ const ITRs = () => {
           onClose={handleModalClose}
           onSuccess={handleModalSuccess}
           itr={selectedITR}
-          initialProjectId={selectedProjectId}
+          subsystems={subsystems.filter(subsystem => systems.some(system => system.id === subsystem.system_id))}
         />
       )}
     </div>

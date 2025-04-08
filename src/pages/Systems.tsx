@@ -9,7 +9,8 @@ import { SystemFormModal } from "@/components/modals/SystemFormModal";
 
 const Systems = () => {
   const [systems, setSystems] = useState<System[]>([]);
-  const [projects, setProjects] = useState<{ [key: string]: Project }>({});
+  const [projects, setProjects] = useState<Project[]>([]);
+  const [projectsMap, setProjectsMap] = useState<{ [key: string]: Project }>({});
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
   const [selectedSystem, setSelectedSystem] = useState<System | undefined>(undefined);
@@ -24,13 +25,14 @@ const Systems = () => {
       ]);
       
       setSystems(systemsData);
+      setProjects(projectsData);
       
       // Crear un mapa de proyectos para búsqueda rápida
       const projectsMap: { [key: string]: Project } = {};
       projectsData.forEach(project => {
         projectsMap[project.id] = project;
       });
-      setProjects(projectsMap);
+      setProjectsMap(projectsMap);
     } catch (error) {
       console.error("Error al obtener datos:", error);
     } finally {
@@ -51,7 +53,7 @@ const Systems = () => {
       header: "Proyecto",
       accessorKey: "project_id" as const,
       cell: (system: System) => (
-        <span>{projects[system.project_id]?.name || "Desconocido"}</span>
+        <span>{projectsMap[system.project_id]?.name || "Desconocido"}</span>
       ),
     },
     {
@@ -144,6 +146,7 @@ const Systems = () => {
           onClose={handleModalClose}
           onSuccess={fetchData}
           system={selectedSystem}
+          projects={projects}
         />
       )}
     </div>
