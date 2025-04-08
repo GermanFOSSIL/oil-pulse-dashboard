@@ -31,8 +31,7 @@ const formSchema = z.object({
   sistema: z.string().min(1, "El sistema es requerido"),
   subsistema: z.string().min(1, "El subsistema es requerido"),
   nombre_paquete: z.string().min(1, "El nombre del paquete es requerido"),
-  itr_asociado: z.string().min(1, "El ITR asociado es requerido"),
-  tagsCount: z.coerce.number().min(1, "Debe crear al menos un TAG").max(50, "Máximo 50 TAGs permitidos")
+  itr_asociado: z.string().min(1, "El ITR asociado es requerido")
 });
 
 type FormValues = z.infer<typeof formSchema>;
@@ -53,8 +52,7 @@ const TestPackFormDialog = ({ open, onOpenChange, testPack, onSuccess }: TestPac
       sistema: testPack?.sistema || "",
       subsistema: testPack?.subsistema || "",
       nombre_paquete: testPack?.nombre_paquete || "",
-      itr_asociado: testPack?.itr_asociado || "",
-      tagsCount: 10 // Default to 10 tags
+      itr_asociado: testPack?.itr_asociado || ""
     }
   });
 
@@ -149,8 +147,7 @@ const TestPackFormDialog = ({ open, onOpenChange, testPack, onSuccess }: TestPac
         sistema: systemId,
         subsistema: subsystemId,
         nombre_paquete: testPack.nombre_paquete,
-        itr_asociado: testPack.itr_asociado,
-        tagsCount: 10
+        itr_asociado: testPack.itr_asociado
       });
       
       // Set selected values for dropdowns
@@ -191,10 +188,10 @@ const TestPackFormDialog = ({ open, onOpenChange, testPack, onSuccess }: TestPac
           nombre_paquete: values.nombre_paquete,
           itr_asociado: values.itr_asociado,
           estado: 'pendiente'
-        }, values.tagsCount);
+        });
         toast({
           title: "Test Pack creado",
-          description: `Se ha creado un nuevo Test Pack con ${values.tagsCount} TAGs`
+          description: "Se ha creado un nuevo Test Pack. Ahora puede añadir TAGs individuales."
         });
       }
       onSuccess();
@@ -336,20 +333,6 @@ const TestPackFormDialog = ({ open, onOpenChange, testPack, onSuccess }: TestPac
                   <FormLabel>Nombre del Test Pack</FormLabel>
                   <FormControl>
                     <Input {...field} disabled={loading} />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-
-            <FormField
-              control={form.control}
-              name="tagsCount"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Cantidad de TAGs</FormLabel>
-                  <FormControl>
-                    <Input type="number" min={1} max={50} {...field} disabled={loading || !!testPack} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>

@@ -1,4 +1,3 @@
-
 import { supabase } from "@/integrations/supabase/client";
 import * as XLSX from 'xlsx';
 
@@ -236,8 +235,7 @@ export const updateTag = async (tagId: string, updates: Partial<Tag>): Promise<T
 
 // Create a new test pack
 export const createTestPack = async (
-  testPackData: Omit<TestPack, "id" | "created_at" | "updated_at" | "progress" | "tags">, 
-  tagsCount: number
+  testPackData: Omit<TestPack, "id" | "created_at" | "updated_at" | "progress" | "tags">
 ): Promise<TestPack> => {
   try {
     console.log("Creating test pack with data:", testPackData);
@@ -262,42 +260,10 @@ export const createTestPack = async (
 
     console.log("Test pack created:", testPack);
 
-    // Step 2: Create tags for this test pack - using the proper naming format
-    const basePackageName = testPack.nombre_paquete;
-    const tagsToCreate = Array.from({ length: tagsCount }).map((_, index) => {
-      const tagNumber = String(index + 1).padStart(3, '0');
-      return {
-        tag_name: `${basePackageName}-${tagNumber}`,
-        test_pack_id: testPack.id,
-        estado: 'pendiente' as 'pendiente' | 'liberado',
-        fecha_liberacion: null
-      };
-    });
-
-    console.log(`Creating ${tagsToCreate.length} tags for test pack ${testPack.id}`);
-    
-    const { data: tags, error: tagsError } = await supabase
-      .from('tags')
-      .insert(tagsToCreate)
-      .select();
-
-    if (tagsError) {
-      console.error("Error creating tags:", tagsError);
-      // We could handle this better, but for now we'll just log the error
-    }
-
-    console.log(`Created ${tags?.length || 0} tags for test pack ${testPack.id}`);
-
-    // Format the tags to ensure estado is the correct type
-    const formattedTags = tags ? tags.map(tag => ({
-      ...tag,
-      estado: tag.estado as 'pendiente' | 'liberado'
-    })) : [];
-
     return {
       ...testPack,
       estado: testPack.estado as 'pendiente' | 'listo',
-      tags: formattedTags,
+      tags: [],
       progress: 0
     };
   } catch (error) {

@@ -1,9 +1,13 @@
 
-import { useQuery } from "@tanstack/react-query";
-import { getTestPackWithTags, updateTag, Tag, TestPack } from "@/services/testPackService";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { getTestPackWithTags, updateTag, Tag, TestPack, createTag } from "@/services/testPackService";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { PlusCircle } from "lucide-react";
+import { useState } from "react";
+import { Input } from "@/components/ui/input";
 import { 
   Table,
   TableBody,
@@ -14,6 +18,7 @@ import {
 } from "@/components/ui/table";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tag as TagIcon } from "lucide-react";
+import { useToast } from "@/hooks/use-toast";
 
 interface TestPackTagsProps {
   testPackId: string;
@@ -26,10 +31,57 @@ const TestPackTags = ({
   userRole, 
   onTagRelease 
 }: TestPackTagsProps) => {
-  const { data: testPack, isLoading } = useQuery({
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+  const [newTagName, setNewTagName] = useState("");
+  const [isAddingTag, setIsAddingTag] = useState(false);
+
+  const { data: testPack, isLoading, refetch } = useQuery({
     queryKey: ['testPack', testPackId],
     queryFn: () => getTestPackWithTags(testPackId),
   });
+
+  const createTagMutation = useMutation({
+    mutationFn: (tagName: string) => {
+      return createTag({
+        tag_name: tagName,
+        test_pack_id: testPackId,
+        estado: 'pendiente',
+        fecha_liberacion: null
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['testPack', testPackId] });
+      setNewTagName("");
+      setIsAddingTag(false);
+      toast({
+        title: "TAG creado",
+        description: "El TAG ha sido creado exitosamente."
+      });
+      refetch();
+    },
+    onError: (error) => {
+      console.error("Error al crear TAG:", error);
+      toast({
+        title: "Error",
+        description: "No se pudo crear el TAG. Por favor, inténtelo de nuevo.",
+        variant: "destructive"
+      });
+    }
+  });
+
+  const handleAddTag = () => {
+    if (!newTagName.trim()) {
+      toast({
+        title: "Error",
+        description: "El nombre del TAG no puede estar vacío.",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    createTagMutation.mutate(newTagName);
+  };
 
   if (isLoading) {
     return (
@@ -42,13 +94,41 @@ const TestPackTags = ({
   if (!testPack || !testPack.tags || testPack.tags.length === 0) {
     return (
       <Card>
-        <CardHeader>
+        <CardHeader className="flex flex-row items-center justify-between">
           <CardTitle className="text-lg">TAGs del Test Pack</CardTitle>
+          {(userRole === 'admin' || userRole === 'tecnico') && (
+            <Button 
+              variant="outline" 
+              size="sm" 
+              onClick={() => setIsAddingTag(true)}
+              className="flex items-center gap-1"
+            >
+              <PlusCircle className="h-4 w-4" />
+              Agregar TAG
+            </Button>
+          )}
         </CardHeader>
         <CardContent>
-          <div className="text-center py-6">
-            <p className="text-muted-foreground">No hay TAGs asociados a este Test Pack.</p>
-          </div>
+          {isAddingTag ? (
+            <div className="flex gap-2 mb-4">
+              <Input
+                placeholder="Nombre del TAG"
+                value={newTagName}
+                onChange={(e) => setNewTagName(e.target.value)}
+                className="flex-1"
+              />
+              <Button onClick={handleAddTag} disabled={createTagMutation.isPending}>
+                {createTagMutation.isPending ? "Creando..." : "Guardar"}
+              </Button>
+              <Button variant="outline" onClick={() => setIsAddingTag(false)}>
+                Cancelar
+              </Button>
+            </div>
+          ) : (
+            <div className="text-center py-6">
+              <p className="text-muted-foreground">No hay TAGs asociados a este Test Pack.</p>
+            </div>
+          )}
         </CardContent>
       </Card>
     );
@@ -56,10 +136,38 @@ const TestPackTags = ({
 
   return (
     <Card>
-      <CardHeader>
+      <CardHeader className="flex flex-row items-center justify-between">
         <CardTitle className="text-lg">TAGs del Test Pack</CardTitle>
+        {(userRole === 'admin' || userRole === 'tecnico') && (
+          <Button 
+            variant="outline" 
+            size="sm" 
+            onClick={() => setIsAddingTag(!isAddingTag)}
+            className="flex items-center gap-1"
+          >
+            <PlusCircle className="h-4 w-4" />
+            Agregar TAG
+          </Button>
+        )}
       </CardHeader>
       <CardContent>
+        {isAddingTag && (
+          <div className="flex gap-2 mb-4">
+            <Input
+              placeholder="Nombre del TAG"
+              value={newTagName}
+              onChange={(e) => setNewTagName(e.target.value)}
+              className="flex-1"
+            />
+            <Button onClick={handleAddTag} disabled={createTagMutation.isPending}>
+              {createTagMutation.isPending ? "Creando..." : "Guardar"}
+            </Button>
+            <Button variant="outline" onClick={() => setIsAddingTag(false)}>
+              Cancelar
+            </Button>
+          </div>
+        )}
+        
         <div className="mb-4">
           <div className="flex justify-between items-center">
             <div>

@@ -3,7 +3,7 @@ import { useState, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { UploadCloud, X, File } from "lucide-react";
 
-interface FileUploadProps {
+export interface FileUploadProps {
   onFilesSelected: (files: File[]) => void;
   disabled?: boolean;
   maxFiles?: number;
