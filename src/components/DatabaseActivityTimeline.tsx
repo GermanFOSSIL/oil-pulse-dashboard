@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { supabase } from "@/integrations/supabase/client";
@@ -5,6 +6,7 @@ import { getUserProfile } from "@/services/userService";
 import { Separator } from "@/components/ui/separator";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
+import { Calendar, User } from "lucide-react";
 
 interface DatabaseActivity {
   id: string;
@@ -127,9 +129,9 @@ export const DatabaseActivityTimeline = () => {
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Actividad de la Base de Datos</CardTitle>
+        <CardTitle>Actividad Reciente</CardTitle>
         <CardDescription>
-          Últimas modificaciones a la base de datos
+          Últimas modificaciones realizadas por los usuarios
         </CardDescription>
       </CardHeader>
       <CardContent>
@@ -140,21 +142,34 @@ export const DatabaseActivityTimeline = () => {
         ) : activities.length === 0 ? (
           <p className="text-center text-muted-foreground py-6">No hay actividad reciente</p>
         ) : (
-          <div className="space-y-4">
+          <div className="relative">
+            <div className="absolute left-4 h-full w-px bg-muted"></div>
             {activities.map((activity, index) => (
-              <div key={activity.id} className="space-y-2">
-                <div className="flex justify-between items-start">
-                  <div>
-                    <span className="font-medium">{activity.userName}</span>
-                    <span className="ml-2 text-muted-foreground">
-                      {getActionText(activity)}
-                    </span>
+              <div key={activity.id} className="mb-8 last:mb-0">
+                <div className="flex items-start">
+                  <div className="flex h-8 w-8 items-center justify-center rounded-full border border-muted bg-background z-10 mr-4">
+                    <span className="flex h-2 w-2 rounded-full bg-primary"></span>
                   </div>
-                  <span className="text-sm text-muted-foreground">
-                    {formatDateTime(activity.created_at)}
-                  </span>
+                  <div className="flex-1 rounded-lg border p-4">
+                    <div className="flex justify-between items-start mb-2">
+                      <div className="flex items-center">
+                        <User className="h-4 w-4 mr-1 text-muted-foreground" />
+                        <span className="font-semibold">{activity.userName}</span>
+                      </div>
+                      <div className="flex items-center text-xs text-muted-foreground">
+                        <Calendar className="h-3 w-3 mr-1" />
+                        <span>{formatDateTime(activity.created_at)}</span>
+                      </div>
+                    </div>
+                    <p className="text-sm">
+                      {getActionText(activity)}
+                      {activity.details && activity.details.name && 
+                        <span className="font-medium"> "{activity.details.name}"</span>
+                      }
+                    </p>
+                  </div>
                 </div>
-                {index < activities.length - 1 && <Separator className="mt-2" />}
+                {index < activities.length - 1 && <div className="h-4"></div>}
               </div>
             ))}
           </div>

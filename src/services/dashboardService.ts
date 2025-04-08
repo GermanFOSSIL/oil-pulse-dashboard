@@ -39,6 +39,15 @@ export const getDashboardStats = async (projectId: string | null = null) => {
     const totalSystems = systems?.length || 0;
     const totalITRs = itrs?.length || 0;
     
+    // Calcular datos para los gráficos de torta
+    const completedProjects = projects?.filter(p => p.status === 'complete').length || 0;
+    const inProgressProjects = projects?.filter(p => p.status === 'inprogress').length || 0;
+    const delayedProjects = projects?.filter(p => p.status === 'delayed').length || 0;
+    
+    const completedITRs = itrs?.filter(itr => itr.status === 'complete').length || 0;
+    const inProgressITRs = itrs?.filter(itr => itr.status === 'inprogress').length || 0;
+    const delayedITRs = itrs?.filter(itr => itr.status === 'delayed').length || 0;
+    
     // Calculate project completion based on ITR completion
     const completionRate = projects?.length 
       ? Math.round(projects.reduce((acc, proj) => acc + (proj.progress || 0), 0) / projects.length) 
@@ -164,6 +173,13 @@ export const getDashboardStats = async (projectId: string | null = null) => {
       totalSystems,
       totalITRs,
       completionRate,
+      // Nuevos datos para los gráficos de torta
+      completedProjects,
+      inProgressProjects,
+      delayedProjects,
+      completedITRs,
+      inProgressITRs,
+      delayedITRs,
       projectsData,
       chartData,
       areaChartData,
