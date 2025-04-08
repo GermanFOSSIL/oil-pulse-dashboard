@@ -1,4 +1,3 @@
-
 import { supabase } from "@/integrations/supabase/client";
 import { ITR } from "@/services/types";
 
@@ -44,7 +43,7 @@ export const getITRById = async (id: string): Promise<ITR | null> => {
   }
 };
 
-export const createITR = async (itr: Omit<ITR, "id" | "created_at" | "updated_at">): Promise<ITR> => {
+export const createITR = async (itr: Omit<ITR, "id" | "created_at" | "updated_at"> & { quantity?: number }): Promise<ITR> => {
   try {
     console.log("Creating new ITR with data:", itr);
     
@@ -75,6 +74,9 @@ export const createITR = async (itr: Omit<ITR, "id" | "created_at" | "updated_at
     
     console.log(`Subsistema verificado: ${subsystemCheck.name}`);
     
+    // Extraer y almacenar la cantidad
+    const quantity = itr.quantity || 1;
+    
     // Preparar el objeto para inserción, asegurando tipos correctos
     const newITR = {
       name: itr.name,
@@ -83,7 +85,8 @@ export const createITR = async (itr: Omit<ITR, "id" | "created_at" | "updated_at
       progress: itr.progress !== undefined ? Number(itr.progress) : 0,
       assigned_to: itr.assigned_to || null,
       start_date: itr.start_date || null,
-      end_date: itr.end_date || null
+      end_date: itr.end_date || null,
+      quantity: quantity  // Add quantity to the metadata in the database
     };
     
     console.log("Datos preparados para inserción:", newITR);
@@ -108,7 +111,7 @@ export const createITR = async (itr: Omit<ITR, "id" | "created_at" | "updated_at
   }
 };
 
-export const updateITR = async (id: string, updates: Partial<ITR>): Promise<ITR> => {
+export const updateITR = async (id: string, updates: Partial<ITR> & { quantity?: number }): Promise<ITR> => {
   try {
     console.log(`Updating ITR with id ${id}:`, updates);
     
@@ -122,6 +125,7 @@ export const updateITR = async (id: string, updates: Partial<ITR>): Promise<ITR>
     if (updates.assigned_to !== undefined) updateData.assigned_to = updates.assigned_to || null;
     if (updates.start_date !== undefined) updateData.start_date = updates.start_date || null;
     if (updates.end_date !== undefined) updateData.end_date = updates.end_date || null;
+    if (updates.quantity !== undefined) updateData.quantity = Number(updates.quantity);
     
     console.log("Datos preparados para actualización:", updateData);
     

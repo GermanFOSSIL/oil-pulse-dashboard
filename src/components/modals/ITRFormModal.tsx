@@ -34,7 +34,8 @@ export const ITRFormModal = ({
     progress: 0,
     assigned_to: "",
     start_date: "",
-    end_date: ""
+    end_date: "",
+    quantity: 1 // Default quantity is 1
   });
   
   const [loading, setLoading] = useState(false);
@@ -49,7 +50,8 @@ export const ITRFormModal = ({
         progress: itr.progress || 0,
         assigned_to: itr.assigned_to || "",
         start_date: itr.start_date ? new Date(itr.start_date).toISOString().split('T')[0] : "",
-        end_date: itr.end_date ? new Date(itr.end_date).toISOString().split('T')[0] : ""
+        end_date: itr.end_date ? new Date(itr.end_date).toISOString().split('T')[0] : "",
+        quantity: (itr as any).quantity || 1 // Get quantity if available
       });
     } else {
       // Reset form for new ITR
@@ -60,7 +62,8 @@ export const ITRFormModal = ({
         progress: 0,
         assigned_to: "",
         start_date: "",
-        end_date: ""
+        end_date: "",
+        quantity: 1 // Default new ITRs to quantity 1
       });
     }
   }, [itr, subsystems, open]);
@@ -92,6 +95,15 @@ export const ITRFormModal = ({
       });
       return false;
     }
+
+    if (!formData.quantity || formData.quantity < 1) {
+      toast({
+        title: "Cantidad inválida",
+        description: "La cantidad debe ser al menos 1",
+        variant: "destructive"
+      });
+      return false;
+    }
     
     return true;
   };
@@ -110,11 +122,13 @@ export const ITRFormModal = ({
       console.log("Formulario a enviar:", {
         ...formData,
         progress: Number(formData.progress),
+        quantity: Number(formData.quantity)
       });
       
       const dataToSend = {
         ...formData,
         progress: Number(formData.progress),
+        quantity: Number(formData.quantity), // Add quantity to data sent
         assigned_to: formData.assigned_to || null,
         start_date: formData.start_date || null,
         end_date: formData.end_date || null
@@ -195,6 +209,20 @@ export const ITRFormModal = ({
                 ))}
               </SelectContent>
             </Select>
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="quantity">Cantidad *</Label>
+            <Input
+              id="quantity"
+              name="quantity"
+              type="number"
+              min="1"
+              value={formData.quantity}
+              onChange={handleInputChange}
+              placeholder="Cantidad de ITRs"
+              required
+            />
           </div>
 
           <div className="space-y-2">

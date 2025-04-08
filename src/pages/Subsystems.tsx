@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { DataTable } from "@/components/ui/data-table";
@@ -20,6 +19,7 @@ interface SubsystemWithDetails extends Subsystem {
   systemName?: string;
   projectName?: string;
   itrsCount?: number;
+  itrsQuantity?: number;
 }
 
 const Subsystems = () => {
@@ -40,20 +40,23 @@ const Subsystems = () => {
         getSystems()
       ]);
       
-      // Create a mapping of system IDs to system objects
       const systemsMap = new Map<string, System>();
       systemsData.forEach(system => systemsMap.set(system.id, system));
       
-      // Get ITR counts for each subsystem
       const enrichedSubsystems = await Promise.all(
         subsystemsData.map(async (subsystem) => {
           const itrs = await getITRsBySubsystemId(subsystem.id);
           const system = systemsMap.get(subsystem.system_id);
           
+          const totalQuantity = itrs.reduce((sum, itr) => {
+            return sum + ((itr as any).quantity || 1);
+          }, 0);
+          
           return {
             ...subsystem,
             systemName: system?.name || 'Sistema Desconocido',
-            itrsCount: itrs.length
+            itrsCount: itrs.length,
+            itrsQuantity: totalQuantity
           };
         })
       );
@@ -76,14 +79,11 @@ const Subsystems = () => {
     fetchData();
   }, []);
 
-  // Apply all active filters
   const filteredSubsystems = subsystems.filter(subsystem => {
-    // System filter
     if (systemFilter !== "all" && subsystem.systemName !== systemFilter) {
       return false;
     }
     
-    // Completion filter
     if (completionFilter === "completed" && (subsystem.completion_rate || 0) < 100) {
       return false;
     } else if (completionFilter === "inprogress" && (subsystem.completion_rate || 0) === 100) {
@@ -103,8 +103,13 @@ const Subsystems = () => {
       accessorKey: "systemName" as const,
     },
     {
-      header: "ITRs",
-      accessorKey: "itrsCount" as const,
+      header: "ITRs (Cantidad Total)",
+      accessorKey: "itrsQuantity" as const,
+      cell: (subsystem: SubsystemWithDetails) => (
+        <div>
+          {subsystem.itrsCount} ITRs ({subsystem.itrsQuantity || 0} unidades)
+        </div>
+      ),
     },
     {
       header: "Tasa de Completado",
@@ -170,7 +175,6 @@ const Subsystems = () => {
     setSelectedSubsystem(undefined);
   };
 
-  // Get unique system names for filter
   const uniqueSystems = Array.from(new Set(subsystems.map(s => s.systemName))).filter(Boolean);
 
   return (
@@ -189,7 +193,6 @@ const Subsystems = () => {
       </div>
 
       <div className="flex justify-start items-center mb-4 space-x-2">
-        {/* System Filter */}
         <div className="w-[180px]">
           <Select
             value={systemFilter}
@@ -209,7 +212,6 @@ const Subsystems = () => {
           </Select>
         </div>
         
-        {/* Completion Filter */}
         <div className="w-[180px]">
           <Select
             value={completionFilter}
