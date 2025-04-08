@@ -4,8 +4,9 @@
 
 export * from './types';
 // Import and re-export from userService without the Profile interface
-import { AVAILABLE_PERMISSIONS, getUserPermissions, getUserProfiles as getUserProfilesList, updateUserProfile, bulkCreateUsers, UserProfile } from './userService';
-export { AVAILABLE_PERMISSIONS, getUserPermissions, updateUserProfile, bulkCreateUsers, UserProfile };
+import { AVAILABLE_PERMISSIONS, getUserPermissions, getUserProfiles as getUserProfilesList, updateUserProfile, bulkCreateUsers } from './userService';
+export { AVAILABLE_PERMISSIONS, getUserPermissions, updateUserProfile, bulkCreateUsers };
+export type { UserProfile } from './userService';
 
 // Rename the function to avoid naming collision
 export const getUserProfiles = getUserProfilesList;

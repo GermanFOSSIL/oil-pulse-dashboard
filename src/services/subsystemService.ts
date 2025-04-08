@@ -1,4 +1,3 @@
-
 import { supabase } from "@/integrations/supabase/client";
 import { Subsystem } from "@/services/types";
 
@@ -162,38 +161,16 @@ interface ActivityLogData {
 
 export const logDatabaseActivity = async (data: ActivityLogData): Promise<void> => {
   try {
-    // Use raw SQL query instead of the type-checked query builder
-    const { error: rpcError } = await supabase
-      .rpc('log_activity', {
-        p_table_name: data.table_name,
-        p_action: data.action,
-        p_user_id: data.user_id,
-        p_record_id: data.record_id,
-        p_details: data.details || {}
-      })
-      .then(result => {
-        if (result.error) {
-          console.error("RPC Error:", result.error);
-          throw result.error;
-        }
-        return result;
-      })
-      .catch(async () => {
-        // Fall back to direct insert if RPC doesn't exist or fails
-        return await supabase
-          .from('db_activity_log')
-          .insert({
-            table_name: data.table_name,
-            action: data.action,
-            user_id: data.user_id,
-            record_id: data.record_id,
-            details: data.details || {}
-          });
+    // Direct insert approach instead of RPC
+    await supabase
+      .from('db_activity_log')
+      .insert({
+        table_name: data.table_name,
+        action: data.action,
+        user_id: data.user_id,
+        record_id: data.record_id,
+        details: data.details || {}
       });
-      
-    if (rpcError) {
-      console.error("Error logging database activity:", rpcError);
-    }
   } catch (e) {
     console.error("Error logging database activity:", e);
   }

@@ -6,7 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { Plus } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { getUserProfiles, updateUserProfile, UserProfile, AVAILABLE_PERMISSIONS } from "@/services/userService";
+import { getUserProfiles, updateUserProfile, AVAILABLE_PERMISSIONS, UserProfile } from "@/services/userService";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";

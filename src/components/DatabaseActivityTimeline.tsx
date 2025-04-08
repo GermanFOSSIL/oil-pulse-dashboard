@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { supabase } from "@/integrations/supabase/client";
@@ -26,22 +25,12 @@ export const DatabaseActivityTimeline = () => {
     const fetchActivities = async () => {
       try {
         setLoading(true);
-        // Use a direct query with executeRaw instead of typed query builder
+        // Execute a raw query to get activity log data
         const { data, error } = await supabase
-          .rpc('get_recent_activity', { limit_count: 10 })
-          .then(result => {
-            if (result.error) throw result.error;
-            return { data: result.data, error: null };
-          })
-          .catch(() => {
-            console.error('Falling back to direct query since RPC call failed');
-            // Fallback to direct query if RPC doesn't exist
-            return supabase
-              .from('db_activity_log')
-              .select('*')
-              .order('created_at', { ascending: false })
-              .limit(10);
-          });
+          .from('db_activity_log')
+          .select('*')
+          .order('created_at', { ascending: false })
+          .limit(10);
 
         if (error) {
           console.error('Error fetching database activities:', error);
