@@ -1,9 +1,10 @@
+
 import React, { useEffect, useRef, useState } from 'react';
 import { gantt } from 'dhtmlx-gantt';
 import 'dhtmlx-gantt/codebase/dhtmlxgantt.css';
 import { Button } from '@/components/ui/button';
 import { Download, ChevronLeft, ChevronRight, Calendar, Search, FileText } from 'lucide-react';
-import { format, addMonths, subMonths } from 'date-fns';
+import { format, addMonths, subMonths, getYear } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { 
   Select,
@@ -498,48 +499,60 @@ export const EnhancedGanttChart: React.FC<EnhancedGanttProps> = ({ data }) => {
   
   return (
     <div className="flex flex-col space-y-4" ref={ganttChartRef}>
-      <div className="flex justify-between items-center px-4 pt-2">
-        <div className="flex items-center space-x-2">
-          <Button variant="outline" size="icon" onClick={goToPreviousMonth}>
-            <ChevronLeft className="h-4 w-4" />
-          </Button>
-          <Button variant="outline" className="font-medium" onClick={goToToday}>
-            <Calendar className="h-4 w-4 mr-2" />
-            Hoy
-          </Button>
-          <Button variant="outline" size="icon" onClick={goToNextMonth}>
-            <ChevronRight className="h-4 w-4" />
-          </Button>
-          <h3 className="text-lg font-medium ml-2">
-            {format(currentDate, 'MMMM yyyy', { locale: es })}
-          </h3>
-        </div>
-        <div className="flex items-center space-x-2">
-          <Select value={viewMode} onValueChange={setViewMode}>
-            <SelectTrigger className="w-[180px]">
-              <SelectValue placeholder="Vista por Mes" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="month">Vista por Mes</SelectItem>
-              <SelectItem value="week">Vista por Semana</SelectItem>
-              <SelectItem value="day">Vista por Día</SelectItem>
-            </SelectContent>
-          </Select>
-          <Button variant="outline" size="icon">
-            <Search className="h-4 w-4" />
-          </Button>
-          <Button variant="outline" onClick={exportToExcel} disabled={exporting}>
-            <Download className="h-4 w-4 mr-2" />
-            Excel
-          </Button>
-          <Button variant="outline" onClick={exportToPDF} disabled={exporting}>
-            <FileText className="h-4 w-4 mr-2" />
-            {exporting ? "Exportando..." : "PDF"}
-          </Button>
+      <div className="border-b pb-4">
+        <h2 className="text-2xl font-bold mb-4">Cronograma de ITRs</h2>
+        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-3">
+          <div className="flex items-center space-x-1">
+            <Button variant="outline" size="icon" onClick={goToPreviousMonth} className="h-9 w-9">
+              <ChevronLeft className="h-4 w-4" />
+            </Button>
+            <Button variant="outline" className="font-medium h-9 px-3" onClick={goToToday}>
+              <Calendar className="h-4 w-4 mr-2" />
+              Hoy
+            </Button>
+            <Button variant="outline" size="icon" onClick={goToNextMonth} className="h-9 w-9">
+              <ChevronRight className="h-4 w-4" />
+            </Button>
+            <div className="ml-2 bg-white border rounded-md py-1 px-3 text-lg font-medium">
+              {format(currentDate, 'MMMM yyyy', { locale: es })}
+            </div>
+          </div>
+          <div className="flex items-center gap-2 flex-wrap md:flex-nowrap">
+            <Select value={viewMode} onValueChange={setViewMode}>
+              <SelectTrigger className="w-[180px] h-9">
+                <SelectValue placeholder="Vista por Mes" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="month">Vista por Mes</SelectItem>
+                <SelectItem value="week">Vista por Semana</SelectItem>
+                <SelectItem value="day">Vista por Día</SelectItem>
+              </SelectContent>
+            </Select>
+            <Button variant="outline" size="icon" className="h-9 w-9">
+              <Search className="h-4 w-4" />
+            </Button>
+            <Button variant="outline" onClick={exportToExcel} disabled={exporting} className="h-9">
+              <Download className="h-4 w-4 mr-2" />
+              Excel
+            </Button>
+            <Button variant="outline" onClick={exportToPDF} disabled={exporting} className="h-9">
+              <FileText className="h-4 w-4 mr-2" />
+              {exporting ? "Exportando..." : "PDF"}
+            </Button>
+          </div>
         </div>
       </div>
       
       <div className="border rounded-lg mx-4">
+        {/* Timeline header with current year and date range */}
+        <div className="border-b bg-gray-50 p-2 flex justify-between items-center">
+          <div className="text-sm font-medium text-gray-700">
+            Año: {getYear(currentDate)}
+          </div>
+          <div className="text-sm font-medium text-gray-700">
+            Periodo visualizado: {format(currentDate, 'dd/MM/yyyy')} - {format(addMonths(currentDate, viewMode === "day" ? 0 : viewMode === "week" ? 0.25 : 1), 'dd/MM/yyyy')}
+          </div>
+        </div>
         <div ref={containerRef} className="h-[500px] w-full" />
         <div className="flex justify-end p-4 border-t">
           <div className="flex flex-wrap items-center gap-4">
