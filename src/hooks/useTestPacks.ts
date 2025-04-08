@@ -67,7 +67,8 @@ export const useTestPacks = () => {
   const { 
     data: testPacks, 
     isLoading: isLoadingTestPacks, 
-    refetch: refetchTestPacks 
+    refetch: refetchTestPacks,
+    error: testPacksError
   } = useQuery({
     queryKey: ['testPacks'],
     queryFn: getTestPacks,
@@ -75,12 +76,26 @@ export const useTestPacks = () => {
 
   const { 
     data: stats, 
-    isLoading: isLoadingStats 
+    isLoading: isLoadingStats,
+    error: statsError
   } = useQuery({
     queryKey: ['testPacksStats'],
     queryFn: getTestPacksStats,
-    enabled: selectedTab === 'dashboard'
+    enabled: selectedTab === 'dashboard',
+    retry: 3,
+    retryDelay: 1000
   });
+
+  // Log errors for debugging
+  useEffect(() => {
+    if (testPacksError) {
+      console.error("Error fetching test packs:", testPacksError);
+    }
+    
+    if (statsError) {
+      console.error("Error fetching stats:", statsError);
+    }
+  }, [testPacksError, statsError]);
 
   // Mutation for updating tags
   const updateTagMutation = useMutation({

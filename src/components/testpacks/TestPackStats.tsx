@@ -10,26 +10,51 @@ interface TestPackStatsProps {
 const COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#6366f1'];
 
 const TestPackStats = ({ stats }: TestPackStatsProps) => {
+  // Early return with a loading state if stats is not provided
   if (!stats) {
-    return <div>No hay datos estadísticos disponibles</div>;
+    return (
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <Card>
+          <CardHeader>
+            <CardTitle>Cargando estadísticas...</CardTitle>
+            <CardDescription>Por favor espere mientras se cargan los datos</CardDescription>
+          </CardHeader>
+          <CardContent className="h-64 flex items-center justify-center">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
+          </CardContent>
+        </Card>
+      </div>
+    );
   }
 
-  // Prepare data for pie charts
+  // Safely access nested properties with default values
+  const testPacksTotal = stats.testPacks?.total || 0;
+  const testPacksCompleted = stats.testPacks?.completed || 0;
+  const testPacksProgress = stats.testPacks?.progress || 0;
+  
+  const tagsTotal = stats.tags?.total || 0;
+  const tagsReleased = stats.tags?.released || 0;
+  const tagsProgress = stats.tags?.progress || 0;
+  
+  // Prepare data for pie charts with safe values
   const testPacksData = [
-    { name: 'Completados', value: stats.testPacks.completed },
-    { name: 'Pendientes', value: stats.testPacks.total - stats.testPacks.completed }
+    { name: 'Completados', value: testPacksCompleted },
+    { name: 'Pendientes', value: testPacksTotal - testPacksCompleted }
   ];
   
   const tagsData = [
-    { name: 'Liberados', value: stats.tags.released },
-    { name: 'Pendientes', value: stats.tags.total - stats.tags.released }
+    { name: 'Liberados', value: tagsReleased },
+    { name: 'Pendientes', value: tagsTotal - tagsReleased }
   ];
   
-  // Progress bars for systems
-  const systemsProgress = stats.systems.sort((a: any, b: any) => b.progress - a.progress);
+  // Progress bars for systems with safe access
+  const systemsProgress = (stats.systems || []).sort((a: any, b: any) => (b.progress || 0) - (a.progress || 0));
   
-  // Progress bars for ITRs
-  const itrsProgress = stats.itrs.sort((a: any, b: any) => b.progress - a.progress);
+  // Progress bars for ITRs with safe access
+  const itrsProgress = (stats.itrs || []).sort((a: any, b: any) => (b.progress || 0) - (a.progress || 0));
+
+  // Subsystems with safe access
+  const subsystems = (stats.subsystems || []);
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -43,21 +68,21 @@ const TestPackStats = ({ stats }: TestPackStatsProps) => {
             <div>
               <div className="flex justify-between items-center mb-2">
                 <h3 className="font-medium">Test Packs</h3>
-                <span>{stats.testPacks.progress}%</span>
+                <span>{testPacksProgress}%</span>
               </div>
-              <Progress value={stats.testPacks.progress} className="h-2 mb-4" />
+              <Progress value={testPacksProgress} className="h-2 mb-4" />
               <div className="text-sm text-muted-foreground mb-2">
                 <div className="flex justify-between">
                   <span>Total:</span>
-                  <span>{stats.testPacks.total}</span>
+                  <span>{testPacksTotal}</span>
                 </div>
                 <div className="flex justify-between">
                   <span>Completados:</span>
-                  <span>{stats.testPacks.completed}</span>
+                  <span>{testPacksCompleted}</span>
                 </div>
                 <div className="flex justify-between">
                   <span>Pendientes:</span>
-                  <span>{stats.testPacks.total - stats.testPacks.completed}</span>
+                  <span>{testPacksTotal - testPacksCompleted}</span>
                 </div>
               </div>
               
@@ -88,21 +113,21 @@ const TestPackStats = ({ stats }: TestPackStatsProps) => {
             <div>
               <div className="flex justify-between items-center mb-2">
                 <h3 className="font-medium">TAGs</h3>
-                <span>{stats.tags.progress}%</span>
+                <span>{tagsProgress}%</span>
               </div>
-              <Progress value={stats.tags.progress} className="h-2 mb-4" />
+              <Progress value={tagsProgress} className="h-2 mb-4" />
               <div className="text-sm text-muted-foreground mb-2">
                 <div className="flex justify-between">
                   <span>Total:</span>
-                  <span>{stats.tags.total}</span>
+                  <span>{tagsTotal}</span>
                 </div>
                 <div className="flex justify-between">
                   <span>Liberados:</span>
-                  <span>{stats.tags.released}</span>
+                  <span>{tagsReleased}</span>
                 </div>
                 <div className="flex justify-between">
                   <span>Pendientes:</span>
-                  <span>{stats.tags.total - stats.tags.released}</span>
+                  <span>{tagsTotal - tagsReleased}</span>
                 </div>
               </div>
               
@@ -145,11 +170,11 @@ const TestPackStats = ({ stats }: TestPackStatsProps) => {
                 <div key={index}>
                   <div className="flex justify-between items-center mb-2">
                     <h3 className="font-medium">{system.name}</h3>
-                    <span>{system.progress}%</span>
+                    <span>{system.progress || 0}%</span>
                   </div>
-                  <Progress value={system.progress} className="h-2 mb-1" />
+                  <Progress value={system.progress || 0} className="h-2 mb-1" />
                   <div className="text-xs text-muted-foreground">
-                    {system.completed} de {system.total} completados
+                    {system.completed || 0} de {system.total || 0} completados
                   </div>
                 </div>
               ))
@@ -174,11 +199,11 @@ const TestPackStats = ({ stats }: TestPackStatsProps) => {
                 <div key={index}>
                   <div className="flex justify-between items-center mb-2">
                     <h3 className="font-medium">{itr.name}</h3>
-                    <span>{itr.progress}%</span>
+                    <span>{itr.progress || 0}%</span>
                   </div>
-                  <Progress value={itr.progress} className="h-2 mb-1" />
+                  <Progress value={itr.progress || 0} className="h-2 mb-1" />
                   <div className="text-xs text-muted-foreground">
-                    {itr.completed} de {itr.total} completados
+                    {itr.completed || 0} de {itr.total || 0} completados
                   </div>
                 </div>
               ))
@@ -198,24 +223,24 @@ const TestPackStats = ({ stats }: TestPackStatsProps) => {
         </CardHeader>
         <CardContent>
           <div className="space-y-6">
-            {stats.subsystems.length > 0 ? (
-              [...stats.subsystems]
-                .sort((a: any, b: any) => b.progress - a.progress)
+            {subsystems.length > 0 ? (
+              [...subsystems]
+                .sort((a: any, b: any) => (b.progress || 0) - (a.progress || 0))
                 .slice(0, 5)
                 .map((subsystem: any, index: number) => (
                   <div key={index}>
                     <div className="flex justify-between items-center mb-2">
                       <div>
-                        <h3 className="font-medium">{subsystem.name}</h3>
+                        <h3 className="font-medium">{subsystem.name || "Sin nombre"}</h3>
                         <div className="text-xs text-muted-foreground">
-                          Sistema: {subsystem.system}
+                          Sistema: {subsystem.system || "Sin sistema"}
                         </div>
                       </div>
-                      <span>{subsystem.progress}%</span>
+                      <span>{subsystem.progress || 0}%</span>
                     </div>
-                    <Progress value={subsystem.progress} className="h-2 mb-1" />
+                    <Progress value={subsystem.progress || 0} className="h-2 mb-1" />
                     <div className="text-xs text-muted-foreground">
-                      {subsystem.completed} de {subsystem.total} completados
+                      {subsystem.completed || 0} de {subsystem.total || 0} completados
                     </div>
                   </div>
                 ))

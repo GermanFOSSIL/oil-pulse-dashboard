@@ -36,26 +36,34 @@ export interface AccionLog {
 }
 
 export interface TestPackStats {
-  totalTestPacks: number;
-  pendingTestPacks: number;
-  completedTestPacks: number;
-  totalTags: number;
-  releasedTags: number;
-  pendingTags: number;
-  bySystem: {
+  testPacks: {
+    total: number;
+    completed: number;
+    progress: number;
+  };
+  tags: {
+    total: number;
+    released: number;
+    progress: number;
+  };
+  systems: {
+    name: string;
+    total: number;
+    completed: number;
+    progress: number;
+  }[];
+  itrs: {
+    name: string;
+    total: number;
+    completed: number;
+    progress: number;
+  }[];
+  subsystems: {
+    name: string;
     system: string;
-    count: number;
+    total: number;
     completed: number;
-  }[];
-  bySubsystem: {
-    subsystem: string;
-    count: number;
-    completed: number;
-  }[];
-  byITR: {
-    itr: string;
-    count: number;
-    completed: number;
+    progress: number;
   }[];
 }
 
@@ -361,7 +369,7 @@ export const getActionLogs = async (): Promise<AccionLog[]> => {
 };
 
 // Get test pack statistics
-export const getTestPacksStats = async (): Promise<TestPackStats> => {
+export const getTestPacksStats = async (): Promise<any> => {
   try {
     // Get all test packs
     const { data: testPacks, error: testPacksError } = await supabase
@@ -370,7 +378,7 @@ export const getTestPacksStats = async (): Promise<TestPackStats> => {
 
     if (testPacksError) {
       console.error("Error fetching test packs for stats:", testPacksError);
-      throw testPacksError;
+      return getEmptyStats(); // Return empty stats object on error
     }
 
     // Get all tags
@@ -380,85 +388,156 @@ export const getTestPacksStats = async (): Promise<TestPackStats> => {
 
     if (tagsError) {
       console.error("Error fetching tags for stats:", tagsError);
-      throw tagsError;
+      return getEmptyStats(); // Return empty stats object on error
     }
+
+    console.log(`Estadísticas: ${testPacks.length} test packs, ${tags.length} tags encontrados`);
 
     // Basic stats
     const totalTestPacks = testPacks.length;
-    const pendingTestPacks = testPacks.filter(tp => tp.estado === 'pendiente').length;
     const completedTestPacks = testPacks.filter(tp => tp.estado === 'listo').length;
+    const testPacksProgress = totalTestPacks > 0 ? Math.round((completedTestPacks / totalTestPacks) * 100) : 0;
+    
     const totalTags = tags.length;
     const releasedTags = tags.filter(tag => tag.estado === 'liberado').length;
-    const pendingTags = totalTags - releasedTags;
+    const tagsProgress = totalTags > 0 ? Math.round((releasedTags / totalTags) * 100) : 0;
 
     // Group by system
-    const systemMap = new Map<string, { count: number; completed: number }>();
+    const systemMap = new Map<string, { count: number; completed: number; name: string }>();
     testPacks.forEach(tp => {
-      const existing = systemMap.get(tp.sistema) || { count: 0, completed: 0 };
-      systemMap.set(tp.sistema, {
-        count: existing.count + 1,
-        completed: existing.completed + (tp.estado === 'listo' ? 1 : 0)
-      });
+      if (!systemMap.has(tp.sistema)) {
+        systemMap.set(tp.sistema, { 
+          count: 0, 
+          completed: 0,
+          name: tp.sistema
+        });
+      }
+      
+      const existing = systemMap.get(tp.sistema)!;
+      existing.count += 1;
+      if (tp.estado === 'listo') {
+        existing.completed += 1;
+      }
     });
 
     // Group by subsystem
-    const subsystemMap = new Map<string, { count: number; completed: number }>();
+    const subsystemMap = new Map<string, { 
+      count: number; 
+      completed: number; 
+      name: string;
+      system: string;
+      progress: number;
+    }>();
+    
     testPacks.forEach(tp => {
-      const existing = subsystemMap.get(tp.subsistema) || { count: 0, completed: 0 };
-      subsystemMap.set(tp.subsistema, {
-        count: existing.count + 1,
-        completed: existing.completed + (tp.estado === 'listo' ? 1 : 0)
-      });
+      if (!subsystemMap.has(tp.subsistema)) {
+        subsystemMap.set(tp.subsistema, { 
+          count: 0, 
+          completed: 0,
+          name: tp.subsistema,
+          system: tp.sistema,
+          progress: 0
+        });
+      }
+      
+      const existing = subsystemMap.get(tp.subsistema)!;
+      existing.count += 1;
+      if (tp.estado === 'listo') {
+        existing.completed += 1;
+      }
+      existing.progress = Math.round((existing.completed / existing.count) * 100);
     });
 
     // Group by ITR
-    const itrMap = new Map<string, { count: number; completed: number }>();
+    const itrMap = new Map<string, { 
+      count: number; 
+      completed: number;
+      name: string;
+      progress: number;
+    }>();
+    
     testPacks.forEach(tp => {
-      const existing = itrMap.get(tp.itr_asociado) || { count: 0, completed: 0 };
-      itrMap.set(tp.itr_asociado, {
-        count: existing.count + 1,
-        completed: existing.completed + (tp.estado === 'listo' ? 1 : 0)
-      });
+      if (!itrMap.has(tp.itr_asociado)) {
+        itrMap.set(tp.itr_asociado, { 
+          count: 0, 
+          completed: 0,
+          name: tp.itr_asociado,
+          progress: 0
+        });
+      }
+      
+      const existing = itrMap.get(tp.itr_asociado)!;
+      existing.count += 1;
+      if (tp.estado === 'listo') {
+        existing.completed += 1;
+      }
+      existing.progress = existing.count > 0 ? Math.round((existing.completed / existing.count) * 100) : 0;
     });
 
+    // Create Systems array with progress
+    const systems = Array.from(systemMap.entries()).map(([name, stats]) => ({
+      name,
+      total: stats.count,
+      completed: stats.completed,
+      progress: stats.count > 0 ? Math.round((stats.completed / stats.count) * 100) : 0
+    }));
+
+    // Create ITRs array with progress
+    const itrs = Array.from(itrMap.entries()).map(([name, stats]) => ({
+      name,
+      total: stats.count,
+      completed: stats.completed,
+      progress: stats.progress
+    }));
+
+    // Create Subsystems array
+    const subsystems = Array.from(subsystemMap.entries()).map(([name, stats]) => ({
+      name,
+      system: stats.system,
+      total: stats.count,
+      completed: stats.completed,
+      progress: stats.progress
+    }));
+
     return {
-      totalTestPacks,
-      pendingTestPacks,
-      completedTestPacks,
-      totalTags,
-      releasedTags,
-      pendingTags,
-      bySystem: Array.from(systemMap.entries()).map(([system, stats]) => ({
-        system,
-        count: stats.count,
-        completed: stats.completed
-      })),
-      bySubsystem: Array.from(subsystemMap.entries()).map(([subsystem, stats]) => ({
-        subsystem,
-        count: stats.count,
-        completed: stats.completed
-      })),
-      byITR: Array.from(itrMap.entries()).map(([itr, stats]) => ({
-        itr,
-        count: stats.count,
-        completed: stats.completed
-      }))
+      testPacks: {
+        total: totalTestPacks,
+        completed: completedTestPacks,
+        progress: testPacksProgress
+      },
+      tags: {
+        total: totalTags,
+        released: releasedTags,
+        progress: tagsProgress
+      },
+      systems,
+      itrs,
+      subsystems
     };
   } catch (error) {
     console.error("Error in getTestPacksStats:", error);
-    // Return empty stats object
-    return {
-      totalTestPacks: 0,
-      pendingTestPacks: 0,
-      completedTestPacks: 0,
-      totalTags: 0,
-      releasedTags: 0,
-      pendingTags: 0,
-      bySystem: [],
-      bySubsystem: [],
-      byITR: []
-    };
+    // Return an empty stats object on error
+    return getEmptyStats();
   }
+};
+
+// Helper function to create empty stats object
+const getEmptyStats = () => {
+  return {
+    testPacks: {
+      total: 0,
+      completed: 0,
+      progress: 0
+    },
+    tags: {
+      total: 0,
+      released: 0,
+      progress: 0
+    },
+    systems: [],
+    itrs: [],
+    subsystems: []
+  };
 };
 
 // Template generation and import/export functions
