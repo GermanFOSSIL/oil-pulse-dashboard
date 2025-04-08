@@ -266,12 +266,12 @@ export const logTagAction = async (actionData: { usuario_id: string; tag_id: str
 // Get all action logs
 export const getActionLogs = async (): Promise<AccionLog[]> => {
   try {
+    // First attempt to query with joins
     const { data: rawLogs, error } = await supabase
       .from('acciones_log')
       .select(`
-        *,
-        profiles (full_name),
-        tags (tag_name)
+        id, tag_id, usuario_id, accion, fecha,
+        tags:tag_id (tag_name)
       `)
       .order('fecha', { ascending: false })
       .limit(20);
@@ -281,16 +281,40 @@ export const getActionLogs = async (): Promise<AccionLog[]> => {
       throw error;
     }
 
-    // Transform the data to match AccionLog interface
-    const logs: AccionLog[] = rawLogs.map(log => ({
-      id: log.id,
-      tag_id: log.tag_id,
-      usuario_id: log.usuario_id,
-      accion: log.accion,
-      fecha: log.fecha,
-      user_name: log.profiles?.full_name || 'Usuario desconocido',
-      tag_name: log.tags?.tag_name || 'TAG desconocido'
-    }));
+    // Process the data to match AccionLog interface
+    const logs: AccionLog[] = await Promise.all(
+      rawLogs.map(async (log) => {
+        // Get user name from profiles if possible
+        let userName = 'Usuario desconocido';
+        if (log.usuario_id !== 'system') {
+          try {
+            const { data: profile, error: profileError } = await supabase
+              .from('profiles')
+              .select('full_name')
+              .eq('id', log.usuario_id)
+              .maybeSingle();
+              
+            if (profile && !profileError) {
+              userName = profile.full_name || 'Usuario desconocido';
+            }
+          } catch (error) {
+            console.error("Error fetching user profile:", error);
+          }
+        } else {
+          userName = 'Sistema';
+        }
+
+        return {
+          id: log.id,
+          tag_id: log.tag_id,
+          usuario_id: log.usuario_id,
+          accion: log.accion,
+          fecha: log.fecha,
+          user_name: userName,
+          tag_name: log.tags?.tag_name || 'TAG desconocido'
+        };
+      })
+    );
 
     return logs;
   } catch (error) {
