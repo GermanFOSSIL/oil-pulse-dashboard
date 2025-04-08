@@ -51,8 +51,8 @@ const TestPackTags = ({
     {
       header: "TAG",
       accessorKey: "tag_name",
-      cell: ({ row }) => {
-        const tag = row.original as Tag;
+      cell: ({ row }: { row: { original: Tag } }) => {
+        const tag = row.original;
         return (
           <div className="flex items-center gap-2">
             <TagIcon className="h-4 w-4 text-muted-foreground" />
@@ -64,8 +64,8 @@ const TestPackTags = ({
     {
       header: "Estado",
       accessorKey: "estado",
-      cell: ({ row }) => {
-        const tag = row.original as Tag;
+      cell: ({ row }: { row: { original: Tag } }) => {
+        const tag = row.original;
         return (
           <Badge variant={tag.estado === 'liberado' ? 'default' : 'outline'}>
             {tag.estado === 'liberado' ? 'Liberado' : 'Pendiente'}
@@ -76,8 +76,8 @@ const TestPackTags = ({
     {
       header: "Fecha Liberación",
       accessorKey: "fecha_liberacion",
-      cell: ({ row }) => {
-        const tag = row.original as Tag;
+      cell: ({ row }: { row: { original: Tag } }) => {
+        const tag = row.original;
         return (
           <span>{tag.fecha_liberacion ? new Date(tag.fecha_liberacion).toLocaleString() : 'Pendiente'}</span>
         );
@@ -86,8 +86,8 @@ const TestPackTags = ({
     {
       header: "Liberar",
       accessorKey: "actions",
-      cell: ({ row }) => {
-        const tag = row.original as Tag;
+      cell: ({ row }: { row: { original: Tag } }) => {
+        const tag = row.original;
         return (
           <Checkbox
             checked={tag.estado === 'liberado'}
