@@ -7,6 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { ITR, Subsystem, createITR, updateITR } from "@/services/supabaseService";
+import { supabase } from "@/integrations/supabase/client";
 
 interface ITRFormModalProps {
   open: boolean;
@@ -62,27 +63,54 @@ export const ITRFormModal = ({
     setLoading(true);
     
     try {
-      // Depurar los datos enviados
-      console.log("Enviando datos a Supabase:", {
+      // Log para depuración
+      console.log("Formulario a enviar:", {
         ...formData,
-        // Ahora assigned_to es un string, no un UUID, así que lo dejamos tal cual
+        progress: Number(formData.progress),
         assigned_to: formData.assigned_to || null
       });
       
+      // Verificar que el subsystem_id existe en la base de datos
+      const { data: subsystemCheck, error: subsystemError } = await supabase
+        .from('subsystems')
+        .select('id, name')
+        .eq('id', formData.subsystem_id)
+        .maybeSingle();
+        
+      if (subsystemError) {
+        console.error("Error al verificar el subsistema:", subsystemError);
+        throw new Error("Error al verificar el subsistema");
+      }
+      
+      if (!subsystemCheck) {
+        console.error("Subsistema no encontrado:", formData.subsystem_id);
+        throw new Error("Subsistema no encontrado");
+      }
+      
+      console.log("Subsistema verificado:", subsystemCheck.name);
+      
       if (isEditMode && itr) {
-        await updateITR(itr.id, {
+        const updatedITR = await updateITR(itr.id, {
           ...formData,
+          progress: Number(formData.progress),
           assigned_to: formData.assigned_to || null
         });
+        
+        console.log("ITR actualizado:", updatedITR);
+        
         toast({
           title: "ITR actualizado",
           description: "El ITR ha sido actualizado correctamente"
         });
       } else {
-        await createITR({
+        const newITR = await createITR({
           ...formData,
+          progress: Number(formData.progress),
           assigned_to: formData.assigned_to || null
         });
+        
+        console.log("ITR creado:", newITR);
+        
         toast({
           title: "ITR creado",
           description: "El ITR ha sido creado correctamente"
@@ -94,7 +122,7 @@ export const ITRFormModal = ({
       console.error("Error al guardar ITR:", error);
       toast({
         title: "Error",
-        description: "No se pudo guardar el ITR",
+        description: "No se pudo guardar el ITR: " + (error instanceof Error ? error.message : "Error desconocido"),
         variant: "destructive"
       });
     } finally {
