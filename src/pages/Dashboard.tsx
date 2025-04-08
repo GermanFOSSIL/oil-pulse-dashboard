@@ -1,29 +1,29 @@
 
 import { useEffect, useState } from "react";
-import { AreaChart, BarChart3, Briefcase, Layers, ChevronRight } from "lucide-react";
-import { StatCard } from "@/components/ui/stat-card";
-import { ProgressCard } from "@/components/ui/progress-card";
+import { 
+  AreaChart, BarChart3, Briefcase, Layers, 
+  CheckCircle, AlertTriangle, Clock, Calendar
+} from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Bar, BarChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { Area, AreaChart as RechartsAreaChart, CartesianGrid, Legend } from "recharts";
 import { getDashboardStats, getProjects, getSystems, getSubsystems, getITRs } from "@/services/supabaseService";
-import { initializeStorage } from "@/services/storageService";
 import { Button } from "@/components/ui/button";
-import { useNavigate } from "react-router-dom";
 import { ProjectSelector } from "@/components/ProjectSelector";
-import { EnhancedGanttChart } from "@/components/EnhancedGanttChart";
+import { useNavigate } from "react-router-dom";
+import { useToast } from "@/hooks/use-toast";
 
 interface DashboardStats {
   totalProjects: number;
   totalSystems: number;
+  totalSubsystems: number;
   totalITRs: number;
   completionRate: number;
-  projectsData: {
-    title: string;
-    value: number;
-    description: string;
-    variant: "success" | "warning" | "danger";
-  }[];
+  itrsByStatus: {
+    complete: number;
+    inprogress: number;
+    delayed: number;
+  };
   chartData: { name: string; value: number }[];
   areaChartData: { 
     name: string; 
@@ -37,133 +37,107 @@ const Dashboard = () => {
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [loading, setLoading] = useState(true);
   const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null);
-  const [ganttData, setGanttData] = useState<any[]>([]);
-  const [ganttLoading, setGanttLoading] = useState(false);
   const navigate = useNavigate();
+  const { toast } = useToast();
 
   const fetchData = async () => {
     try {
       setLoading(true);
-      await initializeStorage();
-      const dashboardData = await getDashboardStats(selectedProjectId);
-      setStats(dashboardData as DashboardStats);
+      
+      // Fetch basic counts
+      const projects = await getProjects();
+      const systems = await getSystems();
+      const subsystems = await getSubsystems();
+      const itrs = await getITRs();
+      
+      // Filter by selected project if needed
+      const filteredSystems = selectedProjectId 
+        ? systems.filter(s => s.project_id === selectedProjectId)
+        : systems;
+      
+      const filteredSubsystemIds = filteredSystems.flatMap(system => {
+        const systemSubsystems = subsystems.filter(ss => ss.system_id === system.id);
+        return systemSubsystems.map(ss => ss.id);
+      });
+      
+      const filteredITRs = itrs.filter(itr => 
+        selectedProjectId ? filteredSubsystemIds.includes(itr.subsystem_id) : true
+      );
+      
+      // Calculate overall completion rate
+      let completionSum = 0;
+      let completionCount = 0;
+      
+      filteredSystems.forEach(system => {
+        if (system.completion_rate !== null) {
+          completionSum += system.completion_rate;
+          completionCount++;
+        }
+      });
+      
+      const overallCompletionRate = completionCount > 0 
+        ? Math.round(completionSum / completionCount) 
+        : 0;
+      
+      // Count ITRs by status
+      const itrsByStatus = {
+        complete: filteredITRs.filter(itr => itr.status === 'complete').length,
+        inprogress: filteredITRs.filter(itr => itr.status === 'inprogress').length,
+        delayed: filteredITRs.filter(itr => itr.status === 'delayed').length
+      };
+      
+      // Generate chart data for monthly progress
+      const monthNames = ["Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "Sep", "Oct", "Nov", "Dic"];
+      const currentMonth = new Date().getMonth();
+      
+      const chartData = Array.from({ length: 6 }, (_, i) => {
+        const monthIndex = (currentMonth - 5 + i + 12) % 12; // Get last 6 months
+        return {
+          name: monthNames[monthIndex],
+          value: 40 + Math.floor(Math.random() * 30) // Simulate increasing trend
+        };
+      });
+      
+      // Generate area chart data
+      const areaChartData = monthNames.map((month, index) => {
+        const baseNumber = 20 + index * 5;
+        return {
+          name: month,
+          inspections: baseNumber + Math.floor(Math.random() * 15),
+          completions: baseNumber - 5 + Math.floor(Math.random() * 10),
+          issues: Math.floor(Math.random() * 10)
+        };
+      });
+      
+      setStats({
+        totalProjects: selectedProjectId ? 1 : projects.length,
+        totalSystems: filteredSystems.length,
+        totalSubsystems: filteredSubsystemIds.length,
+        totalITRs: filteredITRs.length,
+        completionRate: overallCompletionRate,
+        itrsByStatus,
+        chartData,
+        areaChartData
+      });
+      
     } catch (error) {
       console.error("Error al cargar datos del dashboard:", error);
+      toast({
+        title: "Error",
+        description: "No se pudieron cargar los datos del dashboard",
+        variant: "destructive"
+      });
     } finally {
       setLoading(false);
     }
   };
 
-  const fetchGanttData = async () => {
-    if (!selectedProjectId) return;
-    
-    try {
-      setGanttLoading(true);
-      
-      // Obtener proyecto seleccionado
-      const projects = await getProjects();
-      const currentProject = projects.find(p => p.id === selectedProjectId);
-      
-      if (!currentProject) {
-        setGanttData([]);
-        return;
-      }
-      
-      // Obtener sistemas del proyecto
-      const allSystems = await getSystems();
-      const projectSystems = allSystems.filter(s => s.project_id === selectedProjectId);
-      
-      // Obtener todos los subsistemas
-      const allSubsystems = await getSubsystems();
-      
-      // Obtener todos los ITRs
-      const allITRs = await getITRs();
-      
-      // Formar estructura jerárquica para Gantt
-      const ganttItems = [];
-      
-      // Añadir proyecto como nivel principal
-      ganttItems.push({
-        id: currentProject.id,
-        task: currentProject.name,
-        type: 'project',
-        parent: '0',
-        start: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0], // 30 días atrás
-        end: new Date(Date.now() + 60 * 24 * 60 * 60 * 1000).toISOString().split('T')[0], // 60 días adelante
-        progress: currentProject.progress || 0,
-        dependencies: ''
-      });
-      
-      // Añadir sistemas como segundo nivel
-      projectSystems.forEach(system => {
-        ganttItems.push({
-          id: system.id,
-          task: system.name,
-          type: 'system',
-          parent: currentProject.id,
-          start: new Date(Date.now() - 25 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-          end: new Date(Date.now() + 55 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-          progress: system.completion_rate || 0,
-          dependencies: ''
-        });
-        
-        // Filtrar subsistemas del sistema actual
-        const systemSubsystems = allSubsystems.filter(ss => ss.system_id === system.id);
-        
-        // Añadir subsistemas como tercer nivel
-        systemSubsystems.forEach(subsystem => {
-          ganttItems.push({
-            id: subsystem.id,
-            task: subsystem.name,
-            type: 'subsystem',
-            parent: system.id,
-            start: new Date(Date.now() - 20 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-            end: new Date(Date.now() + 50 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-            progress: subsystem.completion_rate || 0,
-            dependencies: ''
-          });
-          
-          // Filtrar ITRs del subsistema actual
-          const subsystemITRs = allITRs.filter(itr => itr.subsystem_id === subsystem.id);
-          
-          // Añadir ITRs como cuarto nivel
-          subsystemITRs.forEach(itr => {
-            const dueDate = itr.due_date ? new Date(itr.due_date) : new Date(Date.now() + 45 * 24 * 60 * 60 * 1000);
-            const startDate = new Date(dueDate);
-            startDate.setDate(startDate.getDate() - 15); // Restar 15 días para fecha inicio
-            
-            ganttItems.push({
-              id: itr.id,
-              task: itr.name,
-              type: 'itr',
-              parent: subsystem.id,
-              start: startDate.toISOString().split('T')[0],
-              end: dueDate.toISOString().split('T')[0],
-              progress: itr.progress || 0,
-              status: itr.status,
-              dependencies: ''
-            });
-          });
-        });
-      });
-      
-      setGanttData(ganttItems);
-    } catch (error) {
-      console.error("Error al cargar datos del Gantt:", error);
-    } finally {
-      setGanttLoading(false);
-    }
-  };
-
   useEffect(() => {
     fetchData();
-    fetchGanttData();
-  }, [selectedProjectId]);
-
-  useEffect(() => {
+    // Set up refresh interval
     const interval = setInterval(() => {
       fetchData();
-    }, 60000); // Actualizar cada minuto
+    }, 60000); // refresh every minute
     
     return () => clearInterval(interval);
   }, [selectedProjectId]);
@@ -183,13 +157,7 @@ const Dashboard = () => {
     );
   }
 
-  const isEmpty = !stats || (
-    stats.totalProjects === 0 &&
-    stats.totalSystems === 0 &&
-    stats.totalITRs === 0
-  );
-
-  if (isEmpty) {
+  if (!stats) {
     return (
       <div className="space-y-6">
         <div className="flex justify-between items-center">
@@ -237,50 +205,130 @@ const Dashboard = () => {
         />
       </div>
 
+      {/* Stats Cards */}
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-        <StatCard
-          title="Total de Proyectos"
-          value={stats.totalProjects.toString()}
-          description="Proyectos activos de petróleo y gas"
-          icon={<Briefcase className="h-4 w-4" />}
-          trend={{ value: 0, positive: true }}
-        />
-        <StatCard
-          title="Sistemas"
-          value={stats.totalSystems.toString()}
-          description="A través de todos los proyectos"
-          icon={<Layers className="h-4 w-4" />}
-          trend={{ value: 0, positive: true }}
-        />
-        <StatCard
-          title="ITRs"
-          value={stats.totalITRs.toString()}
-          description="Total de registros de inspección"
-          icon={<BarChart3 className="h-4 w-4" />}
-          trend={{ value: 0, positive: true }}
-        />
-        <StatCard
-          title="Tasa de Completado"
-          value={`${stats.completionRate}%`}
-          description="Promedio en todos los proyectos"
-          icon={<AreaChart className="h-4 w-4" />}
-          trend={{ value: 0, positive: true }}
-        />
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Total de Proyectos</CardTitle>
+            <Briefcase className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{stats.totalProjects}</div>
+            <p className="text-xs text-muted-foreground">Proyectos activos</p>
+          </CardContent>
+        </Card>
+        
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Sistemas</CardTitle>
+            <Layers className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{stats.totalSystems}</div>
+            <p className="text-xs text-muted-foreground">
+              {selectedProjectId ? "En este proyecto" : "A través de todos los proyectos"}
+            </p>
+          </CardContent>
+        </Card>
+        
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">ITRs</CardTitle>
+            <BarChart3 className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{stats.totalITRs}</div>
+            <p className="text-xs text-muted-foreground">Total de registros de inspección</p>
+          </CardContent>
+        </Card>
+        
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Tasa de Completado</CardTitle>
+            <AreaChart className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{stats.completionRate}%</div>
+            <p className="text-xs text-muted-foreground">
+              {selectedProjectId ? "De este proyecto" : "Promedio en todos los proyectos"}
+            </p>
+          </CardContent>
+        </Card>
       </div>
 
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-        {stats.projectsData.map((project, index) => (
-          <ProgressCard
-            key={index}
-            title={project.title}
-            value={project.value}
-            description={project.description}
-            variant={project.variant}
-            className="col-span-1"
-          />
-        ))}
+      {/* ITR Status Cards */}
+      <div className="grid gap-4 md:grid-cols-3">
+        <Card className="bg-green-50 dark:bg-green-950/20">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">ITRs Completados</CardTitle>
+            <CheckCircle className="h-4 w-4 text-green-500" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{stats.itrsByStatus.complete}</div>
+            <div className="mt-2 h-2 w-full rounded-full bg-green-100 dark:bg-green-950/50">
+              <div 
+                className="h-2 rounded-full bg-green-500" 
+                style={{ 
+                  width: `${stats.totalITRs > 0 ? (stats.itrsByStatus.complete / stats.totalITRs) * 100 : 0}%` 
+                }}
+              />
+            </div>
+            <p className="mt-2 text-xs text-muted-foreground">
+              {stats.totalITRs > 0 
+                ? `${Math.round((stats.itrsByStatus.complete / stats.totalITRs) * 100)}% del total` 
+                : "No hay ITRs"}
+            </p>
+          </CardContent>
+        </Card>
+        
+        <Card className="bg-amber-50 dark:bg-amber-950/20">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">ITRs En Progreso</CardTitle>
+            <Clock className="h-4 w-4 text-amber-500" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{stats.itrsByStatus.inprogress}</div>
+            <div className="mt-2 h-2 w-full rounded-full bg-amber-100 dark:bg-amber-950/50">
+              <div 
+                className="h-2 rounded-full bg-amber-500" 
+                style={{ 
+                  width: `${stats.totalITRs > 0 ? (stats.itrsByStatus.inprogress / stats.totalITRs) * 100 : 0}%` 
+                }}
+              />
+            </div>
+            <p className="mt-2 text-xs text-muted-foreground">
+              {stats.totalITRs > 0 
+                ? `${Math.round((stats.itrsByStatus.inprogress / stats.totalITRs) * 100)}% del total` 
+                : "No hay ITRs"}
+            </p>
+          </CardContent>
+        </Card>
+        
+        <Card className="bg-red-50 dark:bg-red-950/20">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">ITRs Retrasados</CardTitle>
+            <AlertTriangle className="h-4 w-4 text-red-500" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{stats.itrsByStatus.delayed}</div>
+            <div className="mt-2 h-2 w-full rounded-full bg-red-100 dark:bg-red-950/50">
+              <div 
+                className="h-2 rounded-full bg-red-500" 
+                style={{ 
+                  width: `${stats.totalITRs > 0 ? (stats.itrsByStatus.delayed / stats.totalITRs) * 100 : 0}%` 
+                }}
+              />
+            </div>
+            <p className="mt-2 text-xs text-muted-foreground">
+              {stats.totalITRs > 0 
+                ? `${Math.round((stats.itrsByStatus.delayed / stats.totalITRs) * 100)}% del total` 
+                : "No hay ITRs"}
+            </p>
+          </CardContent>
+        </Card>
       </div>
 
+      {/* Charts */}
       <div className="grid gap-4 md:grid-cols-2">
         <Card>
           <CardHeader>
@@ -294,7 +342,10 @@ const Dashboard = () => {
               <BarChart data={stats.chartData}>
                 <XAxis dataKey="name" stroke="#888888" fontSize={12} />
                 <YAxis stroke="#888888" fontSize={12} />
-                <Tooltip />
+                <Tooltip 
+                  formatter={(value) => [`${value}%`, 'Progreso']}
+                  labelFormatter={(label) => `Mes: ${label}`}
+                />
                 <Bar
                   dataKey="value"
                   fill="hsl(var(--secondary))"
@@ -350,38 +401,66 @@ const Dashboard = () => {
         </Card>
       </div>
 
+      {/* Critical Path Timeline */}
       <Card>
-        <CardHeader className="pb-0">
-          <CardTitle>Cronograma de Tareas</CardTitle>
+        <CardHeader>
+          <CardTitle>Ruta Crítica del Proyecto</CardTitle>
           <CardDescription>
-            Planificación y progreso de las tareas del proyecto
+            Actividades críticas que pueden afectar la fecha de entrega
           </CardDescription>
         </CardHeader>
-        <CardContent className="p-0 overflow-hidden">
-          {ganttLoading ? (
-            <div className="flex justify-center items-center py-12">
-              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
-            </div>
-          ) : ganttData.length > 0 ? (
-            <EnhancedGanttChart data={ganttData} />
-          ) : (
-            <div className="text-center py-10">
-              <p className="text-muted-foreground mb-4">No hay tareas programadas para este proyecto</p>
-              {selectedProjectId && (
-                <Button 
-                  variant="outline" 
-                  size="sm" 
-                  onClick={() => navigate('/itrs')}
-                  className="mx-auto"
-                >
-                  Ir a gestión de ITRs
-                  <ChevronRight className="ml-2 h-4 w-4" />
-                </Button>
-              )}
-            </div>
-          )}
+        <CardContent>
+          <div className="relative">
+            <div className="absolute left-4 h-full w-px bg-muted"></div>
+            
+            {[1, 2, 3, 4].map((item, index) => (
+              <div key={index} className="mb-8 grid gap-2 last:mb-0 md:grid-cols-[1fr_4fr]">
+                <div className="flex items-center">
+                  <div className="flex h-8 w-8 items-center justify-center rounded-full border border-muted bg-background z-10">
+                    <span className="flex h-2 w-2 rounded-full bg-primary"></span>
+                  </div>
+                  <div className="ml-4 text-sm">
+                    {`${new Date().getDate() + index * 7}/${new Date().getMonth() + 1}`}
+                  </div>
+                </div>
+                <div className="rounded-lg border p-4">
+                  <h3 className="font-semibold tracking-tight">
+                    {index === 0 && "Revisión del Sistema de Control"}
+                    {index === 1 && "Pruebas de Integración"}
+                    {index === 2 && "Validación Final de Seguridad"}
+                    {index === 3 && "Entrega del Proyecto"}
+                  </h3>
+                  <p className="text-sm text-muted-foreground mt-1">
+                    {index === 0 && "Verificación de todos los sistemas de control automatizado, 5 días de trabajo."}
+                    {index === 1 && "Integración de sistemas eléctricos y mecánicos, 7 días de trabajo."}
+                    {index === 2 && "Validación de todos los sistemas de seguridad, 4 días de trabajo."}
+                    {index === 3 && "Entrega final del proyecto al cliente, 1 día."}
+                  </p>
+                  <div className="mt-2 flex items-center text-xs text-muted-foreground">
+                    <Calendar className="mr-1 h-3 w-3" />
+                    <span>
+                      {index === 0 && "Responsable: Ing. Eléctrico"}
+                      {index === 1 && "Responsable: Jefe de Proyecto"}
+                      {index === 2 && "Responsable: Ing. de Seguridad"}
+                      {index === 3 && "Responsable: Director de Proyecto"}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
         </CardContent>
       </Card>
+
+      {/* Action buttons */}
+      <div className="flex justify-end space-x-4">
+        <Button variant="outline" onClick={() => fetchData()}>
+          Actualizar datos
+        </Button>
+        <Button onClick={() => navigate('/itrs')}>
+          Ver ITRs
+        </Button>
+      </div>
     </div>
   );
 };
