@@ -29,6 +29,7 @@ interface GanttItem {
   parent?: string;
   status?: string;
   dependencies?: string;
+  quantity?: number; // Nueva propiedad para la cantidad
 }
 
 interface EnhancedGanttProps {
@@ -66,7 +67,8 @@ export const EnhancedGanttChart: React.FC<EnhancedGanttProps> = ({ data }) => {
           'Inicio': item.start,
           'Fin': item.end,
           'Progreso (%)': item.progress,
-          'Estado': item.status || 'No definido'
+          'Estado': item.status || 'No definido',
+          'Cantidad': item.quantity || 1 // Exportamos la cantidad
         };
       });
       
@@ -79,7 +81,8 @@ export const EnhancedGanttChart: React.FC<EnhancedGanttProps> = ({ data }) => {
         { wch: 15 },
         { wch: 15 },
         { wch: 15 },
-        { wch: 15 }
+        { wch: 15 },
+        { wch: 10 }  // Ancho para la columna de cantidad
       ];
       ws['!cols'] = colWidths;
       
@@ -229,6 +232,16 @@ export const EnhancedGanttChart: React.FC<EnhancedGanttProps> = ({ data }) => {
       gantt.config.columns = [
         { name: "text", label: "Tarea", tree: true, width: 280, resize: true },
         { 
+          name: "quantity", 
+          label: "Cantidad", 
+          align: "center", 
+          width: 70, 
+          resize: true, 
+          template: function(task: any) {
+            return task.quantity || 1;
+          }
+        },
+        { 
           name: "progress", 
           label: "Progreso",
           align: "center", 
@@ -288,6 +301,10 @@ export const EnhancedGanttChart: React.FC<EnhancedGanttProps> = ({ data }) => {
         tooltipText += "Inicio: " + gantt.templates.tooltip_date_format(start) + "<br/>";
         tooltipText += "Fin: " + gantt.templates.tooltip_date_format(end) + "<br/>";
         tooltipText += "Progreso: " + Math.round(task.progress * 100) + "%<br/>";
+        
+        if (task.quantity && task.quantity > 1) {
+          tooltipText += "Cantidad: " + task.quantity + "<br/>";
+        }
         
         if (statusText) {
           tooltipText += "Estado: " + statusText;
@@ -462,6 +479,7 @@ export const EnhancedGanttChart: React.FC<EnhancedGanttProps> = ({ data }) => {
           parent: item.parent || 0,
           type: item.type,
           status: item.status,
+          quantity: item.quantity || 1, // Agregamos la cantidad
           open: true,
           duration: Math.ceil((endDate.getTime() - startDate.getTime()) / (24 * 60 * 60 * 1000)),
           color_class: item.type === "project" ? "gantt-task-project" : 
@@ -472,10 +490,23 @@ export const EnhancedGanttChart: React.FC<EnhancedGanttProps> = ({ data }) => {
         };
       });
 
-      gantt.config.scales = [
-        { unit: "month", step: 1, format: "%F %Y" },
-        { unit: "day", step: 1, format: "%j" }
-      ];
+      // Configuración de escalas basada en el modo de vista seleccionado
+      if (viewMode === "month") {
+        gantt.config.scales = [
+          { unit: "month", step: 1, format: "%F %Y" },
+          { unit: "day", step: 1, format: "%j" }
+        ];
+      } else if (viewMode === "week") {
+        gantt.config.scales = [
+          { unit: "week", step: 1, format: "Semana #%W" },
+          { unit: "day", step: 1, format: "%j %D" }
+        ];
+      } else if (viewMode === "day") {
+        gantt.config.scales = [
+          { unit: "day", step: 1, format: "%j %D" },
+          { unit: "hour", step: 2, format: "%H:00" }
+        ];
+      }
       
       gantt.templates.task_class = (start, end, task) => {
         return task.color_class || "gantt-task-itr";
@@ -486,7 +517,19 @@ export const EnhancedGanttChart: React.FC<EnhancedGanttProps> = ({ data }) => {
         data: processedData,
         links: []
       });
-      gantt.showDate(currentDate);
+      
+      // Asegúrate de que showDate funcione correctamente
+      try {
+        gantt.showDate(currentDate);
+      } catch (error) {
+        console.error("Error al mostrar la fecha en el Gantt:", error);
+        // Si falla, intentamos con setCurrentScale como alternativa
+        try {
+          gantt.setCurrentScale(viewMode === "day" ? "day" : viewMode === "week" ? "week" : "month");
+        } catch (error) {
+          console.error("Error al establecer la escala en el Gantt:", error);
+        }
+      }
       
       gantt.eachTask(function(task) {
         gantt.open(task.id);

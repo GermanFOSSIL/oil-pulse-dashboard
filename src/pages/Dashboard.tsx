@@ -79,7 +79,8 @@ const Dashboard = () => {
           end: project.end_date || new Date(new Date().setMonth(new Date().getMonth() + 3)).toISOString(),
           progress: project.progress || 0,
           type: 'project',
-          status: project.status
+          status: project.status,
+          quantity: 1
         });
       }
 
@@ -94,7 +95,8 @@ const Dashboard = () => {
           progress: system.completion_rate || 0,
           parent: `project-${projectId}`,
           type: 'system',
-          status: 'inprogress'
+          status: 'inprogress',
+          quantity: 1
         });
       }
 
@@ -109,24 +111,57 @@ const Dashboard = () => {
           progress: subsystem.completion_rate || 0,
           parent: `system-${systemId}`,
           type: 'subsystem',
-          status: 'inprogress'
+          status: 'inprogress',
+          quantity: 1
         });
       }
 
-      // Add ITRs to Gantt
-      for (const itr of itrsData) {
-        const subsystemId = itr.subsystem_id;
+      // Add ITRs to Gantt with quantity grouping
+      const itrGroups: Record<string, {
+        count: number,
+        progress: number,
+        subsystemId: string,
+        start: string,
+        end: string,
+        status: string
+      }> = {};
+      
+      // Agrupar ITRs por nombre
+      itrsData.forEach(itr => {
+        const key = `${itr.name}-${itr.subsystem_id}`;
+        
+        if (!itrGroups[key]) {
+          itrGroups[key] = {
+            count: 0,
+            progress: 0,
+            subsystemId: itr.subsystem_id,
+            start: itr.start_date || new Date().toISOString(),
+            end: itr.end_date || new Date(new Date().setDate(new Date().getDate() + 14)).toISOString(),
+            status: itr.status
+          };
+        }
+        
+        itrGroups[key].count += 1;
+        itrGroups[key].progress += itr.progress || 0;
+      });
+      
+      // Agregar los grupos de ITRs al Gantt
+      Object.entries(itrGroups).forEach(([key, group], index) => {
+        const itrName = key.split('-')[0];
+        const avgProgress = group.count > 0 ? Math.round(group.progress / group.count) : 0;
+        
         ganttItems.push({
-          id: `itr-${itr.id}`,
-          task: itr.name,
-          start: itr.start_date || new Date().toISOString(),
-          end: itr.end_date || new Date(new Date().setDate(new Date().getDate() + 14)).toISOString(),
-          progress: itr.progress || 0,
-          parent: `subsystem-${subsystemId}`,
+          id: `itr-group-${index}`,
+          task: itrName,
+          start: group.start,
+          end: group.end,
+          progress: avgProgress,
+          parent: `subsystem-${group.subsystemId}`,
           type: 'task',
-          status: itr.status
+          status: group.status,
+          quantity: group.count
         });
-      }
+      });
 
       setGanttData(ganttItems);
 
@@ -200,14 +235,15 @@ const Dashboard = () => {
         XLSX.utils.book_append_sheet(wb, activityWs, "Actividad");
       }
       
-      // Export Gantt data
+      // Export Gantt data with quantity
       const ganttExportData = ganttData.map(item => ({
         'Tarea': item.task,
         'Tipo': item.type,
         'Inicio': item.start,
         'Fin': item.end,
         'Progreso': `${item.progress}%`,
-        'Estado': item.status
+        'Estado': item.status,
+        'Cantidad': item.quantity || 1
       }));
       
       const ganttWs = XLSX.utils.json_to_sheet(ganttExportData);
