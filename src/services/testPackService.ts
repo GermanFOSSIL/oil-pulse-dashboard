@@ -20,6 +20,7 @@ export interface TestPack {
   sistema: string;
   subsistema: string;
   itr_asociado: string;
+  itr_name?: string; // Add optional ITR name field
   estado: 'pendiente' | 'listo';
   progress?: number;
   created_at: string;
@@ -61,9 +62,26 @@ export const getTestPackWithTags = async (testPackId: string): Promise<TestPack 
       return null;
     }
 
+    // Get the ITR name if available
+    let itrName = data.itr_asociado;
+    try {
+      const { data: itrData } = await supabase
+        .from('itrs')
+        .select('name')
+        .eq('id', data.itr_asociado)
+        .maybeSingle();
+      
+      if (itrData?.name) {
+        itrName = itrData.name;
+      }
+    } catch (err) {
+      console.log('Error fetching ITR name, using code instead:', err);
+    }
+
     // Ensure estado property is the correct type
     const formattedTestPack: TestPack = {
       ...data,
+      itr_name: itrName,
       estado: data.estado as 'pendiente' | 'listo',
       tags: data.tags ? data.tags.map((tag: any) => ({
         ...tag,
@@ -165,6 +183,26 @@ export const getTestPacks = async (): Promise<TestPack[]> => {
       throw error;
     }
 
+    // Fetch ITR names for all test packs
+    const itrIds = [...new Set(data.map((tp: any) => tp.itr_asociado))];
+    const itrNamesPromises = itrIds.map(async (itrId) => {
+      try {
+        const { data: itrData } = await supabase
+          .from('itrs')
+          .select('id, name')
+          .eq('id', itrId)
+          .maybeSingle();
+        
+        return { id: itrId, name: itrData?.name };
+      } catch (err) {
+        console.log(`Error fetching ITR name for ${itrId}:`, err);
+        return { id: itrId, name: null };
+      }
+    });
+
+    const itrNames = await Promise.all(itrNamesPromises);
+    const itrMap = new Map(itrNames.map(itr => [itr.id, itr.name]));
+
     // Ensure estado property is the correct type and calculate progress
     const formattedTestPacks: TestPack[] = data.map((tp: any) => {
       const formattedTags = tp.tags ? tp.tags.map((tag: any) => ({
@@ -176,8 +214,12 @@ export const getTestPacks = async (): Promise<TestPack[]> => {
       const releasedTags = formattedTags.filter((t: any) => t.estado === 'liberado').length;
       const progress = totalTags > 0 ? Math.round((releasedTags / totalTags) * 100) : 0;
       
+      // Add ITR name if found
+      const itrName = itrMap.get(tp.itr_asociado);
+      
       return {
         ...tp,
+        itr_name: itrName || tp.itr_asociado,
         estado: tp.estado as 'pendiente' | 'listo',
         tags: formattedTags,
         progress
@@ -295,7 +337,7 @@ export const updateTestPackStatusBasedOnTags = async (testPackId: string): Promi
 
 // Create a new test pack
 export const createTestPack = async (
-  testPackData: Omit<TestPack, "id" | "created_at" | "updated_at" | "progress" | "tags">
+  testPackData: Omit<TestPack, "id" | "created_at" | "updated_at" | "progress" | "tags" | "itr_name">
 ): Promise<TestPack> => {
   try {
     console.log("Creating test pack with data:", testPackData);
@@ -470,17 +512,33 @@ export const exportToExcel = async (): Promise<ArrayBuffer> => {
     // Get all test packs with their tags
     const testPacks = await getTestPacks();
     
+    // Get ITR names for the export
+    const itrIds = [...new Set(testPacks.map(tp => tp.itr_asociado))];
+    const { data: itrData } = await supabase
+      .from('itrs')
+      .select('id, name')
+      .in('id', itrIds);
+    
+    const itrMap = new Map();
+    if (itrData) {
+      itrData.forEach((itr: any) => {
+        itrMap.set(itr.id, itr.name);
+      });
+    }
+    
     // Prepare data for export - Detailed main sheet with test pack info
     const exportData = testPacks.map(tp => {
       const releasedTags = tp.tags ? tp.tags.filter(t => t.estado === 'liberado').length : 0;
       const totalTags = tp.tags ? tp.tags.length : 0;
+      const itrName = itrMap.get(tp.itr_asociado) || tp.itr_asociado;
       
       return {
         'ID': tp.id,
         'Nombre': tp.nombre_paquete,
         'Sistema': tp.sistema,
         'Subsistema': tp.subsistema,
-        'ITR Asociado': tp.itr_asociado,
+        'ITR Asociado': itrName,
+        'ITR ID': tp.itr_asociado,
         'Estado': tp.estado === 'listo' ? 'Listo' : 'Pendiente',
         'Progreso': `${tp.progress || 0}%`,
         'TAGs Liberados': `${releasedTags}/${totalTags}`,
@@ -493,12 +551,15 @@ export const exportToExcel = async (): Promise<ArrayBuffer> => {
     const tagsData: any[] = [];
     testPacks.forEach(tp => {
       if (tp.tags && tp.tags.length > 0) {
+        const itrName = itrMap.get(tp.itr_asociado) || tp.itr_asociado;
+        
         tp.tags.forEach(tag => {
           tagsData.push({
             'Test Pack': tp.nombre_paquete,
             'Sistema': tp.sistema,
             'Subsistema': tp.subsistema,
-            'ITR Asociado': tp.itr_asociado,
+            'ITR Asociado': itrName,
+            'ITR ID': tp.itr_asociado,
             'TAG': tag.tag_name,
             'Estado TAG': tag.estado === 'liberado' ? 'Liberado' : 'Pendiente',
             'Fecha Liberación': tag.fecha_liberacion ? new Date(tag.fecha_liberacion).toLocaleString() : 'Pendiente',
@@ -583,7 +644,8 @@ export const getTestPacksStats = async () => {
     
     // Calculate ITR distribution
     const itrCounts = testPacks.reduce((acc: Record<string, number>, tp) => {
-      acc[tp.itr_asociado] = (acc[tp.itr_asociado] || 0) + 1;
+      const itrKey = tp.itr_name || tp.itr_asociado;
+      acc[itrKey] = (acc[itrKey] || 0) + 1;
       return acc;
     }, {});
     
@@ -623,13 +685,28 @@ export const getTestPacksStats = async () => {
 export const getTestPacksByITR = async (itrName: string): Promise<TestPack[]> => {
   try {
     console.log(`Fetching test packs for ITR: ${itrName}`);
+    
+    // First try to get the ITR id if itrName is not a UUID
+    let itrId = itrName;
+    if (!isUUID(itrName)) {
+      const { data: itrData } = await supabase
+        .from('itrs')
+        .select('id')
+        .eq('name', itrName)
+        .maybeSingle();
+      
+      if (itrData?.id) {
+        itrId = itrData.id;
+      }
+    }
+    
     const { data, error } = await supabase
       .from('test_packs')
       .select(`
         *,
         tags:tags(*)
       `)
-      .eq('itr_asociado', itrName)
+      .eq('itr_asociado', itrId)
       .order('created_at', { ascending: false });
 
     if (error) {
@@ -650,6 +727,7 @@ export const getTestPacksByITR = async (itrName: string): Promise<TestPack[]> =>
       
       return {
         ...tp,
+        itr_name: itrName,
         estado: tp.estado as 'pendiente' | 'listo',
         tags: formattedTags,
         progress
@@ -662,4 +740,10 @@ export const getTestPacksByITR = async (itrName: string): Promise<TestPack[]> =>
     console.error(`Error in getTestPacksByITR for ${itrName}:`, error);
     return [];
   }
+};
+
+// Helper function to check if a string is a UUID
+const isUUID = (str: string): boolean => {
+  const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+  return uuidRegex.test(str);
 };

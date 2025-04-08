@@ -179,7 +179,7 @@ const TestPackList = ({
                   <div>
                     <CardTitle className="text-lg">{testPack.nombre_paquete}</CardTitle>
                     <CardDescription>
-                      ITR: {testPack.itr_asociado} | Sistema: {testPack.sistema} | Subsistema: {testPack.subsistema}
+                      ITR: {testPack.itr_name || testPack.itr_asociado} | Sistema: {testPack.sistema} | Subsistema: {testPack.subsistema}
                     </CardDescription>
                   </div>
                   <Badge variant={testPack.estado === 'listo' ? 'default' : 'outline'}>
