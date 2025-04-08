@@ -362,6 +362,7 @@ const Dashboard = () => {
     }
   };
 
+  // Modificar la función renderActiveShape para evitar el error TypeScript
   const renderActiveShape = (props: any) => {
     const { cx, cy, innerRadius, outerRadius, startAngle, endAngle, fill, payload, percent, value } = props;
   
@@ -378,7 +379,7 @@ const Dashboard = () => {
         </text>
         <Pie
           activeIndex={0}
-          activeShape={props => renderActiveShape(props)}
+          activeShape={(props) => renderActiveShape(props)}
           data={[{ name: payload.name, value }]}
           cx={cx}
           cy={cy}
