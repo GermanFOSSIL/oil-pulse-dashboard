@@ -7,6 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { supabase } from "@/integrations/supabase/client";
 import { 
   ITR, 
   Subsystem, 
@@ -288,7 +289,7 @@ export const ITRFormModal = ({
               </SelectTrigger>
               <SelectContent>
                 {projects.length === 0 ? (
-                  <SelectItem value="no-projects" disabled>No hay proyectos disponibles</SelectItem>
+                  <SelectItem value="no-projects">No hay proyectos disponibles</SelectItem>
                 ) : (
                   projects.map(project => (
                     <SelectItem key={project.id} value={project.id}>
@@ -312,7 +313,7 @@ export const ITRFormModal = ({
               </SelectTrigger>
               <SelectContent>
                 {systems.length === 0 ? (
-                  <SelectItem value="no-systems" disabled>No hay sistemas disponibles para este proyecto</SelectItem>
+                  <SelectItem value="no-systems">No hay sistemas disponibles para este proyecto</SelectItem>
                 ) : (
                   systems.map(system => (
                     <SelectItem key={system.id} value={system.id}>
@@ -336,7 +337,7 @@ export const ITRFormModal = ({
               </SelectTrigger>
               <SelectContent>
                 {subsystems.length === 0 ? (
-                  <SelectItem value="no-subsystems" disabled>No hay subsistemas disponibles para este sistema</SelectItem>
+                  <SelectItem value="no-subsystems">No hay subsistemas disponibles para este sistema</SelectItem>
                 ) : (
                   subsystems.map(subsystem => (
                     <SelectItem key={subsystem.id} value={subsystem.id}>
@@ -393,14 +394,14 @@ export const ITRFormModal = ({
           <div className="space-y-2">
             <Label htmlFor="assigned_to">Asignado a</Label>
             <Select
-              value={formData.assigned_to}
-              onValueChange={(value) => handleSelectChange("assigned_to", value)}
+              value={formData.assigned_to || "unassigned"}
+              onValueChange={(value) => handleSelectChange("assigned_to", value === "unassigned" ? "" : value)}
             >
               <SelectTrigger id="assigned_to">
                 <SelectValue placeholder="Seleccionar responsable" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="">Sin asignar</SelectItem>
+                <SelectItem value="unassigned">Sin asignar</SelectItem>
                 {profiles.map(profile => (
                   <SelectItem key={profile.id} value={profile.id}>
                     {profile.full_name || profile.id}

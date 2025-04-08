@@ -1,8 +1,9 @@
+
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { DataTable } from "@/components/ui/data-table";
 import { StatusBadge } from "@/components/ui/status-badge";
-import { Plus } from "lucide-react";
+import { Plus, Database } from "lucide-react";
 import {
   Select,
   SelectContent,
@@ -15,6 +16,7 @@ import { getITRs, ITR, getSubsystems, Subsystem, deleteITR, getSystemsByProjectI
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { ITRFormModal } from "@/components/modals/ITRFormModal";
 import { ProjectSelector } from "@/components/ProjectSelector";
+import { addSampleITRs } from "@/scripts/addSampleData";
 
 interface ITRWithDetails extends ITR {
   subsystemName?: string;
@@ -31,6 +33,7 @@ const ITRs = () => {
   const [showModal, setShowModal] = useState(false);
   const [selectedITR, setSelectedITR] = useState<ITR | undefined>(undefined);
   const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null);
+  const [addingSampleData, setAddingSampleData] = useState(false);
   const { toast } = useToast();
 
   const fetchData = async () => {
@@ -195,6 +198,39 @@ const ITRs = () => {
     setSelectedProjectId(projectId);
   };
 
+  const handleAddSampleData = async () => {
+    setAddingSampleData(true);
+    try {
+      const result = await addSampleITRs();
+      if (result.success) {
+        toast({
+          title: "Datos de muestra añadidos",
+          description: "Se han añadido ITRs de muestra correctamente",
+        });
+        // Set the project id to the one we just created or used
+        if (result.data && result.data.project) {
+          setSelectedProjectId(result.data.project.id);
+        }
+        fetchData();
+      } else {
+        toast({
+          title: "Error",
+          description: "No se pudieron añadir los datos de muestra",
+          variant: "destructive"
+        });
+      }
+    } catch (error) {
+      console.error("Error adding sample data:", error);
+      toast({
+        title: "Error",
+        description: "Ocurrió un error al añadir datos de muestra",
+        variant: "destructive"
+      });
+    } finally {
+      setAddingSampleData(false);
+    }
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center">
@@ -212,6 +248,10 @@ const ITRs = () => {
           <Button onClick={handleNewITR} disabled={!selectedProjectId}>
             <Plus className="h-4 w-4 mr-2" />
             Nuevo ITR
+          </Button>
+          <Button onClick={handleAddSampleData} variant="outline" disabled={addingSampleData}>
+            <Database className="h-4 w-4 mr-2" />
+            {addingSampleData ? "Añadiendo datos..." : "Añadir datos de muestra"}
           </Button>
         </div>
       </div>
@@ -267,6 +307,7 @@ const ITRs = () => {
               </CardHeader>
               <CardContent>
                 <p>Puede crear un nuevo ITR usando el botón "Nuevo ITR" o importar datos desde la página de configuración.</p>
+                <p className="mt-4">También puede utilizar el botón "Añadir datos de muestra" para generar ITRs de ejemplo.</p>
               </CardContent>
             </Card>
           ) : (
