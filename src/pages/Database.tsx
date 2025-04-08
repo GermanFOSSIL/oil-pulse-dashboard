@@ -1,9 +1,9 @@
-
-import { Database as DatabaseIcon, FileDown, FileUp, RefreshCw, TableProperties } from "lucide-react";
+import { Database as DatabaseIcon, FileDown, FileUp, RefreshCw, TableProperties, List, Plus } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Progress } from "@/components/ui/progress";
+import BatchITRUpload from "@/components/BatchITRUpload";
 
 const Database = () => {
   return (
@@ -104,6 +104,7 @@ const Database = () => {
           <TabsTrigger value="tables">Tables</TabsTrigger>
           <TabsTrigger value="backups">Backups</TabsTrigger>
           <TabsTrigger value="logs">Logs</TabsTrigger>
+          <TabsTrigger value="batch-upload">Carga Masiva ITR</TabsTrigger>
         </TabsList>
 
         <TabsContent value="tables">
@@ -307,6 +308,10 @@ const Database = () => {
               </div>
             </CardContent>
           </Card>
+        </TabsContent>
+
+        <TabsContent value="batch-upload">
+          <BatchITRUpload />
         </TabsContent>
       </Tabs>
     </div>
