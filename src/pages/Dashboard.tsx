@@ -378,7 +378,7 @@ const Dashboard = () => {
         </text>
         <Pie
           activeIndex={0}
-          activeShape={renderActiveShape}
+          activeShape={props => renderActiveShape(props)}
           data={[{ name: payload.name, value }]}
           cx={cx}
           cy={cy}
