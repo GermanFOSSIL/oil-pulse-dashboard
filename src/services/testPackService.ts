@@ -1,4 +1,3 @@
-
 import { supabase } from "@/integrations/supabase/client";
 import { v4 as uuidv4 } from 'uuid';
 import * as XLSX from 'xlsx';
@@ -168,7 +167,8 @@ export const createTestPack = async (testPackData: Omit<TestPack, "id" | "create
         const tagData = {
           test_pack_id: newTestPack.id,
           tag_name: `TAG-${newTestPack.itr_asociado}-${index + 1}`,
-          estado: 'pendiente'
+          estado: 'pendiente',
+          fecha_liberacion: null
         };
         
         return createTag(tagData);

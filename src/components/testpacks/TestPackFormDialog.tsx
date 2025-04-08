@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
@@ -129,14 +128,26 @@ const TestPackFormDialog = ({ open, onOpenChange, testPack, onSuccess }: TestPac
     try {
       if (testPack) {
         // Update existing test pack
-        await updateTestPack(testPack.id, values);
+        await updateTestPack(testPack.id, {
+          sistema: values.sistema,
+          subsistema: values.subsistema,
+          nombre_paquete: values.nombre_paquete,
+          itr_asociado: values.itr_asociado,
+          estado: testPack.estado
+        });
         toast({
           title: "Test Pack actualizado",
           description: "El Test Pack ha sido actualizado correctamente"
         });
       } else {
-        // Create new test pack
-        await createTestPack(values, values.tagsCount);
+        // Create new test pack - add the required estado property
+        await createTestPack({
+          sistema: values.sistema,
+          subsistema: values.subsistema,
+          nombre_paquete: values.nombre_paquete,
+          itr_asociado: values.itr_asociado,
+          estado: 'pendiente' // Adding the required estado property
+        }, values.tagsCount);
         toast({
           title: "Test Pack creado",
           description: `Se ha creado un nuevo Test Pack con ${values.tagsCount} TAGs`
