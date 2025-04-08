@@ -9,6 +9,7 @@ export const AVAILABLE_PERMISSIONS = [
   "systems",
   "subsystems",
   "itrs",
+  "testpacks",
   "configuration",
   "users",
   "reports",

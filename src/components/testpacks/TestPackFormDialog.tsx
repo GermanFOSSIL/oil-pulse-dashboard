@@ -1,264 +1,158 @@
 
-import { useState } from "react";
-import { z } from "zod";
-import { useForm } from "react-hook-form";
-import { zodResolver } from "@hookform/resolvers/zod";
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { useState, useEffect } from "react";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { useToast } from "@/hooks/use-toast";
-import { createTestPack, createTag, TestPack } from "@/services/testPackService";
-import {
-  Form,
-  FormControl,
-  FormField,
-  FormItem,
-  FormLabel,
-  FormMessage,
-} from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
-import { Plus, Trash } from "lucide-react";
+import { Label } from "@/components/ui/label";
+import { useToast } from "@/hooks/use-toast";
+import { createTestPack, updateTestPack, TestPack } from "@/services/testPackService";
 
 interface TestPackFormDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  testPack?: TestPack | null;
   onSuccess: () => void;
+  testPack?: TestPack | null;
 }
 
-// Define the schema for the test pack form
-const testPackSchema = z.object({
-  sistema: z.string().min(1, { message: "El sistema es requerido" }),
-  subsistema: z.string().min(1, { message: "El subsistema es requerido" }),
-  nombre_paquete: z.string().min(1, { message: "El nombre del paquete es requerido" }),
-  itr_asociado: z.string().min(1, { message: "El ITR asociado es requerido" }),
-  tags: z.array(
-    z.object({
-      tag_name: z.string().min(1, { message: "El nombre del TAG es requerido" })
-    })
-  ).optional()
-});
-
-type TestPackFormValues = z.infer<typeof testPackSchema>;
-
-const TestPackFormDialog = ({ open, onOpenChange, testPack, onSuccess }: TestPackFormDialogProps) => {
+const TestPackFormDialog = ({ open, onOpenChange, onSuccess, testPack }: TestPackFormDialogProps) => {
   const { toast } = useToast();
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [tagInputs, setTagInputs] = useState<{ id: number; tag_name: string }[]>([
-    { id: 1, tag_name: "" }
-  ]);
-
-  // Initialize the form
-  const form = useForm<TestPackFormValues>({
-    resolver: zodResolver(testPackSchema),
-    defaultValues: {
-      sistema: testPack?.sistema || "",
-      subsistema: testPack?.subsistema || "",
-      nombre_paquete: testPack?.nombre_paquete || "",
-      itr_asociado: testPack?.itr_asociado || "",
-      tags: []
-    }
+  const [loading, setLoading] = useState(false);
+  const isEditMode = !!testPack;
+  
+  const [formData, setFormData] = useState({
+    sistema: '',
+    subsistema: '',
+    nombre_paquete: '',
+    itr_asociado: '',
+    estado: 'pendiente'
   });
-
-  // Add a new tag input field
-  const addTagInput = () => {
-    const newId = tagInputs.length > 0 ? Math.max(...tagInputs.map(t => t.id)) + 1 : 1;
-    setTagInputs([...tagInputs, { id: newId, tag_name: "" }]);
-  };
-
-  // Remove a tag input field
-  const removeTagInput = (id: number) => {
-    if (tagInputs.length > 1) {
-      setTagInputs(tagInputs.filter(t => t.id !== id));
+  
+  useEffect(() => {
+    if (testPack) {
+      setFormData({
+        sistema: testPack.sistema,
+        subsistema: testPack.subsistema,
+        nombre_paquete: testPack.nombre_paquete,
+        itr_asociado: testPack.itr_asociado,
+        estado: testPack.estado
+      });
     }
+  }, [testPack]);
+  
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const { name, value } = e.target;
+    setFormData(prev => ({ ...prev, [name]: value }));
   };
-
-  // Update a tag input field
-  const updateTagInput = (id: number, value: string) => {
-    setTagInputs(tagInputs.map(t => (t.id === id ? { ...t, tag_name: value } : t)));
-  };
-
-  // Submit handler
-  const onSubmit = async (values: TestPackFormValues) => {
+  
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    if (!formData.sistema || !formData.subsistema || !formData.nombre_paquete || !formData.itr_asociado) {
+      toast({
+        title: "Campos incompletos",
+        description: "Por favor complete todos los campos obligatorios",
+        variant: "destructive"
+      });
+      return;
+    }
+    
+    setLoading(true);
+    
     try {
-      setIsSubmitting(true);
-      
-      // Filter out empty tags
-      const validTags = tagInputs.filter(t => t.tag_name.trim() !== "");
-      
-      if (validTags.length === 0) {
+      if (isEditMode && testPack) {
+        await updateTestPack(testPack.id, formData);
         toast({
-          title: "Error",
-          description: "Debe agregar al menos un TAG válido",
-          variant: "destructive"
+          title: "Test Pack actualizado",
+          description: "El Test Pack ha sido actualizado correctamente"
         });
-        setIsSubmitting(false);
-        return;
+      } else {
+        await createTestPack(formData);
+        toast({
+          title: "Test Pack creado",
+          description: "El Test Pack ha sido creado correctamente"
+        });
       }
       
-      // Create the test pack
-      const newTestPack = await createTestPack({
-        sistema: values.sistema,
-        subsistema: values.subsistema,
-        nombre_paquete: values.nombre_paquete,
-        itr_asociado: values.itr_asociado,
-        estado: 'pendiente'
-      });
-      
-      // Create tags for the test pack
-      const tagPromises = validTags.map(tag => 
-        createTag({
-          test_pack_id: newTestPack.id,
-          tag_name: tag.tag_name,
-          estado: 'pendiente',
-          fecha_liberacion: null
-        })
-      );
-      
-      await Promise.all(tagPromises);
-      
-      toast({
-        title: "Test Pack creado",
-        description: `Se ha creado correctamente el Test Pack con ${validTags.length} TAGs.`
-      });
-      
       onSuccess();
-    } catch (error) {
-      console.error("Error creating test pack:", error);
+    } catch (error: any) {
+      console.error("Error saving test pack:", error);
       toast({
         title: "Error",
-        description: "No se pudo crear el Test Pack. Por favor, inténtelo de nuevo.",
+        description: `No se pudo guardar el Test Pack: ${error.message || "Error desconocido"}`,
         variant: "destructive"
       });
     } finally {
-      setIsSubmitting(false);
+      setLoading(false);
     }
   };
-
+  
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-lg">
+      <DialogContent className="sm:max-w-[500px]">
         <DialogHeader>
-          <DialogTitle>Crear Test Pack</DialogTitle>
-          <DialogDescription>
-            Complete el formulario para crear un nuevo Test Pack con sus TAGs asociados.
-          </DialogDescription>
+          <DialogTitle>
+            {isEditMode ? "Editar Test Pack" : "Nuevo Test Pack"}
+          </DialogTitle>
         </DialogHeader>
         
-        <Form {...form}>
-          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <FormField
-                control={form.control}
-                name="sistema"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Sistema</FormLabel>
-                    <FormControl>
-                      <Input placeholder="Nombre del sistema" {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              
-              <FormField
-                control={form.control}
-                name="subsistema"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Subsistema</FormLabel>
-                    <FormControl>
-                      <Input placeholder="Nombre del subsistema" {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-            </div>
-            
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <FormField
-                control={form.control}
-                name="nombre_paquete"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Nombre del Paquete</FormLabel>
-                    <FormControl>
-                      <Input placeholder="Nombre del test pack" {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              
-              <FormField
-                control={form.control}
-                name="itr_asociado"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>ITR Asociado</FormLabel>
-                    <FormControl>
-                      <Input placeholder="Código de ITR" {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-            </div>
-            
-            <div className="space-y-2">
-              <div className="flex justify-between items-center">
-                <FormLabel>TAGs</FormLabel>
-                <Button type="button" variant="outline" size="sm" onClick={addTagInput}>
-                  <Plus className="h-4 w-4 mr-1" /> Agregar TAG
-                </Button>
-              </div>
-              
-              <div className="space-y-2">
-                {tagInputs.map((tag) => (
-                  <div key={tag.id} className="flex items-center gap-2">
-                    <Input
-                      placeholder="Nombre del TAG"
-                      value={tag.tag_name}
-                      onChange={(e) => updateTagInput(tag.id, e.target.value)}
-                    />
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="icon"
-                      onClick={() => removeTagInput(tag.id)}
-                      disabled={tagInputs.length <= 1}
-                    >
-                      <Trash className="h-4 w-4" />
-                    </Button>
-                  </div>
-                ))}
-              </div>
-            </div>
-            
-            <DialogFooter>
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => onOpenChange(false)}
-                disabled={isSubmitting}
-              >
-                Cancelar
-              </Button>
-              <Button type="submit" disabled={isSubmitting}>
-                {isSubmitting ? (
-                  <>
-                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
-                    Creando...
-                  </>
-                ) : (
-                  "Crear Test Pack"
-                )}
-              </Button>
-            </DialogFooter>
-          </form>
-        </Form>
+        <form onSubmit={handleSubmit} className="space-y-4 pt-4">
+          <div className="space-y-2">
+            <Label htmlFor="sistema">Sistema *</Label>
+            <Input
+              id="sistema"
+              name="sistema"
+              value={formData.sistema}
+              onChange={handleInputChange}
+              placeholder="Nombre del sistema"
+              required
+            />
+          </div>
+          
+          <div className="space-y-2">
+            <Label htmlFor="subsistema">Subsistema *</Label>
+            <Input
+              id="subsistema"
+              name="subsistema"
+              value={formData.subsistema}
+              onChange={handleInputChange}
+              placeholder="Nombre del subsistema"
+              required
+            />
+          </div>
+          
+          <div className="space-y-2">
+            <Label htmlFor="nombre_paquete">Nombre del Test Pack *</Label>
+            <Input
+              id="nombre_paquete"
+              name="nombre_paquete"
+              value={formData.nombre_paquete}
+              onChange={handleInputChange}
+              placeholder="Nombre identificativo del paquete"
+              required
+            />
+          </div>
+          
+          <div className="space-y-2">
+            <Label htmlFor="itr_asociado">ITR Asociado *</Label>
+            <Input
+              id="itr_asociado"
+              name="itr_asociado"
+              value={formData.itr_asociado}
+              onChange={handleInputChange}
+              placeholder="Código o nombre del ITR"
+              required
+            />
+          </div>
+          
+          <div className="flex justify-end space-x-2 pt-4">
+            <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
+              Cancelar
+            </Button>
+            <Button type="submit" disabled={loading}>
+              {loading ? "Guardando..." : isEditMode ? "Actualizar" : "Crear"}
+            </Button>
+          </div>
+        </form>
       </DialogContent>
     </Dialog>
   );
