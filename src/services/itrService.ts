@@ -118,7 +118,8 @@ export const createTestITRs = async (): Promise<{ success: boolean; message: str
         progress: i * 25, // 25, 50, 75, 100
         assigned_to: `Técnico ${i}`,
         start_date: startDate.toISOString().split('T')[0],
-        end_date: endDate.toISOString().split('T')[0]
+        end_date: endDate.toISOString().split('T')[0],
+        quantity: i  // Agregar la cantidad basada en el índice
       };
       
       console.log(`Creando ITR ${i}:`, itrData);

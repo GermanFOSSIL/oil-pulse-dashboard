@@ -29,7 +29,7 @@ interface GanttItem {
   parent?: string;
   status?: string;
   dependencies?: string;
-  quantity?: number; // Nueva propiedad para la cantidad
+  quantity?: number;
 }
 
 interface EnhancedGanttProps {
@@ -269,26 +269,36 @@ export const EnhancedGanttChart: React.FC<EnhancedGanttProps> = ({ data }) => {
         }
       ];
       
+      // Fix the progress text to not overlap with task name
       gantt.templates.progress_text = function(start, end, task) {
-        return "<span style='text-align:center;'>" + Math.round(task.progress * 100) + "% </span>";
+        return ""; // Remove the text inside the progress bar
+      };
+      
+      // Add a custom right-aligned progress display
+      gantt.templates.rightside_text = function(start, end, task) {
+        return "<span class='gantt-task-progress-value'>" + Math.round(task.progress * 100) + "%</span>";
       };
 
       gantt.templates.task_class = function(start, end, task) {
+        let baseClass = "";
+        
         if (task.type === "project") {
-          return "gantt-task-project";
+          baseClass = "gantt-task-project";
         } else if (task.type === "system") {
-          return "gantt-task-system";
+          baseClass = "gantt-task-system";
         } else if (task.type === "subsystem") {
-          return "gantt-task-subsystem";
+          baseClass = "gantt-task-subsystem";
         } else {
           if (task.status === "complete") {
-            return "gantt-task-complete";
+            baseClass = "gantt-task-complete";
           } else if (task.status === "delayed") {
-            return "gantt-task-delayed";
+            baseClass = "gantt-task-delayed";
           } else {
-            return "gantt-task-itr";
+            baseClass = "gantt-task-itr";
           }
         }
+        
+        return baseClass;
       };
       
       gantt.templates.tooltip_text = function(start, end, task) {
@@ -433,6 +443,24 @@ export const EnhancedGanttChart: React.FC<EnhancedGanttProps> = ({ data }) => {
         }
         .gantt_grid_head_cell, .gantt_grid_data {
           padding-left: 10px;
+        }
+        .gantt-task-progress-value {
+          position: absolute;
+          right: -40px;
+          top: 0;
+          background-color: rgba(255, 255, 255, 0.7);
+          padding: 0 4px;
+          border-radius: 2px;
+          font-size: 11px;
+          color: #333;
+        }
+        .gantt_task_content {
+          padding-right: 5px;
+          white-space: nowrap;
+          overflow: hidden;
+          text-overflow: ellipsis;
+          font-size: 11px;
+          font-weight: 500;
         }
       `;
       
