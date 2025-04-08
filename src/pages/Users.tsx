@@ -16,6 +16,33 @@ import { useAuth } from "@/contexts/AuthContext";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { AlertTriangle } from "lucide-react";
 
+interface PasswordChangeModalProps {
+  open: boolean;
+  onClose: () => void;
+  onSuccess: () => void;
+  user: UserProfile;
+}
+
+interface PasswordChangeData {
+  userId: string;
+  newPassword: string;
+}
+
+const changeUserPassword = async (data: PasswordChangeData): Promise<{ success: boolean; message: string }> => {
+  try {
+    return { 
+      success: false, 
+      message: "La funcionalidad de cambio de contraseña requiere permisos de administrador en Supabase" 
+    };
+  } catch (error: any) {
+    console.error("Error changing password:", error);
+    return { 
+      success: false, 
+      message: `Error al cambiar la contraseña: ${error.message || "Error desconocido"}` 
+    };
+  }
+};
+
 interface UserFormModalProps {
   open: boolean;
   onClose: () => void;
@@ -606,7 +633,7 @@ const Users = () => {
       </div>
 
       {!isAdmin && (
-        <Alert variant="warning" className="bg-amber-50 border-amber-200 mb-4">
+        <Alert variant="destructive" className="bg-amber-50 border-amber-200 mb-4">
           <AlertTriangle className="h-4 w-4 text-amber-600" />
           <AlertTitle className="text-amber-800">Permisos insuficientes</AlertTitle>
           <AlertDescription className="text-amber-700">
