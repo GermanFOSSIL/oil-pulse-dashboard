@@ -48,6 +48,7 @@ const TestPacks = () => {
     setShowImportDialog,
     setShowFormDialog,
     handleTagRelease,
+    handleDeleteTestPack,
     handleDownloadTemplate,
     handleExportData,
     refetchTestPacks,
@@ -57,17 +58,6 @@ const TestPacks = () => {
     handleImportSuccess,
     openEditTestPackForm
   } = useTestPacks();
-
-  // Handle URL-based editing
-  useEffect(() => {
-    if (isEditMode && testPackId) {
-      const testPack = testPacks?.find(tp => tp.id === testPackId);
-      if (testPack) {
-        openEditTestPackForm(testPack);
-        navigate('/testpacks', { replace: true });
-      }
-    }
-  }, [isEditMode, testPackId, testPacks, navigate, openEditTestPackForm]);
 
   return (
     <div className="container mx-auto py-6 space-y-6">
@@ -98,6 +88,8 @@ const TestPacks = () => {
               onTagRelease={handleTagRelease}
               userRole={userRole}
               onClearFilters={() => refetchTestPacks()}
+              onEdit={openEditTestPackForm}
+              onDelete={handleDeleteTestPack}
             />
           </TabsContent>
           

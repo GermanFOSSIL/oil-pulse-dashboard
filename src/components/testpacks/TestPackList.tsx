@@ -9,6 +9,16 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { SearchIcon, FilterIcon, X, Edit, Trash } from "lucide-react";
 import TestPackTags from "./TestPackTags";
+import { 
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 interface TestPackListProps {
   testPacks: TestPack[] | undefined;
@@ -16,6 +26,8 @@ interface TestPackListProps {
   onTagRelease: (tagId: string) => void;
   userRole: string;
   onClearFilters: () => void;
+  onEdit: (testPack: TestPack) => void;
+  onDelete: (id: string) => void;
 }
 
 const TestPackList = ({ 
@@ -23,7 +35,9 @@ const TestPackList = ({
   isLoading,
   onTagRelease,
   userRole,
-  onClearFilters
+  onClearFilters,
+  onEdit,
+  onDelete
 }: TestPackListProps) => {
   const [expandedTestPack, setExpandedTestPack] = useState<string | null>(null);
   const [filter, setFilter] = useState({
@@ -32,6 +46,8 @@ const TestPackList = ({
     subsistema: "",
     estado: ""
   });
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [testPackToDelete, setTestPackToDelete] = useState<string | null>(null);
 
   // Get unique list of systems
   const systems = testPacks 
@@ -72,6 +88,19 @@ const TestPackList = ({
 
   const toggleExpand = (id: string) => {
     setExpandedTestPack(expandedTestPack === id ? null : id);
+  };
+
+  const handleDeleteClick = (id: string) => {
+    setTestPackToDelete(id);
+    setDeleteDialogOpen(true);
+  };
+
+  const confirmDelete = () => {
+    if (testPackToDelete) {
+      onDelete(testPackToDelete);
+      setDeleteDialogOpen(false);
+      setTestPackToDelete(null);
+    }
   };
 
   if (isLoading) {
@@ -188,10 +217,15 @@ const TestPackList = ({
                     </Badge>
                     {userRole === 'admin' && (
                       <div className="flex space-x-1">
-                        <Button variant="outline" size="icon" className="h-8 w-8" onClick={() => window.location.href = `/testpacks/edit/${testPack.id}`}>
+                        <Button variant="outline" size="icon" className="h-8 w-8" onClick={() => onEdit(testPack)}>
                           <Edit className="h-4 w-4" />
                         </Button>
-                        <Button variant="outline" size="icon" className="h-8 w-8 text-destructive hover:bg-destructive hover:text-white">
+                        <Button 
+                          variant="outline" 
+                          size="icon" 
+                          className="h-8 w-8 text-destructive hover:bg-destructive hover:text-white"
+                          onClick={() => handleDeleteClick(testPack.id)}
+                        >
                           <Trash className="h-4 w-4" />
                         </Button>
                       </div>
@@ -231,6 +265,24 @@ const TestPackList = ({
           ))}
         </div>
       </div>
+
+      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>¿Está seguro?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Esta acción eliminará permanentemente el Test Pack y todos sus TAGs asociados.
+              Esta acción no se puede deshacer.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction onClick={confirmDelete} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+              Eliminar
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 };

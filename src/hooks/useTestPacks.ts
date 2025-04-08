@@ -167,11 +167,14 @@ export const useTestPacks = () => {
   const handleDeleteTestPack = async (id: string) => {
     try {
       // Since deleteTestPack isn't exported, we'll implement it directly here
-      const { error } = await fetch(`/api/testpacks/${id}`, {
+      const response = await fetch(`/api/testpacks/${id}`, {
         method: 'DELETE',
-      }).then(res => res.json());
+      });
       
-      if (error) throw new Error(error.message);
+      if (!response.ok) {
+        const data = await response.json();
+        throw new Error(data.error?.message || 'Failed to delete test pack');
+      }
       
       toast({
         title: "Success",
@@ -192,22 +195,33 @@ export const useTestPacks = () => {
 
   const handleTagRelease = async (tagId: string) => {
     try {
-      // Since releaseTag isn't exported, we'll use updateTag instead
+      // Get the current tag to toggle its state
+      const tag = testPacks?.flatMap(tp => tp.tags || []).find(t => t.id === tagId);
+      if (!tag) {
+        throw new Error("Tag not found");
+      }
+      
+      // Toggle the state
+      const newState = tag.estado === 'liberado' ? 'pendiente' : 'liberado';
+      const releaseDate = newState === 'liberado' ? new Date().toISOString() : null;
+      
       await updateTag(tagId, { 
-        estado: 'liberado',
-        fecha_liberacion: new Date().toISOString()
+        estado: newState,
+        fecha_liberacion: releaseDate
       });
+      
       toast({
         title: "Success",
-        description: "Tag released successfully.",
+        description: `Tag ${newState === 'liberado' ? 'released' : 'marked as pending'} successfully.`,
       });
+      
       fetchTestPacks(); // Refresh test packs after releasing tag
       fetchStats(); // Refresh stats after releasing tag
     } catch (error: any) {
       console.error("Error releasing tag:", error);
       toast({
         title: "Error",
-        description: error.message || "Failed to release tag. Please try again.",
+        description: error.message || "Failed to update tag. Please try again.",
         variant: "destructive",
       });
     }

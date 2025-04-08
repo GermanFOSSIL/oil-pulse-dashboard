@@ -70,6 +70,32 @@ const TestPackTags = ({
     }
   });
 
+  const updateTagMutation = useMutation({
+    mutationFn: ({ tagId, newStatus }: { tagId: string; newStatus: 'pendiente' | 'liberado' }) => {
+      const updates: Partial<Tag> = {
+        estado: newStatus,
+        fecha_liberacion: newStatus === 'liberado' ? new Date().toISOString() : null
+      };
+      return updateTag(tagId, updates);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['testPack', testPackId] });
+      toast({
+        title: "TAG actualizado",
+        description: "El estado del TAG ha sido actualizado exitosamente."
+      });
+      refetch();
+    },
+    onError: (error) => {
+      console.error("Error al actualizar TAG:", error);
+      toast({
+        title: "Error",
+        description: "No se pudo actualizar el estado del TAG. Por favor, inténtelo de nuevo.",
+        variant: "destructive"
+      });
+    }
+  });
+
   const handleAddTag = () => {
     if (!newTagName.trim()) {
       toast({
@@ -81,6 +107,11 @@ const TestPackTags = ({
     }
 
     createTagMutation.mutate(newTagName);
+  };
+
+  const handleTagStatusToggle = (tag: Tag) => {
+    const newStatus = tag.estado === 'liberado' ? 'pendiente' : 'liberado';
+    updateTagMutation.mutate({ tagId: tag.id, newStatus });
   };
 
   if (isLoading) {
@@ -187,7 +218,7 @@ const TestPackTags = ({
               <TableHead>TAG</TableHead>
               <TableHead>Estado</TableHead>
               <TableHead>Fecha Liberación</TableHead>
-              <TableHead>Liberar</TableHead>
+              <TableHead>Estado</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -208,11 +239,23 @@ const TestPackTags = ({
                   <span>{tag.fecha_liberacion ? new Date(tag.fecha_liberacion).toLocaleString() : 'Pendiente'}</span>
                 </TableCell>
                 <TableCell>
-                  <Checkbox
-                    checked={tag.estado === 'liberado'}
-                    disabled={tag.estado === 'liberado' || (userRole !== 'admin' && userRole !== 'tecnico')}
-                    onCheckedChange={() => onTagRelease(tag.id)}
-                  />
+                  <div className="flex items-center">
+                    {(userRole === 'admin' || userRole === 'tecnico') ? (
+                      <Button 
+                        variant="outline" 
+                        size="sm"
+                        onClick={() => handleTagStatusToggle(tag)}
+                        disabled={updateTagMutation.isPending}
+                      >
+                        {tag.estado === 'liberado' ? 'Marcar Pendiente' : 'Marcar Liberado'}
+                      </Button>
+                    ) : (
+                      <Checkbox
+                        checked={tag.estado === 'liberado'}
+                        disabled={true}
+                      />
+                    )}
+                  </div>
                 </TableCell>
               </TableRow>
             ))}
