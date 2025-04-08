@@ -4,7 +4,14 @@ import { getTestPackWithTags, updateTag, Tag, TestPack } from "@/services/testPa
 import { Checkbox } from "@/components/ui/checkbox";
 import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
-import { DataTable } from "@/components/ui/data-table";
+import { 
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow
+} from "@/components/ui/table";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tag as TagIcon } from "lucide-react";
 
@@ -47,58 +54,6 @@ const TestPackTags = ({
     );
   }
 
-  const columns = [
-    {
-      header: "TAG",
-      accessorKey: "tag_name",
-      cell: ({ row }: { row: { original: Tag } }) => {
-        const tag = row.original;
-        return (
-          <div className="flex items-center gap-2">
-            <TagIcon className="h-4 w-4 text-muted-foreground" />
-            <span>{tag.tag_name}</span>
-          </div>
-        );
-      },
-    },
-    {
-      header: "Estado",
-      accessorKey: "estado",
-      cell: ({ row }: { row: { original: Tag } }) => {
-        const tag = row.original;
-        return (
-          <Badge variant={tag.estado === 'liberado' ? 'default' : 'outline'}>
-            {tag.estado === 'liberado' ? 'Liberado' : 'Pendiente'}
-          </Badge>
-        );
-      },
-    },
-    {
-      header: "Fecha Liberación",
-      accessorKey: "fecha_liberacion",
-      cell: ({ row }: { row: { original: Tag } }) => {
-        const tag = row.original;
-        return (
-          <span>{tag.fecha_liberacion ? new Date(tag.fecha_liberacion).toLocaleString() : 'Pendiente'}</span>
-        );
-      },
-    },
-    {
-      header: "Liberar",
-      accessorKey: "actions",
-      cell: ({ row }: { row: { original: Tag } }) => {
-        const tag = row.original;
-        return (
-          <Checkbox
-            checked={tag.estado === 'liberado'}
-            disabled={tag.estado === 'liberado' || (userRole !== 'admin' && userRole !== 'tecnico')}
-            onCheckedChange={() => onTagRelease(tag.id)}
-          />
-        );
-      },
-    },
-  ];
-
   return (
     <Card>
       <CardHeader>
@@ -118,10 +73,43 @@ const TestPackTags = ({
           <Progress value={testPack.progress || 0} className="h-2 mt-1" />
         </div>
         
-        <DataTable
-          columns={columns}
-          data={testPack.tags}
-        />
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>TAG</TableHead>
+              <TableHead>Estado</TableHead>
+              <TableHead>Fecha Liberación</TableHead>
+              <TableHead>Liberar</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {testPack.tags.map((tag) => (
+              <TableRow key={tag.id}>
+                <TableCell>
+                  <div className="flex items-center gap-2">
+                    <TagIcon className="h-4 w-4 text-muted-foreground" />
+                    <span>{tag.tag_name}</span>
+                  </div>
+                </TableCell>
+                <TableCell>
+                  <Badge variant={tag.estado === 'liberado' ? 'default' : 'outline'}>
+                    {tag.estado === 'liberado' ? 'Liberado' : 'Pendiente'}
+                  </Badge>
+                </TableCell>
+                <TableCell>
+                  <span>{tag.fecha_liberacion ? new Date(tag.fecha_liberacion).toLocaleString() : 'Pendiente'}</span>
+                </TableCell>
+                <TableCell>
+                  <Checkbox
+                    checked={tag.estado === 'liberado'}
+                    disabled={tag.estado === 'liberado' || (userRole !== 'admin' && userRole !== 'tecnico')}
+                    onCheckedChange={() => onTagRelease(tag.id)}
+                  />
+                </TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
       </CardContent>
     </Card>
   );
