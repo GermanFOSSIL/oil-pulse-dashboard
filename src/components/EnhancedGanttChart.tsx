@@ -1,653 +1,258 @@
-
-import React, { useEffect, useRef, useState } from 'react';
-import { gantt } from 'dhtmlx-gantt';
-import 'dhtmlx-gantt/codebase/dhtmlxgantt.css';
-import { Button } from '@/components/ui/button';
-import { Download, ChevronLeft, ChevronRight, Calendar, Search, FileText } from 'lucide-react';
-import { format, addMonths, subMonths, getYear } from 'date-fns';
+import React, { useState, useEffect } from 'react';
+import { Card, CardContent } from '@/components/ui/card';
+import { format, parseISO, isValid } from 'date-fns';
 import { es } from 'date-fns/locale';
-import { 
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue
-} from '@/components/ui/select';
-import * as XLSX from 'xlsx';
-import { jsPDF } from 'jspdf';
-import 'jspdf-autotable';
-import html2canvas from 'html2canvas';
-import { useToast } from "@/hooks/use-toast";
+import { cn } from '@/lib/utils';
 
-interface GanttItem {
-  id: string;
-  task: string;
-  start: string;
-  end: string;
-  progress: number;
-  type?: string;
-  parent?: string;
-  status?: string;
-  dependencies?: string;
-  quantity?: number;
+export interface EnhancedGanttProps {
+  data: any[];
+  startDate: string;
+  endDate: string;
+  viewMode: string;
 }
 
-interface EnhancedGanttProps {
-  data: GanttItem[];
-}
-
-export const EnhancedGanttChart: React.FC<EnhancedGanttProps> = ({ data }) => {
-  const containerRef = useRef<HTMLDivElement>(null);
-  const ganttChartRef = useRef<HTMLDivElement>(null);
-  const [currentDate, setCurrentDate] = useState(new Date());
-  const [viewMode, setViewMode] = useState<string>("month");
-  const [initialized, setInitialized] = useState(false);
-  const todayMarkerRef = useRef<HTMLDivElement | null>(null);
-  const { toast } = useToast();
-  const [exporting, setExporting] = useState(false);
-
-  const goToPreviousMonth = () => {
-    setCurrentDate(prevDate => subMonths(prevDate, 1));
-  };
-
-  const goToNextMonth = () => {
-    setCurrentDate(prevDate => addMonths(prevDate, 1));
-  };
-
-  const goToToday = () => {
-    setCurrentDate(new Date());
-  };
-
-  const exportToExcel = () => {
-    try {
-      const exportData = data.map(item => {
-        return {
-          'Tarea': item.task,
-          'Tipo': item.type || 'No definido',
-          'Inicio': item.start,
-          'Fin': item.end,
-          'Progreso (%)': item.progress,
-          'Estado': item.status || 'No definido',
-          'Cantidad': item.quantity || 1 // Exportamos la cantidad
-        };
-      });
-      
-      const wb = XLSX.utils.book_new();
-      const ws = XLSX.utils.json_to_sheet(exportData);
-      
-      const colWidths = [
-        { wch: 30 },
-        { wch: 15 },
-        { wch: 15 },
-        { wch: 15 },
-        { wch: 15 },
-        { wch: 15 },
-        { wch: 10 }  // Ancho para la columna de cantidad
-      ];
-      ws['!cols'] = colWidths;
-      
-      XLSX.utils.book_append_sheet(wb, ws, "Cronograma");
-      
-      XLSX.writeFile(wb, `Cronograma_${format(new Date(), 'yyyyMMdd')}.xlsx`);
-      
-      toast({
-        title: "Exportación exitosa",
-        description: "El archivo Excel ha sido generado correctamente"
-      });
-    } catch (error) {
-      console.error("Error exporting data to Excel:", error);
-      toast({
-        title: "Error de exportación",
-        description: "No se pudo exportar a Excel. Inténtelo de nuevo.",
-        variant: "destructive"
-      });
-    }
-  };
-
-  const exportToPDF = async () => {
-    try {
-      if (!ganttChartRef.current) return;
-      
-      setExporting(true);
-      toast({
-        title: "Exportando a PDF",
-        description: "Generando PDF de alta resolución. Esto puede tardar unos segundos..."
-      });
-
-      const pdf = new jsPDF({
-        orientation: 'landscape',
-        unit: 'mm',
-        format: 'a3'
-      });
-
-      const ganttContainer = containerRef.current;
-      if (!ganttContainer) {
-        setExporting(false);
-        return;
-      }
-      
-      const canvas = await html2canvas(ganttContainer, {
-        scale: 3,
-        logging: false,
-        useCORS: true,
-        allowTaint: true,
-        backgroundColor: '#ffffff',
-        x: 0,
-        y: 0,
-        scrollX: 0,
-        scrollY: 0,
-        windowWidth: document.documentElement.offsetWidth,
-        windowHeight: document.documentElement.offsetHeight
-      });
-      
-      const imgData = canvas.toDataURL('image/jpeg', 1.0);
-      
-      pdf.setProperties({
-        title: 'Cronograma de ITRs',
-        subject: 'Cronograma detallado del proyecto',
-        author: 'Sistema de Gestión de Proyectos',
-        keywords: 'cronograma, ITR, gantt',
-        creator: 'Sistema de Gestión'
-      });
-      
-      pdf.setFontSize(18);
-      pdf.text('Cronograma de ITRs', 20, 15);
-      pdf.setFontSize(12);
-      pdf.text(`Fecha de exportación: ${format(new Date(), 'dd/MM/yyyy')}`, 20, 22);
-      
-      const pdfWidth = pdf.internal.pageSize.getWidth();
-      const pdfHeight = pdf.internal.pageSize.getHeight();
-      
-      const imgWidth = canvas.width;
-      const imgHeight = canvas.height;
-      
-      const ratio = Math.min(pdfWidth / imgWidth, (pdfHeight - 30) / imgHeight);
-      
-      const imgX = (pdfWidth - imgWidth * ratio) / 2;
-      const imgY = 30;
-      
-      pdf.addImage(imgData, 'JPEG', imgX, imgY, imgWidth * ratio, imgHeight * ratio);
-      
-      pdf.save(`Cronograma_ITRs_${format(new Date(), 'yyyyMMdd')}.pdf`);
-      
-      setExporting(false);
-      toast({
-        title: "PDF generado correctamente",
-        description: "El cronograma ha sido exportado con éxito en alta resolución"
-      });
-    } catch (error) {
-      console.error("Error exporting to PDF:", error);
-      setExporting(false);
-      toast({
-        title: "Error al exportar",
-        description: "No se pudo generar el PDF. Inténtelo de nuevo.",
-        variant: "destructive"
-      });
-    }
-  };
-
-  const updateTodayMarker = () => {
-    if (!containerRef.current) return;
-    
-    if (todayMarkerRef.current) {
-      todayMarkerRef.current.remove();
-    }
-    
-    const today = new Date();
-    const todayPos = gantt.posFromDate(today);
-    
-    if (isNaN(todayPos)) return;
-    
-    const line = document.createElement('div');
-    line.className = 'today-line';
-    line.style.left = todayPos + 'px';
-    
-    const taskArea = containerRef.current.querySelector('.gantt_task');
-    if (taskArea) {
-      taskArea.appendChild(line);
-      todayMarkerRef.current = line;
-    }
-  };
+export const EnhancedGanttChart: React.FC<EnhancedGanttProps> = ({
+  data,
+  startDate,
+  endDate,
+  viewMode
+}) => {
+  const [expandedItems, setExpandedItems] = useState<Record<string, boolean>>({});
+  const [visibleItems, setVisibleItems] = useState<any[]>([]);
 
   useEffect(() => {
-    if (containerRef.current && !initialized) {
-      gantt.config.date_format = "%Y-%m-%d";
-      gantt.config.row_height = 30;
-      gantt.config.min_column_width = 20;
-      gantt.config.duration_unit = "day";
-      gantt.config.duration_step = 1;
-      gantt.config.scale_height = 50;
-      gantt.config.subscales = [];
-      gantt.config.task_height = 16;
-      gantt.config.link_line_width = 2;
-      gantt.config.link_arrow_size = 6;
-      gantt.config.show_progress = true;
-      gantt.config.fit_tasks = true;
-      
-      gantt.config.open_tree_initially = true;
-      gantt.config.show_task_cells = true;
-      gantt.config.smart_rendering = true;
-      gantt.config.indent_size = 15;
-      
-      gantt.config.columns = [
-        { name: "text", label: "Tarea", tree: true, width: 280, resize: true },
-        { 
-          name: "quantity", 
-          label: "Cantidad", 
-          align: "center", 
-          width: 70, 
-          resize: true, 
-          template: function(task: any) {
-            return task.quantity || 1;
-          }
-        },
-        { 
-          name: "progress", 
-          label: "Progreso",
-          align: "center", 
-          width: 70,
-          resize: true,
-          template: function(task: any) {
-            if (task.progress) {
-              return Math.round(task.progress * 100) + "%";
-            }
-            return "";
-          }
-        },
-        { 
-          name: "status", 
-          label: "Estado", 
-          align: "center", 
-          width: 80,
-          resize: true,
-          template: function(task: any) {
-            if (task.status === "complete") return "Completado";
-            if (task.status === "inprogress") return "En Progreso";
-            if (task.status === "delayed") return "Retrasado";
-            return "";
-          }
-        }
-      ];
-      
-      // Fix the progress text to not overlap with task name
-      gantt.templates.progress_text = function(start, end, task) {
-        return ""; // Remove the text inside the progress bar
-      };
-      
-      // Add a custom right-aligned progress display
-      gantt.templates.rightside_text = function(start, end, task) {
-        return "<span class='gantt-task-progress-value'>" + Math.round(task.progress * 100) + "%</span>";
-      };
+    // Process data to determine parent-child relationships and visibility
+    const processedData = processGanttData(data);
+    setVisibleItems(processedData);
+  }, [data]);
 
-      gantt.templates.task_class = function(start, end, task) {
-        let baseClass = "";
-        
-        if (task.type === "project") {
-          baseClass = "gantt-task-project";
-        } else if (task.type === "system") {
-          baseClass = "gantt-task-system";
-        } else if (task.type === "subsystem") {
-          baseClass = "gantt-task-subsystem";
-        } else {
-          if (task.status === "complete") {
-            baseClass = "gantt-task-complete";
-          } else if (task.status === "delayed") {
-            baseClass = "gantt-task-delayed";
-          } else {
-            baseClass = "gantt-task-itr";
-          }
-        }
-        
-        return baseClass;
+  const processGanttData = (items: any[]) => {
+    // Create a map of parent-child relationships
+    const itemMap: Record<string, any> = {};
+    const rootItems: any[] = [];
+    
+    // First pass: create map of all items
+    items.forEach(item => {
+      itemMap[item.id] = {
+        ...item,
+        children: []
       };
-      
-      gantt.templates.tooltip_text = function(start, end, task) {
-        let statusText = "";
-        if (task.status === "complete") statusText = "Completado";
-        else if (task.status === "delayed") statusText = "Retrasado";
-        else if (task.status === "inprogress") statusText = "En Progreso";
-        
-        let tooltipText = "<b>" + task.text + "</b><br/>";
-        tooltipText += "Inicio: " + gantt.templates.tooltip_date_format(start) + "<br/>";
-        tooltipText += "Fin: " + gantt.templates.tooltip_date_format(end) + "<br/>";
-        tooltipText += "Progreso: " + Math.round(task.progress * 100) + "%<br/>";
-        
-        if (task.quantity && task.quantity > 1) {
-          tooltipText += "Cantidad: " + task.quantity + "<br/>";
-        }
-        
-        if (statusText) {
-          tooltipText += "Estado: " + statusText;
-        }
-        
-        return tooltipText;
-      };
-      
-      gantt.i18n.setLocale({
-        date: {
-          month_full: ["Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"],
-          month_short: ["Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "Sep", "Oct", "Nov", "Dic"],
-          day_full: ["Domingo", "Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado"],
-          day_short: ["Dom", "Lun", "Mar", "Mié", "Jue", "Vie", "Sáb"]
-        },
-        labels: {
-          new_task: "Nueva tarea",
-          section_description: "Descripción",
-          section_time: "Tiempo",
-          section_type: "Tipo",
-          
-          column_text: "Nombre de tarea",
-          column_start_date: "Fecha inicio",
-          column_duration: "Duración",
-          column_progress: "Progreso",
-          
-          confirm_deleting: "¿Confirma eliminación?",
-          section_priority: "Prioridad"
-        }
-      });
-      
-      const configureTimeScale = () => {
-        if (viewMode === "month") {
-          gantt.config.scales = [
-            { unit: "month", step: 1, format: "%F %Y" },
-            { unit: "day", step: 1, format: "%j" }
-          ];
-        } else if (viewMode === "week") {
-          gantt.config.scales = [
-            { unit: "week", step: 1, format: "Semana #%W" },
-            { unit: "day", step: 1, format: "%j %D" }
-          ];
-        } else if (viewMode === "day") {
-          gantt.config.scales = [
-            { unit: "day", step: 1, format: "%j %D" },
-            { unit: "hour", step: 2, format: "%H:00" }
-          ];
-        }
-      };
-      
-      configureTimeScale();
-      
-      const customStyles = `
-        .gantt_task_line {
-          border-radius: 4px;
-        }
-        .gantt-task-project {
-          background-color: #a855f7 !important;
-          border-color: #9333ea !important;
-          color: white !important;
-          font-weight: bold;
-          height: 22px !important;
-          line-height: 22px !important;
-          margin-top: -3px;
-        }
-        .gantt-task-system {
-          background-color: #3b82f6 !important;
-          border-color: #2563eb !important;
-          color: white !important;
-          height: 18px !important;
-          line-height: 18px !important;
-          margin-top: -1px;
-        }
-        .gantt-task-subsystem {
-          background-color: #22c55e !important;
-          border-color: #16a34a !important;
-          color: white !important;
-        }
-        .gantt-task-itr {
-          background-color: #f97316 !important;
-          border-color: #ea580c !important;
-          color: white !important;
-        }
-        .gantt-task-complete {
-          background-color: #10b981 !important;
-          border-color: #059669 !important;
-          color: white !important;
-        }
-        .gantt-task-delayed {
-          background-color: #ef4444 !important;
-          border-color: #dc2626 !important;
-          color: white !important;
-        }
-        .gantt_grid_head_cell {
-          font-weight: bold;
-        }
-        .gantt_grid {
-          background-color: #f3f4f6;
-        }
-        .gantt_task {
-          background-color: #fff;
-        }
-        .gantt_task_row {
-          border-bottom: 1px solid #e5e7eb;
-        }
-        .gantt_grid_scale, .gantt_task_scale {
-          background-color: #f9fafb;
-          border-bottom: 1px solid #e5e7eb;
-        }
-        .today-line {
-          position: absolute;
-          top: 0;
-          height: 100%;
-          border-left: 2px dashed #f43f5e;
-          z-index: 1;
-        }
-        .gantt_tree_icon.gantt_close, .gantt_tree_icon.gantt_open {
-          width: 18px;
-          height: 18px;
-          border-radius: 3px;
-          background-color: #f3f4f6;
-          border: 1px solid #e5e7eb;
-          font-size: 16px;
-          line-height: 16px;
-          text-align: center;
-        }
-        .gantt_grid_head_cell, .gantt_grid_data {
-          padding-left: 10px;
-        }
-        .gantt-task-progress-value {
-          position: absolute;
-          right: -40px;
-          top: 0;
-          background-color: rgba(255, 255, 255, 0.7);
-          padding: 0 4px;
-          border-radius: 2px;
-          font-size: 11px;
-          color: #333;
-        }
-        .gantt_task_content {
-          padding-right: 5px;
-          white-space: nowrap;
-          overflow: hidden;
-          text-overflow: ellipsis;
-          font-size: 11px;
-          font-weight: 500;
-        }
-      `;
-      
-      const styleId = 'gantt-custom-styles';
-      if (!document.getElementById(styleId)) {
-        const styleElement = document.createElement('style');
-        styleElement.id = styleId;
-        styleElement.innerHTML = customStyles;
-        document.head.appendChild(styleElement);
+    });
+    
+    // Second pass: establish parent-child relationships
+    items.forEach(item => {
+      if (item.parent && itemMap[item.parent]) {
+        itemMap[item.parent].children.push(itemMap[item.id]);
+      } else {
+        rootItems.push(itemMap[item.id]);
       }
-      
-      gantt.init(containerRef.current);
-      setInitialized(true);
-      
-      gantt.attachEvent("onGanttRender", updateTodayMarker);
-      
-      return () => {
-        gantt.clearAll();
-        gantt.detachEvent("onGanttRender");
+    });
+    
+    // Flatten the hierarchy for display, respecting expanded state
+    const flattenedItems: any[] = [];
+    
+    const flattenHierarchy = (items: any[], level = 0) => {
+      items.forEach(item => {
+        const isExpanded = expandedItems[item.id] !== false; // Default to expanded
         
-        if (todayMarkerRef.current) {
-          todayMarkerRef.current.remove();
+        flattenedItems.push({
+          ...item,
+          level,
+          isExpanded
+        });
+        
+        if (isExpanded && item.children && item.children.length > 0) {
+          flattenHierarchy(item.children, level + 1);
         }
-      };
-    }
-  }, [initialized]);
-  
-  useEffect(() => {
-    if (initialized && data.length > 0) {
-      const processedData = data.map(item => {
-        const startDate = item.start ? new Date(item.start) : new Date();
-        const endDate = item.end ? new Date(item.end) : new Date(startDate);
-        
-        if (endDate <= startDate) {
-          endDate.setDate(startDate.getDate() + 7);
-        }
-        
-        return {
-          id: item.id,
-          text: item.task,
-          start_date: startDate,
-          end_date: endDate,
-          progress: item.progress / 100,
-          parent: item.parent || 0,
-          type: item.type,
-          status: item.status,
-          quantity: item.quantity || 1, // Agregamos la cantidad
-          open: true,
-          duration: Math.ceil((endDate.getTime() - startDate.getTime()) / (24 * 60 * 60 * 1000)),
-          color_class: item.type === "project" ? "gantt-task-project" : 
-                      item.type === "system" ? "gantt-task-system" : 
-                      item.type === "subsystem" ? "gantt-task-subsystem" : 
-                      item.status === "complete" ? "gantt-task-complete" : 
-                      item.status === "delayed" ? "gantt-task-delayed" : "gantt-task-itr"
-        };
       });
+    };
+    
+    flattenHierarchy(rootItems);
+    return flattenedItems;
+  };
 
-      // Configuración de escalas basada en el modo de vista seleccionado
-      if (viewMode === "month") {
-        gantt.config.scales = [
-          { unit: "month", step: 1, format: "%F %Y" },
-          { unit: "day", step: 1, format: "%j" }
-        ];
-      } else if (viewMode === "week") {
-        gantt.config.scales = [
-          { unit: "week", step: 1, format: "Semana #%W" },
-          { unit: "day", step: 1, format: "%j %D" }
-        ];
-      } else if (viewMode === "day") {
-        gantt.config.scales = [
-          { unit: "day", step: 1, format: "%j %D" },
-          { unit: "hour", step: 2, format: "%H:00" }
-        ];
-      }
-      
-      gantt.templates.task_class = (start, end, task) => {
-        return task.color_class || "gantt-task-itr";
-      };
-      
-      gantt.clearAll();
-      gantt.parse({
-        data: processedData,
-        links: []
-      });
-      
-      // Asegúrate de que showDate funcione correctamente
-      try {
-        gantt.showDate(currentDate);
-      } catch (error) {
-        console.error("Error al mostrar la fecha en el Gantt:", error);
-        // Si falla, intentamos con setCurrentScale como alternativa
-        try {
-          gantt.setCurrentScale(viewMode === "day" ? "day" : viewMode === "week" ? "week" : "month");
-        } catch (error) {
-          console.error("Error al establecer la escala en el Gantt:", error);
-        }
-      }
-      
-      gantt.eachTask(function(task) {
-        gantt.open(task.id);
-      });
-      
-      gantt.render();
-      setTimeout(updateTodayMarker, 100);
+  const toggleExpand = (id: string) => {
+    setExpandedItems(prev => ({
+      ...prev,
+      [id]: !prev[id]
+    }));
+  };
+
+  const getStatusColor = (status: string) => {
+    switch (status) {
+      case 'complete':
+        return 'bg-status-complete';
+      case 'inprogress':
+        return 'bg-status-inprogress';
+      case 'delayed':
+        return 'bg-status-delayed';
+      default:
+        return 'bg-gray-400';
     }
-  }, [data, currentDate, viewMode, initialized]);
+  };
+
+  const getTypeIcon = (type: string) => {
+    switch (type) {
+      case 'project':
+        return '📁';
+      case 'system':
+        return '⚙️';
+      case 'subsystem':
+        return '🔧';
+      case 'task':
+        return '📝';
+      default:
+        return '•';
+    }
+  };
+
+  const formatDate = (dateString: string) => {
+    try {
+      if (!dateString) return 'N/A';
+      const date = typeof dateString === 'string' ? parseISO(dateString) : new Date(dateString);
+      return isValid(date) ? format(date, 'dd/MM/yyyy', { locale: es }) : 'Fecha inválida';
+    } catch (error) {
+      console.error('Error formatting date:', error);
+      return 'Error';
+    }
+  };
+
+  // Calculate date range for the timeline
+  const startDateObj = parseISO(startDate);
+  const endDateObj = parseISO(endDate);
   
+  // Generate timeline headers based on view mode
+  const generateTimelineHeaders = () => {
+    const headers = [];
+    let current = new Date(startDateObj);
+    
+    while (current <= endDateObj) {
+      let label = '';
+      
+      if (viewMode === 'year') {
+        label = format(current, 'MMM', { locale: es });
+        current = new Date(current.getFullYear(), current.getMonth() + 1, 1);
+      } else if (viewMode === 'month') {
+        label = format(current, 'd', { locale: es });
+        current.setDate(current.getDate() + 1);
+      } else {
+        // Week view
+        label = format(current, 'EEE d', { locale: es });
+        current.setDate(current.getDate() + 1);
+      }
+      
+      headers.push(label);
+    }
+    
+    return headers;
+  };
+  
+  const timelineHeaders = generateTimelineHeaders();
+
+  // Calculate position and width for gantt bars
+  const calculateBarPosition = (item: any) => {
+    try {
+      const itemStart = parseISO(item.start);
+      const itemEnd = parseISO(item.end);
+      
+      // Calculate total timeline duration in milliseconds
+      const timelineDuration = endDateObj.getTime() - startDateObj.getTime();
+      
+      // Calculate item position relative to timeline start
+      const itemStartPosition = Math.max(0, itemStart.getTime() - startDateObj.getTime());
+      const itemDuration = Math.min(
+        itemEnd.getTime() - itemStart.getTime(),
+        itemEnd.getTime() - startDateObj.getTime()
+      );
+      
+      // Convert to percentage
+      const startPercentage = (itemStartPosition / timelineDuration) * 100;
+      const widthPercentage = (itemDuration / timelineDuration) * 100;
+      
+      return {
+        left: `${startPercentage}%`,
+        width: `${widthPercentage}%`
+      };
+    } catch (error) {
+      console.error('Error calculating bar position:', error, item);
+      return { left: '0%', width: '10%' };
+    }
+  };
+
   return (
-    <div className="flex flex-col space-y-4" ref={ganttChartRef}>
-      <div className="border-b pb-4">
-        <h2 className="text-2xl font-bold mb-4">Cronograma de ITRs</h2>
-        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-3">
-          <div className="flex items-center space-x-1">
-            <Button variant="outline" size="icon" onClick={goToPreviousMonth} className="h-9 w-9">
-              <ChevronLeft className="h-4 w-4" />
-            </Button>
-            <Button variant="outline" className="font-medium h-9 px-3" onClick={goToToday}>
-              <Calendar className="h-4 w-4 mr-2" />
-              Hoy
-            </Button>
-            <Button variant="outline" size="icon" onClick={goToNextMonth} className="h-9 w-9">
-              <ChevronRight className="h-4 w-4" />
-            </Button>
-            <div className="ml-2 bg-white border rounded-md py-1 px-3 text-lg font-medium">
-              {format(currentDate, 'MMMM yyyy', { locale: es })}
-            </div>
-          </div>
-          <div className="flex items-center gap-2 flex-wrap md:flex-nowrap">
-            <Select value={viewMode} onValueChange={setViewMode}>
-              <SelectTrigger className="w-[180px] h-9">
-                <SelectValue placeholder="Vista por Mes" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="month">Vista por Mes</SelectItem>
-                <SelectItem value="week">Vista por Semana</SelectItem>
-                <SelectItem value="day">Vista por Día</SelectItem>
-              </SelectContent>
-            </Select>
-            <Button variant="outline" size="icon" className="h-9 w-9">
-              <Search className="h-4 w-4" />
-            </Button>
-            <Button variant="outline" onClick={exportToExcel} disabled={exporting} className="h-9">
-              <Download className="h-4 w-4 mr-2" />
-              Excel
-            </Button>
-            <Button variant="outline" onClick={exportToPDF} disabled={exporting} className="h-9">
-              <FileText className="h-4 w-4 mr-2" />
-              {exporting ? "Exportando..." : "PDF"}
-            </Button>
+    <div className="overflow-x-auto">
+      <div className="min-w-[800px]">
+        {/* Timeline header */}
+        <div className="flex">
+          <div className="w-1/3 min-w-[300px] p-2 font-medium">Tarea</div>
+          <div className="w-2/3 flex">
+            {timelineHeaders.map((header, index) => (
+              <div 
+                key={index} 
+                className="flex-1 text-center text-xs p-1 border-l border-gray-200"
+              >
+                {header}
+              </div>
+            ))}
           </div>
         </div>
-      </div>
-      
-      <div className="border rounded-lg mx-4">
-        {/* Timeline header with current year and date range */}
-        <div className="border-b bg-gray-50 p-2 flex justify-between items-center">
-          <div className="text-sm font-medium text-gray-700">
-            Año: {getYear(currentDate)}
-          </div>
-          <div className="text-sm font-medium text-gray-700">
-            Periodo visualizado: {format(currentDate, 'dd/MM/yyyy')} - {format(addMonths(currentDate, viewMode === "day" ? 0 : viewMode === "week" ? 0.25 : 1), 'dd/MM/yyyy')}
-          </div>
-        </div>
-        <div ref={containerRef} className="h-[500px] w-full" />
-        <div className="flex justify-end p-4 border-t">
-          <div className="flex flex-wrap items-center gap-4">
-            <div className="flex items-center">
-              <div className="w-3 h-3 bg-purple-500 rounded-full mr-2"></div>
-              <span className="text-sm">Proyecto</span>
+        
+        {/* Gantt rows */}
+        <div className="divide-y">
+          {visibleItems.map((item) => (
+            <div key={item.id} className="flex hover:bg-gray-50">
+              {/* Task info */}
+              <div 
+                className="w-1/3 min-w-[300px] p-2 flex items-center"
+                style={{ paddingLeft: `${(item.level * 20) + 8}px` }}
+              >
+                {item.children && item.children.length > 0 && (
+                  <button 
+                    onClick={() => toggleExpand(item.id)}
+                    className="mr-1 w-4 h-4 flex items-center justify-center text-xs"
+                  >
+                    {item.isExpanded ? '▼' : '►'}
+                  </button>
+                )}
+                <span className="mr-2">{getTypeIcon(item.type)}</span>
+                <div className="flex-1 truncate">
+                  <div className="font-medium truncate">{item.task}</div>
+                  <div className="flex items-center text-xs text-gray-500 space-x-2">
+                    <span>{formatDate(item.start)} - {formatDate(item.end)}</span>
+                    {item.quantity > 1 && (
+                      <span className="bg-gray-100 px-1 rounded">
+                        x{item.quantity}
+                      </span>
+                    )}
+                  </div>
+                </div>
+              </div>
+              
+              {/* Timeline */}
+              <div className="w-2/3 relative p-2">
+                <div className="absolute inset-0 flex">
+                  {timelineHeaders.map((_, index) => (
+                    <div 
+                      key={index} 
+                      className="flex-1 border-l border-gray-200"
+                    />
+                  ))}
+                </div>
+                
+                <div 
+                  className={cn(
+                    "absolute h-6 rounded-sm flex items-center justify-center text-xs text-white",
+                    getStatusColor(item.status)
+                  )}
+                  style={calculateBarPosition(item)}
+                >
+                  <div className="truncate px-1">
+                    {item.progress}%
+                  </div>
+                </div>
+              </div>
             </div>
-            <div className="flex items-center">
-              <div className="w-3 h-3 bg-blue-500 rounded-full mr-2"></div>
-              <span className="text-sm">Sistema</span>
-            </div>
-            <div className="flex items-center">
-              <div className="w-3 h-3 bg-green-500 rounded-full mr-2"></div>
-              <span className="text-sm">Subsistema</span>
-            </div>
-            <div className="flex items-center">
-              <div className="w-3 h-3 bg-orange-500 rounded-full mr-2"></div>
-              <span className="text-sm">ITR</span>
-            </div>
-            <div className="flex items-center">
-              <div className="w-3 h-3 bg-red-500 rounded-full mr-2"></div>
-              <span className="text-sm">Retrasado</span>
-            </div>
-          </div>
+          ))}
         </div>
       </div>
     </div>

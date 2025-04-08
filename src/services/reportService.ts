@@ -1,7 +1,9 @@
+
 import { supabase } from "@/integrations/supabase/client";
 import { jsPDF } from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import * as XLSX from 'xlsx';
+import { getDashboardStats } from "@/services/dashboardService";
 
 const translateStatus = (status: string): string => {
   switch (status) {

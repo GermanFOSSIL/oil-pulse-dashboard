@@ -1,10 +1,10 @@
-
 import { useState, useEffect, useRef } from "react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { ProgressCard } from "@/components/ui/progress-card";
 import { StatCard } from "@/components/ui/stat-card";
 import { EnhancedGanttChart } from "@/components/EnhancedGanttChart";
-import { getProjects, getSystems, getSubsystems, getITRs, getDashboardStats } from "@/services/supabaseService";
+import { getProjects, getSystems, getSubsystems, getITRs } from "@/services/supabaseService";
+import { getDashboardStats } from "@/services/dashboardService";
 import { format, subMonths, addMonths } from "date-fns";
 import { es } from "date-fns/locale";
 import { ProjectSelector } from "@/components/ProjectSelector";
@@ -47,11 +47,9 @@ const Dashboard = () => {
   const fetchProjectData = async (projectId: string | null) => {
     setLoading(true);
     try {
-      // Fetch dashboard stats
       const dashboardStats = await getDashboardStats(projectId);
       setStats(dashboardStats);
 
-      // Fetch data for Gantt chart
       let projectsData: any[] = [];
       let systemsData: any[] = [];
       let subsystemsData: any[] = [];
@@ -62,7 +60,6 @@ const Dashboard = () => {
       const allSubsystems = await getSubsystems();
       const allITRs = await getITRs();
 
-      // Filter data based on selected project
       if (projectId) {
         projectsData = projects.filter(p => p.id === projectId);
         systemsData = allSystems.filter(s => s.project_id === projectId);
@@ -71,18 +68,14 @@ const Dashboard = () => {
         systemsData = allSystems;
       }
       
-      // Get subsystems for the systems
       const systemIds = systemsData.map(s => s.id);
       subsystemsData = allSubsystems.filter(sub => systemIds.includes(sub.system_id));
       
-      // Get ITRs for the subsystems
       const subsystemIds = subsystemsData.map(sub => sub.id);
       itrsData = allITRs.filter(itr => subsystemIds.includes(itr.subsystem_id));
 
-      // Format Gantt data
       const ganttItems = [];
       
-      // Add projects to Gantt
       for (const project of projectsData) {
         ganttItems.push({
           id: `project-${project.id}`,
@@ -96,7 +89,6 @@ const Dashboard = () => {
         });
       }
 
-      // Add systems to Gantt
       for (const system of systemsData) {
         const projectId = system.project_id;
         ganttItems.push({
@@ -112,7 +104,6 @@ const Dashboard = () => {
         });
       }
 
-      // Add subsystems to Gantt
       for (const subsystem of subsystemsData) {
         const systemId = subsystem.system_id;
         ganttItems.push({
@@ -128,7 +119,6 @@ const Dashboard = () => {
         });
       }
 
-      // Add ITRs to Gantt with quantity grouping
       const itrGroups: Record<string, {
         count: number,
         progress: number,
@@ -138,7 +128,6 @@ const Dashboard = () => {
         status: string
       }> = {};
       
-      // Agrupar ITRs por nombre
       itrsData.forEach(itr => {
         const key = `${itr.name}-${itr.subsystem_id}`;
         
@@ -157,7 +146,6 @@ const Dashboard = () => {
         itrGroups[key].progress += itr.progress || 0;
       });
       
-      // Agregar los grupos de ITRs al Gantt
       Object.entries(itrGroups).forEach(([key, group], index) => {
         const itrName = key.split('-')[0];
         const avgProgress = group.count > 0 ? Math.round(group.progress / group.count) : 0;
@@ -175,7 +163,6 @@ const Dashboard = () => {
         });
       });
 
-      // Filter gantt items by search term if provided
       const filteredGanttItems = searchTerm 
         ? ganttItems.filter(item => item.task.toLowerCase().includes(searchTerm.toLowerCase()))
         : ganttItems;
@@ -193,7 +180,6 @@ const Dashboard = () => {
     fetchProjectData(selectedProjectId);
   }, [selectedProjectId, searchTerm]);
 
-  // Effect for handling date navigation in Gantt
   useEffect(() => {
     if (ganttContainerRef.current) {
       // This would be implemented to control the gantt view
@@ -207,10 +193,8 @@ const Dashboard = () => {
 
   const exportDashboardData = () => {
     try {
-      // Create workbook
       const wb = XLSX.utils.book_new();
       
-      // Export KPI data
       const kpiData = [
         ['Métrica', 'Valor'],
         ['Total Proyectos', stats.totalProjects],
@@ -222,7 +206,6 @@ const Dashboard = () => {
       const kpiWs = XLSX.utils.aoa_to_sheet(kpiData);
       XLSX.utils.book_append_sheet(wb, kpiWs, "KPIs");
       
-      // Export project data if available
       if (stats.projectsData && stats.projectsData.length > 0) {
         const projectsExportData = stats.projectsData.map((project: any) => ({
           'Proyecto': project.title,
@@ -234,7 +217,6 @@ const Dashboard = () => {
         XLSX.utils.book_append_sheet(wb, projectsWs, "Proyectos");
       }
       
-      // Export chart data if available
       if (stats.chartData && stats.chartData.length > 0) {
         const chartExportData = stats.chartData.map((item: any) => ({
           'Sistema': item.name,
@@ -247,7 +229,6 @@ const Dashboard = () => {
         XLSX.utils.book_append_sheet(wb, chartWs, "Sistemas");
       }
       
-      // Export activity data if available
       if (stats.areaChartData && stats.areaChartData.length > 0) {
         const activityExportData = stats.areaChartData.map((item: any) => ({
           'Mes': item.name,
@@ -260,7 +241,6 @@ const Dashboard = () => {
         XLSX.utils.book_append_sheet(wb, activityWs, "Actividad");
       }
       
-      // Export Gantt data with quantity
       const ganttExportData = ganttData.map(item => ({
         'Tarea': item.task,
         'Tipo': item.type,
@@ -274,7 +254,6 @@ const Dashboard = () => {
       const ganttWs = XLSX.utils.json_to_sheet(ganttExportData);
       XLSX.utils.book_append_sheet(wb, ganttWs, "Cronograma");
       
-      // Generate Excel file and trigger download
       XLSX.writeFile(wb, `Dashboard_${format(new Date(), 'yyyyMMdd')}.xlsx`);
     } catch (error) {
       console.error("Error exporting dashboard data:", error);
@@ -285,7 +264,6 @@ const Dashboard = () => {
     try {
       const reportUrl = await generateReport('project_status', selectedProjectId);
       
-      // Open the PDF in a new tab
       window.open(reportUrl, '_blank');
     } catch (error) {
       console.error("Error generating PDF report:", error);
@@ -308,7 +286,6 @@ const Dashboard = () => {
     }
   };
 
-  // Custom tooltip for the chart that shows ITR completion information
   const CustomBarTooltip = ({ active, payload }: any) => {
     if (active && payload && payload.length) {
       const data = payload[0].payload;
@@ -335,7 +312,6 @@ const Dashboard = () => {
     return null;
   };
 
-  // Prepare pie chart data
   const projectStatusData = !loading && stats.projectsData ? [
     { name: 'Completados', value: stats.projectsData.filter((p: any) => p.variant === 'success').length, fill: '#22c55e', percentage: Math.round(stats.projectsData.filter((p: any) => p.variant === 'success').length / stats.totalProjects * 100) || 0 },
     { name: 'En Progreso', value: stats.projectsData.filter((p: any) => p.variant === 'warning').length, fill: '#f59e0b', percentage: Math.round(stats.projectsData.filter((p: any) => p.variant === 'warning').length / stats.totalProjects * 100) || 0 },
@@ -376,7 +352,6 @@ const Dashboard = () => {
         end: format(monthEnd, 'yyyy/MM/dd')
       };
     } else {
-      // Week view
       const weekStart = currentDate;
       const weekEnd = new Date(currentDate);
       weekEnd.setDate(weekEnd.getDate() + 6);
@@ -412,6 +387,7 @@ const Dashboard = () => {
           startAngle={startAngle}
           endAngle={endAngle}
           fill={fill}
+          dataKey="value"
         />
       </g>
     );
@@ -476,7 +452,6 @@ const Dashboard = () => {
             />
           </div>
 
-          {/* KPI Pie Charts */}
           <div className="grid gap-4 md:grid-cols-2">
             <Card>
               <CardHeader>
@@ -591,13 +566,13 @@ const Dashboard = () => {
             <CardContent ref={ganttContainerRef}>
               <EnhancedGanttChart 
                 data={ganttData} 
-                dateRange={calculateDateRange()}
+                startDate={calculateDateRange().start}
+                endDate={calculateDateRange().end}
                 viewMode={currentView}
               />
             </CardContent>
           </Card>
 
-          {/* Sistemas section - Siempre visible */}
           <Card>
             <CardHeader>
               <CardTitle>Sistemas</CardTitle>
@@ -689,7 +664,6 @@ const Dashboard = () => {
             </CardContent>
           </Card>
 
-          {/* Real database activity timeline */}
           <DatabaseActivityTimeline />
         </>
       )}
