@@ -1,6 +1,6 @@
 
 import { supabase } from "@/integrations/supabase/client";
-import { BulkUserData } from "@/services/types";
+import { BulkUserData, UserCreateData, UserUpdateData, PasswordChangeData } from "@/services/types";
 
 // Define available permissions for sidebar menu items
 export const AVAILABLE_PERMISSIONS = [
@@ -110,27 +110,16 @@ export const bulkCreateUsers = async (users: BulkUserData[]): Promise<number> =>
     
     for (const user of users) {
       try {
-        const { data, error } = await supabase.auth.admin.createUser({
+        const result = await createUser({
           email: user.email,
-          password: generateRandomPassword(),
-          email_confirm: true,
-          user_metadata: {
-            full_name: user.full_name
-          }
+          password: user.password || generateRandomPassword(),
+          full_name: user.full_name,
+          role: user.role || 'user'
         });
         
-        if (error) {
-          console.error(`Error creating user ${user.email}:`, error);
-          continue;
+        if (result.success) {
+          successCount++;
         }
-        
-        if (data.user && user.role) {
-          await updateUserProfile(data.user.id, {
-            role: user.role
-          });
-        }
-        
-        successCount++;
       } catch (err) {
         console.error(`Error processing user ${user.email}:`, err);
       }
@@ -140,6 +129,104 @@ export const bulkCreateUsers = async (users: BulkUserData[]): Promise<number> =>
   } catch (error) {
     console.error("Error in bulk user creation:", error);
     throw error;
+  }
+};
+
+export const createUser = async (userData: UserCreateData): Promise<{ success: boolean; message: string; userId?: string }> => {
+  try {
+    // First, create the user in auth
+    const { data: authData, error: authError } = await supabase.auth.admin.createUser({
+      email: userData.email,
+      password: userData.password,
+      email_confirm: true, // Automatically confirm the email
+    });
+
+    if (authError) {
+      console.error("Error creating user account:", authError);
+      return { 
+        success: false, 
+        message: `Error al crear la cuenta de usuario: ${authError.message}` 
+      };
+    }
+
+    if (!authData.user) {
+      return { success: false, message: "Error al crear la cuenta de usuario: No se pudo crear el usuario" };
+    }
+
+    const userId = authData.user.id;
+
+    // Then, update the profile with additional information
+    const profileData: UserUpdateData = {
+      full_name: userData.full_name,
+      role: userData.role || 'user',
+    };
+
+    if (userData.permissions) {
+      profileData.permissions = userData.permissions;
+    } else {
+      // Set default permissions based on role
+      if (userData.role === 'admin') {
+        profileData.permissions = [...AVAILABLE_PERMISSIONS];
+      } else if (userData.role === 'tecnico') {
+        profileData.permissions = ['dashboard', 'reports', 'itrs'];
+      } else {
+        profileData.permissions = ['dashboard', 'reports'];
+      }
+    }
+
+    const { error: profileError } = await supabase
+      .from('profiles')
+      .update(profileData)
+      .eq('id', userId);
+
+    if (profileError) {
+      console.error("Error updating user profile:", profileError);
+      return { 
+        success: true, 
+        message: "Usuario creado, pero hubo un error al actualizar el perfil", 
+        userId 
+      };
+    }
+
+    return { 
+      success: true, 
+      message: "Usuario creado exitosamente", 
+      userId 
+    };
+  } catch (error: any) {
+    console.error("Error creating user:", error);
+    return { 
+      success: false, 
+      message: `Error al crear usuario: ${error.message || "Error desconocido"}` 
+    };
+  }
+};
+
+export const changeUserPassword = async (data: PasswordChangeData): Promise<{ success: boolean; message: string }> => {
+  try {
+    const { error } = await supabase.auth.admin.updateUserById(
+      data.userId,
+      { password: data.newPassword }
+    );
+
+    if (error) {
+      console.error("Error changing password:", error);
+      return { 
+        success: false, 
+        message: `Error al cambiar la contraseña: ${error.message}` 
+      };
+    }
+
+    return { 
+      success: true, 
+      message: "Contraseña cambiada exitosamente" 
+    };
+  } catch (error: any) {
+    console.error("Error changing password:", error);
+    return { 
+      success: false, 
+      message: `Error al cambiar la contraseña: ${error.message || "Error desconocido"}` 
+    };
   }
 };
 

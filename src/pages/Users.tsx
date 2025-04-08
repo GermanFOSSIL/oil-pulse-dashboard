@@ -3,15 +3,16 @@ import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { DataTable } from "@/components/ui/data-table";
 import { Badge } from "@/components/ui/badge";
-import { Plus } from "lucide-react";
+import { Plus, Key } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { getUserProfiles, updateUserProfile, AVAILABLE_PERMISSIONS, UserProfile } from "@/services/userService";
+import { getUserProfiles, updateUserProfile, AVAILABLE_PERMISSIONS, UserProfile, createUser, changeUserPassword } from "@/services/userService";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
+import { PasswordChangeData, UserCreateData } from "@/services/types";
 
 interface UserFormModalProps {
   open: boolean;
@@ -19,6 +20,125 @@ interface UserFormModalProps {
   onSuccess: () => void;
   user?: UserProfile;
 }
+
+interface PasswordChangeModalProps {
+  open: boolean;
+  onClose: () => void;
+  onSuccess: () => void;
+  user: UserProfile;
+}
+
+const PasswordChangeModal = ({ open, onClose, onSuccess, user }: PasswordChangeModalProps) => {
+  const { toast } = useToast();
+  const [loading, setLoading] = useState(false);
+  const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+
+    if (!password) {
+      toast({
+        title: "Contraseña requerida",
+        description: "Por favor ingrese una contraseña",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    if (password !== confirmPassword) {
+      toast({
+        title: "Las contraseñas no coinciden",
+        description: "La contraseña y la confirmación deben ser iguales",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    setLoading(true);
+
+    try {
+      const data: PasswordChangeData = {
+        userId: user.id,
+        newPassword: password
+      };
+
+      const result = await changeUserPassword(data);
+
+      if (result.success) {
+        toast({
+          title: "Contraseña actualizada",
+          description: "La contraseña ha sido actualizada correctamente"
+        });
+        onSuccess();
+      } else {
+        toast({
+          title: "Error",
+          description: result.message,
+          variant: "destructive"
+        });
+      }
+    } catch (error: any) {
+      console.error("Error al cambiar contraseña:", error);
+      toast({
+        title: "Error",
+        description: `No se pudo cambiar la contraseña: ${error.message || "Error desconocido"}`,
+        variant: "destructive"
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={onClose}>
+      <DialogContent className="sm:max-w-[500px]">
+        <DialogHeader>
+          <DialogTitle>
+            Cambiar contraseña para {user.full_name || 'usuario'}
+          </DialogTitle>
+        </DialogHeader>
+        
+        <form onSubmit={handleSubmit} className="space-y-4 pt-4">
+          <div className="space-y-2">
+            <Label htmlFor="password">Nueva contraseña *</Label>
+            <Input
+              id="password"
+              name="password"
+              type="password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              placeholder="Ingrese la nueva contraseña"
+              required
+            />
+          </div>
+          
+          <div className="space-y-2">
+            <Label htmlFor="confirm_password">Confirmar contraseña *</Label>
+            <Input
+              id="confirm_password"
+              name="confirm_password"
+              type="password"
+              value={confirmPassword}
+              onChange={(e) => setConfirmPassword(e.target.value)}
+              placeholder="Confirme la contraseña"
+              required
+            />
+          </div>
+          
+          <div className="flex justify-end space-x-2 pt-4">
+            <Button type="button" variant="outline" onClick={onClose}>
+              Cancelar
+            </Button>
+            <Button type="submit" disabled={loading}>
+              {loading ? "Guardando..." : "Cambiar contraseña"}
+            </Button>
+          </div>
+        </form>
+      </DialogContent>
+    </Dialog>
+  );
+};
 
 const UserFormModal = ({ open, onClose, onSuccess, user }: UserFormModalProps) => {
   const isEditMode = !!user;
@@ -29,7 +149,10 @@ const UserFormModal = ({ open, onClose, onSuccess, user }: UserFormModalProps) =
     full_name: user?.full_name || "",
     role: user?.role || "user",
     avatar_url: user?.avatar_url || "",
-    permissions: user?.permissions || []
+    permissions: user?.permissions || [],
+    email: "",
+    password: "",
+    confirmPassword: ""
   });
   
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -84,25 +207,77 @@ const UserFormModal = ({ open, onClose, onSuccess, user }: UserFormModalProps) =
       return;
     }
     
-    setLoading(true);
-    
-    try {
-      if (isEditMode && user) {
-        await updateUserProfile(user.id, formData);
+    // For creating a new user, check email and password
+    if (!isEditMode) {
+      if (!formData.email) {
         toast({
-          title: "Usuario actualizado",
-          description: "El usuario ha sido actualizado correctamente"
-        });
-      } else {
-        toast({
-          title: "Error",
-          description: "La creación de usuarios está disponible mediante el proceso de registro",
+          title: "Email requerido",
+          description: "Por favor ingrese un email para el usuario",
           variant: "destructive"
         });
         return;
       }
-      
-      onSuccess();
+
+      if (!formData.password) {
+        toast({
+          title: "Contraseña requerida",
+          description: "Por favor ingrese una contraseña para el usuario",
+          variant: "destructive"
+        });
+        return;
+      }
+
+      if (formData.password !== formData.confirmPassword) {
+        toast({
+          title: "Las contraseñas no coinciden",
+          description: "La contraseña y la confirmación deben ser iguales",
+          variant: "destructive"
+        });
+        return;
+      }
+    }
+    
+    setLoading(true);
+    
+    try {
+      if (isEditMode && user) {
+        await updateUserProfile(user.id, {
+          full_name: formData.full_name,
+          avatar_url: formData.avatar_url,
+          role: formData.role,
+          permissions: formData.permissions
+        });
+        toast({
+          title: "Usuario actualizado",
+          description: "El usuario ha sido actualizado correctamente"
+        });
+        onSuccess();
+      } else {
+        // Create a new user
+        const userData: UserCreateData = {
+          email: formData.email,
+          password: formData.password,
+          full_name: formData.full_name,
+          role: formData.role,
+          permissions: formData.permissions
+        };
+
+        const result = await createUser(userData);
+        
+        if (result.success) {
+          toast({
+            title: "Usuario creado",
+            description: "El usuario ha sido creado correctamente"
+          });
+          onSuccess();
+        } else {
+          toast({
+            title: "Error",
+            description: result.message,
+            variant: "destructive"
+          });
+        }
+      }
     } catch (error: any) {
       console.error("Error al guardar usuario:", error);
       toast({
@@ -136,6 +311,49 @@ const UserFormModal = ({ open, onClose, onSuccess, user }: UserFormModalProps) =
               required
             />
           </div>
+          
+          {!isEditMode && (
+            <>
+              <div className="space-y-2">
+                <Label htmlFor="email">Email *</Label>
+                <Input
+                  id="email"
+                  name="email"
+                  type="email"
+                  value={formData.email}
+                  onChange={handleInputChange}
+                  placeholder="usuario@ejemplo.com"
+                  required
+                />
+              </div>
+              
+              <div className="space-y-2">
+                <Label htmlFor="password">Contraseña *</Label>
+                <Input
+                  id="password"
+                  name="password"
+                  type="password"
+                  value={formData.password}
+                  onChange={handleInputChange}
+                  placeholder="Ingrese contraseña"
+                  required
+                />
+              </div>
+              
+              <div className="space-y-2">
+                <Label htmlFor="confirmPassword">Confirmar Contraseña *</Label>
+                <Input
+                  id="confirmPassword"
+                  name="confirmPassword"
+                  type="password"
+                  value={formData.confirmPassword}
+                  onChange={handleInputChange}
+                  placeholder="Confirme contraseña"
+                  required
+                />
+              </div>
+            </>
+          )}
           
           <div className="space-y-2">
             <Label htmlFor="role">Rol</Label>
@@ -209,6 +427,7 @@ const Users = () => {
   const [users, setUsers] = useState<UserProfile[]>([]);
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
+  const [showPasswordModal, setShowPasswordModal] = useState(false);
   const [selectedUser, setSelectedUser] = useState<UserProfile | undefined>(undefined);
   const { toast } = useToast();
 
@@ -290,12 +509,33 @@ const Users = () => {
         return <span>{date.toLocaleDateString('es-ES')}</span>;
       }
     },
+    {
+      header: "Acciones",
+      accessorKey: "id" as keyof UserProfile,
+      cell: (user: UserProfile) => (
+        <div className="flex space-x-2">
+          <Button 
+            variant="ghost" 
+            size="icon" 
+            onClick={() => handleChangePassword(user)}
+            title="Cambiar contraseña"
+          >
+            <Key className="h-4 w-4" />
+          </Button>
+        </div>
+      ),
+    }
   ];
 
   const handleEditUser = (user: UserProfile) => {
     console.log("Editando usuario:", user);
     setSelectedUser(user);
     setShowModal(true);
+  };
+
+  const handleChangePassword = (user: UserProfile) => {
+    setSelectedUser(user);
+    setShowPasswordModal(true);
   };
 
   const handleDeleteUser = async (user: UserProfile) => {
@@ -316,10 +556,24 @@ const Users = () => {
     setSelectedUser(undefined);
   };
 
+  const handlePasswordModalClose = () => {
+    setShowPasswordModal(false);
+    setSelectedUser(undefined);
+  };
+
   const handleModalSuccess = () => {
     setShowModal(false);
     setSelectedUser(undefined);
     fetchUsers();
+  };
+
+  const handlePasswordChangeSuccess = () => {
+    setShowPasswordModal(false);
+    setSelectedUser(undefined);
+    toast({
+      title: "Contraseña actualizada",
+      description: "La contraseña ha sido cambiada exitosamente"
+    });
   };
 
   return (
@@ -364,6 +618,15 @@ const Users = () => {
           open={showModal}
           onClose={handleModalClose}
           onSuccess={handleModalSuccess}
+          user={selectedUser}
+        />
+      )}
+
+      {showPasswordModal && selectedUser && (
+        <PasswordChangeModal
+          open={showPasswordModal}
+          onClose={handlePasswordModalClose}
+          onSuccess={handlePasswordChangeSuccess}
           user={selectedUser}
         />
       )}

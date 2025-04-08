@@ -64,12 +64,34 @@ export type Profile = {
   full_name: string | null;
   avatar_url: string | null;
   role: string | null;
+  permissions?: string[] | null;
 };
 
 export type BulkUserData = {
   email: string;
   full_name: string;
   role?: string;
+  password?: string;
 };
 
 export type ReportType = 'project_status' | 'itrs' | 'tasks';
+
+export type UserUpdateData = {
+  full_name?: string;
+  avatar_url?: string;
+  role?: string;
+  permissions?: string[];
+};
+
+export type UserCreateData = {
+  email: string;
+  password: string;
+  full_name: string;
+  role?: string;
+  permissions?: string[];
+};
+
+export type PasswordChangeData = {
+  userId: string;
+  newPassword: string;
+};
