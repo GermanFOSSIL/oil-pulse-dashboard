@@ -273,6 +273,19 @@ export const updateTestPackStatusBasedOnTags = async (testPackId: string): Promi
         console.error(`Error updating test pack ${testPackId} status:`, updateError);
       } else {
         console.log(`Test pack ${testPackId} status updated to 'listo'`);
+        
+        // Get the ITR name for this test pack to update ITR status
+        const { data: testPack } = await supabase
+          .from('test_packs')
+          .select('itr_asociado')
+          .eq('id', testPackId)
+          .single();
+        
+        if (testPack?.itr_asociado) {
+          // Import and use the function to update ITR status
+          const { updateITRStatusBasedOnTestPacks } = await import('@/services/itrService');
+          await updateITRStatusBasedOnTestPacks(testPack.itr_asociado);
+        }
       }
     }
   } catch (error) {
