@@ -1245,8 +1245,10 @@ export const importDataFromExcel = async (buffer: ArrayBuffer): Promise<{
     
     for (const row of data) {
       try {
-        if (row.project_name) {
-          const projectName = row.project_name.toString();
+        const rowData = row as Record<string, any>;
+        
+        if (rowData.project_name) {
+          const projectName = rowData.project_name.toString();
           
           if (!projectMap.has(projectName)) {
             let projectQuery = supabase
@@ -1265,9 +1267,9 @@ export const importDataFromExcel = async (buffer: ArrayBuffer): Promise<{
                 .from('projects')
                 .insert({
                   name: projectName,
-                  location: row.project_location || null,
-                  status: row.project_status || 'inprogress',
-                  progress: row.project_progress || 0
+                  location: rowData.project_location || null,
+                  status: rowData.project_status || 'inprogress',
+                  progress: rowData.project_progress || 0
                 })
                 .select('id')
                 .single();
@@ -1288,8 +1290,8 @@ export const importDataFromExcel = async (buffer: ArrayBuffer): Promise<{
           
           const projectId = projectMap.get(projectName);
           
-          if (row.system_name && projectId) {
-            const systemName = row.system_name.toString();
+          if (rowData.system_name && projectId) {
+            const systemName = rowData.system_name.toString();
             const systemKey = `${projectName}:${systemName}`;
             
             if (!systemMap.has(systemKey)) {
@@ -1310,8 +1312,8 @@ export const importDataFromExcel = async (buffer: ArrayBuffer): Promise<{
                   .from('systems')
                   .insert({
                     name: systemName,
-                    project_id: row.system_project_id || projectId,
-                    completion_rate: row.system_completion_rate || 0
+                    project_id: rowData.system_project_id || projectId,
+                    completion_rate: rowData.system_completion_rate || 0
                   })
                   .select('id')
                   .single();
@@ -1332,8 +1334,8 @@ export const importDataFromExcel = async (buffer: ArrayBuffer): Promise<{
             
             const systemId = systemMap.get(systemKey);
             
-            if (row.subsystem_name && systemId) {
-              const subsystemName = row.subsystem_name.toString();
+            if (rowData.subsystem_name && systemId) {
+              const subsystemName = rowData.subsystem_name.toString();
               const subsystemKey = `${systemKey}:${subsystemName}`;
               
               if (!subsystemMap.has(subsystemKey)) {
@@ -1354,8 +1356,8 @@ export const importDataFromExcel = async (buffer: ArrayBuffer): Promise<{
                     .from('subsystems')
                     .insert({
                       name: subsystemName,
-                      system_id: row.subsystem_system_id || systemId,
-                      completion_rate: row.subsystem_completion_rate || 0
+                      system_id: rowData.subsystem_system_id || systemId,
+                      completion_rate: rowData.subsystem_completion_rate || 0
                     })
                     .select('id')
                     .single();
@@ -1376,15 +1378,15 @@ export const importDataFromExcel = async (buffer: ArrayBuffer): Promise<{
               
               const subsystemId = subsystemMap.get(subsystemKey);
               
-              if (row.task_name && subsystemId) {
-                const taskName = row.task_name.toString();
+              if (rowData.task_name && subsystemId) {
+                const taskName = rowData.task_name.toString();
                 const { data: newTask, error: taskError } = await supabase
                   .from('tasks')
                   .insert({
                     name: taskName,
-                    description: row.task_description || null,
-                    subsystem_id: row.task_subsystem_id || subsystemId,
-                    status: row.task_status || 'pending'
+                    description: rowData.task_description || null,
+                    subsystem_id: rowData.task_subsystem_id || subsystemId,
+                    status: rowData.task_status || 'pending'
                   })
                   .select('id')
                   .single();
@@ -1398,17 +1400,17 @@ export const importDataFromExcel = async (buffer: ArrayBuffer): Promise<{
                 console.log(`Tarea creada: ${taskName} (${newTask.id})`);
               }
               
-              if (row.itr_name && subsystemId) {
-                const itrName = row.itr_name.toString();
+              if (rowData.itr_name && subsystemId) {
+                const itrName = rowData.itr_name.toString();
                 const { data: newITR, error: itrError } = await supabase
                   .from('itrs')
                   .insert({
                     name: itrName,
-                    subsystem_id: row.itr_subsystem_id || subsystemId,
-                    status: row.itr_status || 'inprogress',
-                    progress: row.itr_progress || 0,
-                    due_date: row.itr_due_date || null,
-                    assigned_to: row.itr_assigned_to || null
+                    subsystem_id: rowData.itr_subsystem_id || subsystemId,
+                    status: rowData.itr_status || 'inprogress',
+                    progress: rowData.itr_progress || 0,
+                    due_date: rowData.itr_due_date || null,
+                    assigned_to: rowData.itr_assigned_to || null
                   })
                   .select('id')
                   .single();
@@ -1424,14 +1426,14 @@ export const importDataFromExcel = async (buffer: ArrayBuffer): Promise<{
             }
           }
           
-          if (row.user_email && row.user_full_name) {
-            const userName = row.user_full_name.toString();
+          if (rowData.user_email && rowData.user_full_name) {
+            const userName = rowData.user_full_name.toString();
             const { data: newUser, error: userError } = await supabase
               .from('profiles')
               .insert({
                 id: crypto.randomUUID(),
                 full_name: userName,
-                role: row.user_role || 'user'
+                role: rowData.user_role || 'user'
               })
               .select('id')
               .single();

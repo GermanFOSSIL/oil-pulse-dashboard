@@ -63,27 +63,36 @@ export const ITRFormModal = ({
       setFormLoading(true);
       setError(null);
       try {
+        console.log("Loading initial data for ITR form");
         // Cargar proyectos
         const projectsData = await getProjects();
+        console.log("Projects loaded:", projectsData);
         setProjects(projectsData);
         
         // Cargar perfiles de usuario para asignación
         const profilesData = await getUserProfiles();
+        console.log("User profiles loaded:", profilesData);
         setProfiles(profilesData);
         
         // Si hay un proyecto seleccionado o un ITR con proyecto, cargar sus sistemas
         if (formData.project_id) {
+          console.log("Loading systems for project ID:", formData.project_id);
           const systemsData = await getSystemsByProjectId(formData.project_id);
+          console.log("Systems loaded:", systemsData);
           setSystems(systemsData);
           
           // Si estamos editando un ITR existente
           if (isEditMode && itr) {
+            console.log("Edit mode, loading subsystem data for ITR:", itr);
             // Necesitamos encontrar el sistema al que pertenece el subsistema del ITR
+            let foundSubsystemSystem = false;
+            
             for (const system of systemsData) {
               const subsystemsForSystem = await getSubsystemsBySystemId(system.id);
               const matchingSubsystem = subsystemsForSystem.find(sub => sub.id === itr.subsystem_id);
               
               if (matchingSubsystem) {
+                console.log("Found matching subsystem in system:", system.id);
                 // Actualizamos el sistema seleccionado
                 setFormData(prev => ({ 
                   ...prev, 
@@ -92,7 +101,27 @@ export const ITRFormModal = ({
                 
                 // Cargamos los subsistemas para este sistema
                 setSubsystems(subsystemsForSystem);
+                foundSubsystemSystem = true;
                 break;
+              }
+            }
+            
+            if (!foundSubsystemSystem) {
+              console.log("Could not find system for subsystem:", itr.subsystem_id);
+              // Si no encontramos el sistema, cargar solo el subsistema actual
+              const subsystemData = await getSubsystemById(itr.subsystem_id);
+              if (subsystemData) {
+                const systemData = await getSystemById(subsystemData.system_id);
+                if (systemData) {
+                  setSystems([systemData]);
+                  setFormData(prev => ({ 
+                    ...prev, 
+                    system_id: systemData.id
+                  }));
+                  
+                  const subsystemsForSystem = await getSubsystemsBySystemId(systemData.id);
+                  setSubsystems(subsystemsForSystem);
+                }
               }
             }
           }
@@ -113,7 +142,9 @@ export const ITRFormModal = ({
     const loadSubsystems = async () => {
       if (formData.system_id) {
         try {
+          console.log("Loading subsystems for system ID:", formData.system_id);
           const subsystemsData = await getSubsystemsBySystemId(formData.system_id);
+          console.log("Subsystems loaded:", subsystemsData);
           setSubsystems(subsystemsData);
         } catch (error: any) {
           console.error("Error al cargar subsistemas:", error);
@@ -134,6 +165,7 @@ export const ITRFormModal = ({
   
   const handleSelectChange = (name: string, value: string) => {
     if (name === "project_id") {
+      console.log("Project changed to:", value);
       // Al cambiar el proyecto, reiniciamos sistema y subsistema
       setFormData(prev => ({ 
         ...prev, 
@@ -142,6 +174,7 @@ export const ITRFormModal = ({
         subsystem_id: ""
       }));
     } else if (name === "system_id") {
+      console.log("System changed to:", value);
       // Al cambiar el sistema, reiniciamos subsistema
       setFormData(prev => ({ 
         ...prev, 
@@ -389,4 +422,35 @@ export const ITRFormModal = ({
       </DialogContent>
     </Dialog>
   );
+};
+
+// Add missing functions import to fix the "getSubsystemById is not defined" error
+const getSubsystemById = async (id: string): Promise<Subsystem | null> => {
+  const { data, error } = await supabase
+    .from('subsystems')
+    .select('*')
+    .eq('id', id)
+    .single();
+
+  if (error) {
+    console.error(`Error fetching subsystem with id ${id}:`, error);
+    throw error;
+  }
+
+  return data as unknown as Subsystem;
+};
+
+const getSystemById = async (id: string): Promise<System | null> => {
+  const { data, error } = await supabase
+    .from('systems')
+    .select('*')
+    .eq('id', id)
+    .single();
+
+  if (error) {
+    console.error(`Error fetching system with id ${id}:`, error);
+    throw error;
+  }
+
+  return data as unknown as System;
 };

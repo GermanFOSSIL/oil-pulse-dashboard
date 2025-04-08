@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { DataTable } from "@/components/ui/data-table";
@@ -37,28 +36,22 @@ const ITRs = () => {
   const fetchData = async () => {
     setLoading(true);
     try {
-      // Primero obtenemos los subsistemas
       const subsystemsData = await getSubsystems();
       setSubsystems(subsystemsData);
       
-      // Si hay un proyecto seleccionado, obtenemos sus sistemas
       if (selectedProjectId) {
         const systemsData = await getSystemsByProjectId(selectedProjectId);
         setSystems(systemsData);
         
-        // Filtramos los subsistemas por los sistemas del proyecto
         const systemIds = systemsData.map(system => system.id);
         const filteredSubsystems = subsystemsData.filter(
           subsystem => systemIds.includes(subsystem.system_id)
         );
         
-        // Obtenemos todos los ITRs y luego filtramos
         const itrsData = await getITRs();
         
-        // Enriquecemos los ITRs con información de subsistema
         const enrichedITRs = itrsData
           .filter(itr => {
-            // Solo incluimos ITRs cuyos subsistemas pertenezcan al proyecto seleccionado
             return filteredSubsystems.some(sub => sub.id === itr.subsystem_id);
           })
           .map(itr => {
@@ -74,14 +67,10 @@ const ITRs = () => {
         
         setITRs(enrichedITRs);
       } else {
-        // Si no hay proyecto seleccionado, mostramos todos los ITRs
         const itrsData = await getITRs();
         
-        // Enriquecemos los ITRs con información de subsistema
         const enrichedITRs = itrsData.map(itr => {
           const relatedSubsystem = subsystemsData.find(sub => sub.id === itr.subsystem_id);
-          // Necesitaríamos los sistemas para obtener los nombres
-          // Esto podría ser optimizado con una consulta JOIN en el backend
           
           return {
             ...itr,
@@ -235,6 +224,9 @@ const ITRs = () => {
               Por favor seleccione un proyecto para ver y gestionar sus ITRs
             </CardDescription>
           </CardHeader>
+          <CardContent>
+            <p>Para gestionar ITRs, primero seleccione un proyecto de la lista desplegable en la parte superior.</p>
+          </CardContent>
         </Card>
       ) : (
         <>
@@ -257,7 +249,15 @@ const ITRs = () => {
             </div>
           </div>
 
-          {filteredITRs.length === 0 && !loading ? (
+          {loading ? (
+            <Card>
+              <CardContent className="py-10">
+                <div className="flex justify-center items-center">
+                  <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
+                </div>
+              </CardContent>
+            </Card>
+          ) : filteredITRs.length === 0 ? (
             <Card>
               <CardHeader>
                 <CardTitle>No hay ITRs</CardTitle>
