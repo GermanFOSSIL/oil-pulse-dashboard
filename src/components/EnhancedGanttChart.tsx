@@ -1,9 +1,9 @@
+
 import React, { useEffect, useRef, useState } from 'react';
 import { gantt } from 'dhtmlx-gantt';
 import 'dhtmlx-gantt/codebase/dhtmlxgantt.css';
 import { Button } from '@/components/ui/button';
-import { Card } from '@/components/ui/card';
-import { ChevronLeft, ChevronRight, Calendar, Search } from 'lucide-react';
+import { Download, ChevronLeft, ChevronRight, Calendar, Search } from 'lucide-react';
 import { format, addMonths, subMonths } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { 
@@ -13,6 +13,7 @@ import {
   SelectTrigger,
   SelectValue
 } from '@/components/ui/select';
+import * as XLSX from 'xlsx';
 
 interface GanttItem {
   id: string;
@@ -47,6 +48,45 @@ export const EnhancedGanttChart: React.FC<EnhancedGanttProps> = ({ data }) => {
 
   const goToToday = () => {
     setCurrentDate(new Date());
+  };
+
+  // Function to export Gantt data to Excel
+  const exportToExcel = () => {
+    try {
+      // Format data for export
+      const exportData = data.map(item => {
+        return {
+          'Tarea': item.task,
+          'Tipo': item.type || 'No definido',
+          'Inicio': item.start,
+          'Fin': item.end,
+          'Progreso (%)': item.progress,
+          'Estado': item.status || 'No definido'
+        };
+      });
+      
+      // Create workbook and add the data
+      const wb = XLSX.utils.book_new();
+      const ws = XLSX.utils.json_to_sheet(exportData);
+      
+      // Set column widths
+      const colWidths = [
+        { wch: 30 }, // Tarea
+        { wch: 15 }, // Tipo
+        { wch: 15 }, // Inicio
+        { wch: 15 }, // Fin
+        { wch: 15 }, // Progreso
+        { wch: 15 }, // Estado
+      ];
+      ws['!cols'] = colWidths;
+      
+      XLSX.utils.book_append_sheet(wb, ws, "Cronograma");
+      
+      // Generate Excel file and trigger download
+      XLSX.writeFile(wb, `Cronograma_${format(new Date(), 'yyyyMMdd')}.xlsx`);
+    } catch (error) {
+      console.error("Error exporting data to Excel:", error);
+    }
   };
 
   // Function to add today marker
@@ -135,26 +175,23 @@ export const EnhancedGanttChart: React.FC<EnhancedGanttProps> = ({ data }) => {
 
       // Personalizar apariencia de las barras según el tipo y estado
       gantt.templates.task_class = function(start, end, task) {
-        let typeClass = "";
-        
+        // First check the type
         if (task.type === "project") {
-          typeClass = "gantt-task-project";
+          return "gantt-task-project";
         } else if (task.type === "system") {
-          typeClass = "gantt-task-system";
+          return "gantt-task-system";
         } else if (task.type === "subsystem") {
-          typeClass = "gantt-task-subsystem";
+          return "gantt-task-subsystem";
         } else {
-          // ITRs
+          // For ITRs, check status
           if (task.status === "complete") {
             return "gantt-task-complete";
           } else if (task.status === "delayed") {
             return "gantt-task-delayed";
           } else {
-            return "gantt-task-inprogress";
+            return "gantt-task-itr"; // New class for ITRs
           }
         }
-        
-        return typeClass;
       };
       
       // Personalizar tooltip
@@ -224,7 +261,7 @@ export const EnhancedGanttChart: React.FC<EnhancedGanttProps> = ({ data }) => {
       
       configureTimeScale();
       
-      // Ajustar estilos CSS personalizados
+      // Ajustar estilos CSS personalizados - Updated colors
       const customStyles = `
         .gantt_task_line {
           border-radius: 4px;
@@ -247,17 +284,18 @@ export const EnhancedGanttChart: React.FC<EnhancedGanttProps> = ({ data }) => {
           margin-top: -1px;
         }
         .gantt-task-subsystem {
-          background-color: #0ea5e9;
-          border-color: #0284c7;
+          background-color: #22c55e;
+          border-color: #16a34a;
+          color: white;
+        }
+        .gantt-task-itr {
+          background-color: #f97316 !important;
+          border-color: #ea580c !important;
           color: white;
         }
         .gantt-task-complete {
           background-color: #10b981 !important;
           border-color: #059669 !important;
-        }
-        .gantt-task-inprogress {
-          background-color: #f59e0b !important;
-          border-color: #d97706 !important;
         }
         .gantt-task-delayed {
           background-color: #ef4444 !important;
@@ -427,6 +465,10 @@ export const EnhancedGanttChart: React.FC<EnhancedGanttProps> = ({ data }) => {
           <Button variant="outline" size="icon">
             <Search className="h-4 w-4" />
           </Button>
+          <Button variant="outline" onClick={exportToExcel}>
+            <Download className="h-4 w-4 mr-2" />
+            Exportar
+          </Button>
         </div>
       </div>
       
@@ -443,16 +485,12 @@ export const EnhancedGanttChart: React.FC<EnhancedGanttProps> = ({ data }) => {
               <span className="text-sm">Sistema</span>
             </div>
             <div className="flex items-center">
-              <div className="w-3 h-3 bg-sky-500 rounded-full mr-2"></div>
+              <div className="w-3 h-3 bg-green-500 rounded-full mr-2"></div>
               <span className="text-sm">Subsistema</span>
             </div>
             <div className="flex items-center">
-              <div className="w-3 h-3 bg-green-500 rounded-full mr-2"></div>
-              <span className="text-sm">Completado</span>
-            </div>
-            <div className="flex items-center">
-              <div className="w-3 h-3 bg-amber-500 rounded-full mr-2"></div>
-              <span className="text-sm">En curso</span>
+              <div className="w-3 h-3 bg-orange-500 rounded-full mr-2"></div>
+              <span className="text-sm">ITR</span>
             </div>
             <div className="flex items-center">
               <div className="w-3 h-3 bg-red-500 rounded-full mr-2"></div>

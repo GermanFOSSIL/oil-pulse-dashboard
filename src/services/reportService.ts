@@ -2,17 +2,14 @@
 import { supabase } from "@/integrations/supabase/client";
 import { jsPDF } from 'jspdf';
 import autoTable from 'jspdf-autotable';
+import * as XLSX from 'xlsx';
 
 const translateStatus = (status: string): string => {
   switch (status) {
-    case 'complete':
-      return 'Completado';
-    case 'inprogress':
-      return 'En Progreso';
-    case 'delayed':
-      return 'Retrasado';
-    default:
-      return status;
+    case 'complete': return 'Completado';
+    case 'inprogress': return 'En Progreso';
+    case 'delayed': return 'Retrasado';
+    default: return status;
   }
 };
 
@@ -90,7 +87,7 @@ export const generateReport = async (reportType: string, projectId: string | nul
       }
       
       case 'itrs': {
-        let itrsQuery = supabase.from('itrs').select('*, subsystems(name, system_id, systems:system_id(name, project_id, projects:project_id(name)))');
+        let itrsQuery = supabase.from('itrs').select('*, subsystems(name, system_id, systems:system_id(name, project_id, projects:project_id(name)))')
         
         if (projectId) {
           const { data: systems } = await supabase
@@ -140,7 +137,7 @@ export const generateReport = async (reportType: string, projectId: string | nul
       }
       
       case 'tasks': {
-        let tasksQuery = supabase.from('tasks').select('*, subsystems(name, system_id, systems:system_id(name, project_id, projects:project_id(name)))');
+        let tasksQuery = supabase.from('tasks').select('*, subsystems(name, system_id, systems:system_id(name, project_id, projects:project_id(name)))')
         
         if (projectId) {
           const { data: systems } = await supabase
@@ -214,164 +211,187 @@ export const generateReport = async (reportType: string, projectId: string | nul
       doc.text(`Estado: ${translateStatus(projectInfo.status)}`, 20, 60);
       doc.text(`Progreso: ${projectInfo.progress || 0}%`, 20, 66);
       
+      let startDate = 'No especificada';
       if (projectInfo.start_date) {
-        doc.text(`Fecha de inicio: ${new Date(projectInfo.start_date).toLocaleDateString('es-ES')}`, 20, 72);
+        startDate = new Date(projectInfo.start_date).toLocaleDateString('es-ES');
       }
       
+      let endDate = 'No especificada';
       if (projectInfo.end_date) {
-        doc.text(`Fecha de finalización: ${new Date(projectInfo.end_date).toLocaleDateString('es-ES')}`, 20, 78);
+        endDate = new Date(projectInfo.end_date).toLocaleDateString('es-ES');
       }
+      
+      doc.text(`Fecha inicio: ${startDate}`, 20, 72);
+      doc.text(`Fecha fin: ${endDate}`, 20, 78);
     }
     
     let yPos = projectInfo ? 90 : 40;
     
-    if (reportType === 'project_status') {
-      if (reportData.systems && reportData.systems.length > 0) {
-        doc.setFontSize(12);
-        doc.text('Sistemas', 14, yPos);
-        yPos += 10;
-        
-        const systemsData = reportData.systems.map((system: any) => [
-          system.name,
-          `${system.completion_rate || 0}%`,
-          system.start_date ? new Date(system.start_date).toLocaleDateString('es-ES') : '-',
-          system.end_date ? new Date(system.end_date).toLocaleDateString('es-ES') : '-'
-        ]);
-        
-        autoTable(doc, {
-          startY: yPos,
-          head: [['Nombre', 'Avance', 'Fecha Inicio', 'Fecha Fin']],
-          body: systemsData,
-        });
-        
-        yPos = (doc as any).lastAutoTable.finalY + 15;
-      }
-      
-      doc.setFontSize(12);
-      doc.text('Resumen de ITRs', 14, yPos);
-      yPos += 10;
-      
-      const summaryData = [
-        ['Total ITRs', reportData.summary.totalITRs.toString()],
-        ['Completados', reportData.summary.completedITRs.toString()],
-        ['En Progreso', reportData.summary.inProgressITRs.toString()],
-        ['Retrasados', reportData.summary.delayedITRs.toString()]
-      ];
-      
-      autoTable(doc, {
-        startY: yPos,
-        head: [['Estado', 'Cantidad']],
-        body: summaryData,
-      });
-    } else if (reportType === 'itrs') {
-      doc.setFontSize(12);
-      doc.text('Registros de Inspección (ITRs)', 14, yPos);
-      yPos += 10;
-      
-      if (reportData.itrs && reportData.itrs.length > 0) {
-        const itrsData = reportData.itrs.map((itr: any) => {
-          const subsystem = itr.subsystems;
-          const system = subsystem?.systems;
-          
-          return [
-            itr.name,
-            subsystem?.name || '-',
-            system?.name || '-',
-            translateStatus(itr.status),
-            `${itr.progress || 0}%`,
-            itr.assigned_to || '-',
-            itr.start_date ? new Date(itr.start_date).toLocaleDateString('es-ES') : '-',
-            itr.end_date ? new Date(itr.end_date).toLocaleDateString('es-ES') : '-'
-          ];
-        });
-        
-        autoTable(doc, {
-          startY: yPos,
-          head: [['ITR', 'Subsistema', 'Sistema', 'Estado', 'Progreso', 'Asignado a', 'Fecha Inicio', 'Fecha Fin']],
-          body: itrsData,
-          styles: { overflow: 'ellipsize', cellWidth: 'wrap' },
-          columnStyles: { 0: { cellWidth: 30 }, 1: { cellWidth: 30 }, 2: { cellWidth: 30 } }
-        });
-        
-        yPos = (doc as any).lastAutoTable.finalY + 15;
-      } else {
-        doc.setFontSize(10);
-        doc.text('No hay ITRs disponibles para este proyecto', 20, yPos);
-        yPos += 10;
-      }
-      
+    // Resumen
+    if (reportData.summary) {
       doc.setFontSize(12);
       doc.text('Resumen', 14, yPos);
-      yPos += 10;
+      yPos += 8;
       
-      const summaryData = [
-        ['Total ITRs', reportData.summary.totalITRs.toString()],
-        ['Completados', reportData.summary.completedITRs.toString()],
-        ['En Progreso', reportData.summary.inProgressITRs.toString()],
-        ['Retrasados', reportData.summary.delayedITRs.toString()]
-      ];
+      doc.setFontSize(10);
+      
+      if (reportData.summary.totalSystems !== undefined) {
+        doc.text(`Total de sistemas: ${reportData.summary.totalSystems}`, 20, yPos);
+        yPos += 6;
+      }
+      
+      if (reportData.summary.totalITRs !== undefined) {
+        doc.text(`Total de ITRs: ${reportData.summary.totalITRs}`, 20, yPos);
+        yPos += 6;
+      }
+      
+      if (reportData.summary.completedITRs !== undefined) {
+        doc.text(`ITRs completados: ${reportData.summary.completedITRs}`, 20, yPos);
+        yPos += 6;
+      }
+      
+      if (reportData.summary.inProgressITRs !== undefined) {
+        doc.text(`ITRs en progreso: ${reportData.summary.inProgressITRs}`, 20, yPos);
+        yPos += 6;
+      }
+      
+      if (reportData.summary.delayedITRs !== undefined) {
+        doc.text(`ITRs retrasados: ${reportData.summary.delayedITRs}`, 20, yPos);
+        yPos += 6;
+      }
+      
+      if (reportData.summary.totalTasks !== undefined) {
+        doc.text(`Total de tareas: ${reportData.summary.totalTasks}`, 20, yPos);
+        yPos += 6;
+      }
+      
+      yPos += 8;
+    }
+    
+    // Tabla de sistemas
+    if (reportData.systems && reportData.systems.length > 0) {
+      doc.setFontSize(12);
+      doc.text('Sistemas', 14, yPos);
+      yPos += 8;
+      
+      const systemsTableData = reportData.systems.map((system: any) => [
+        system.name,
+        translateStatus(system.status || 'inprogress'),
+        `${system.completion_rate || 0}%`,
+        system.start_date ? new Date(system.start_date).toLocaleDateString('es-ES') : 'N/A',
+        system.end_date ? new Date(system.end_date).toLocaleDateString('es-ES') : 'N/A'
+      ]);
       
       autoTable(doc, {
         startY: yPos,
-        head: [['Estado', 'Cantidad']],
-        body: summaryData,
+        head: [['Nombre', 'Estado', 'Progreso', 'Inicio', 'Fin']],
+        body: systemsTableData,
+        theme: 'striped',
+        styles: { fontSize: 8 },
+        headStyles: { fillColor: [41, 128, 185] }
       });
-    } else if (reportType === 'tasks') {
+      
+      yPos = (doc as any).lastAutoTable.finalY + 10;
+    }
+    
+    // Tabla de ITRs
+    if (reportData.itrs && reportData.itrs.length > 0) {
+      // Nueva página si es necesario
+      if (yPos > 220) {
+        doc.addPage();
+        yPos = 20;
+      }
+      
+      doc.setFontSize(12);
+      doc.text('ITRs', 14, yPos);
+      yPos += 8;
+      
+      const itrsTableData = reportData.itrs.map((itr: any) => {
+        const subsystemName = itr.subsystems ? itr.subsystems.name : 'N/A';
+        const systemName = itr.subsystems && itr.subsystems.systems ? itr.subsystems.systems.name : 'N/A';
+        
+        return [
+          itr.name,
+          subsystemName,
+          systemName,
+          translateStatus(itr.status),
+          `${itr.progress || 0}%`,
+          itr.start_date ? new Date(itr.start_date).toLocaleDateString('es-ES') : 'N/A',
+          itr.end_date ? new Date(itr.end_date).toLocaleDateString('es-ES') : 'N/A'
+        ];
+      });
+      
+      autoTable(doc, {
+        startY: yPos,
+        head: [['Nombre', 'Subsistema', 'Sistema', 'Estado', 'Progreso', 'Inicio', 'Fin']],
+        body: itrsTableData,
+        theme: 'striped',
+        styles: { fontSize: 8 },
+        headStyles: { fillColor: [41, 128, 185] }
+      });
+      
+      yPos = (doc as any).lastAutoTable.finalY + 10;
+    }
+    
+    // Tabla de tareas
+    if (reportData.tasks && reportData.tasks.length > 0) {
+      // Nueva página si es necesario
+      if (yPos > 220) {
+        doc.addPage();
+        yPos = 20;
+      }
+      
       doc.setFontSize(12);
       doc.text('Tareas', 14, yPos);
-      yPos += 10;
+      yPos += 8;
       
-      if (reportData.tasks && reportData.tasks.length > 0) {
-        const tasksData = reportData.tasks.map((task: any) => {
-          const subsystem = task.subsystems;
-          const system = subsystem?.systems;
-          
-          return [
-            task.name,
-            subsystem?.name || '-',
-            system?.name || '-',
-            translateStatus(task.status),
-            task.description || '-'
-          ];
-        });
+      const tasksTableData = reportData.tasks.map((task: any) => {
+        const subsystemName = task.subsystems ? task.subsystems.name : 'N/A';
+        const systemName = task.subsystems && task.subsystems.systems ? task.subsystems.systems.name : 'N/A';
         
-        autoTable(doc, {
-          startY: yPos,
-          head: [['Tarea', 'Subsistema', 'Sistema', 'Estado', 'Descripción']],
-          body: tasksData,
-          styles: { overflow: 'ellipsize', cellWidth: 'wrap' },
-          columnStyles: { 0: { cellWidth: 30 }, 4: { cellWidth: 50 } }
-        });
-        
-        yPos = (doc as any).lastAutoTable.finalY + 15;
-      } else {
-        doc.setFontSize(10);
-        doc.text('No hay tareas disponibles para este proyecto', 20, yPos);
-        yPos += 10;
-      }
-      
-      doc.setFontSize(12);
-      doc.text('Resumen', 14, yPos);
-      yPos += 10;
-      
-      const summaryData = [
-        ['Total Tareas', reportData.summary.totalTasks.toString()],
-        ['Completadas', reportData.summary.completedTasks.toString()],
-        ['En Progreso', reportData.summary.inProgressTasks.toString()],
-        ['Pendientes', reportData.summary.pendingTasks.toString()]
-      ];
+        return [
+          task.name,
+          subsystemName,
+          systemName,
+          translateStatus(task.status),
+          task.description || 'N/A'
+        ];
+      });
       
       autoTable(doc, {
         startY: yPos,
-        head: [['Estado', 'Cantidad']],
-        body: summaryData,
+        head: [['Nombre', 'Subsistema', 'Sistema', 'Estado', 'Descripción']],
+        body: tasksTableData,
+        theme: 'striped',
+        styles: { fontSize: 8 },
+        headStyles: { fillColor: [41, 128, 185] }
       });
     }
     
-    doc.save(fileName);
-    return fileName;
+    // Exportar a BLOB
+    const pdfBlob = doc.output('blob');
+    const url = URL.createObjectURL(pdfBlob);
+    return url;
   } catch (error) {
     console.error("Error al generar reporte:", error);
     throw error;
+  }
+};
+
+// Excel export function
+export const exportToExcel = (
+  data: any[],
+  sheetName: string = 'Sheet1',
+  fileName: string = 'export.xlsx'
+) => {
+  try {
+    const ws = XLSX.utils.json_to_sheet(data);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, sheetName);
+    XLSX.writeFile(wb, fileName);
+    return true;
+  } catch (error) {
+    console.error("Error exporting to Excel:", error);
+    return false;
   }
 };

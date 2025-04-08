@@ -5,13 +5,14 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Download, Upload } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import { generateImportTemplate, importDataFromExcel } from "@/services/supabaseService";
+import * as XLSX from 'xlsx';
+import { supabase } from "@/integrations/supabase/client";
+import { ITR, Subsystem, System, Project } from "@/services/types";
 
 interface ImportStats {
   projects: number;
   systems: number;
   subsystems: number;
-  tasks: number;
   itrs: number;
   users: number;
 }
@@ -22,6 +23,47 @@ export function DataImport() {
   const [importStats, setImportStats] = useState<ImportStats | null>(null);
   const [error, setError] = useState<string | null>(null);
 
+  const generateImportTemplate = () => {
+    // Create workbook with sheets for projects, systems, subsystems, and ITRs
+    const wb = XLSX.utils.book_new();
+    
+    // Projects sheet
+    const projectsData = [
+      ["name", "location", "status", "progress", "start_date", "end_date"],
+      ["Proyecto Ejemplo", "Ubicación ejemplo", "inprogress", 50, "2023-01-01", "2023-12-31"]
+    ];
+    const projectsWs = XLSX.utils.aoa_to_sheet(projectsData);
+    XLSX.utils.book_append_sheet(wb, projectsWs, "Proyectos");
+    
+    // Systems sheet
+    const systemsData = [
+      ["name", "project_id", "completion_rate", "start_date", "end_date"],
+      ["Sistema Ejemplo", "ID_PROYECTO", 40, "2023-01-15", "2023-11-30"]
+    ];
+    const systemsWs = XLSX.utils.aoa_to_sheet(systemsData);
+    XLSX.utils.book_append_sheet(wb, systemsWs, "Sistemas");
+    
+    // Subsystems sheet
+    const subsystemsData = [
+      ["name", "system_id", "completion_rate", "start_date", "end_date"],
+      ["Subsistema Ejemplo", "ID_SISTEMA", 30, "2023-02-01", "2023-10-31"]
+    ];
+    const subsystemsWs = XLSX.utils.aoa_to_sheet(subsystemsData);
+    XLSX.utils.book_append_sheet(wb, subsystemsWs, "Subsistemas");
+    
+    // ITRs sheet
+    const itrsData = [
+      ["name", "subsystem_id", "status", "progress", "assigned_to", "start_date", "end_date"],
+      ["ITR Ejemplo", "ID_SUBSISTEMA", "inprogress", 25, "Técnico ejemplo", "2023-03-01", "2023-09-30"]
+    ];
+    const itrsWs = XLSX.utils.aoa_to_sheet(itrsData);
+    XLSX.utils.book_append_sheet(wb, itrsWs, "ITRs");
+    
+    // Generate buffer
+    const wbout = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
+    return wbout;
+  };
+
   const downloadTemplate = async () => {
     try {
       setError(null);
@@ -30,8 +72,8 @@ export function DataImport() {
         description: "Preparando plantilla de importación...",
       });
       
-      // Generar el template usando la función del servicio
-      const buffer = await generateImportTemplate();
+      // Generar el template
+      const buffer = generateImportTemplate();
       
       // Convertir a Blob
       const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
@@ -63,6 +105,158 @@ export function DataImport() {
     }
   };
 
+  const importDataFromExcel = async (data: ArrayBuffer): Promise<ImportStats> => {
+    try {
+      const wb = XLSX.read(data, { type: 'array' });
+      
+      // Process Projects
+      let projectsCount = 0;
+      if (wb.SheetNames.includes('Proyectos')) {
+        const projectsSheet = wb.Sheets['Proyectos'];
+        const projectsData = XLSX.utils.sheet_to_json(projectsSheet);
+        
+        for (const row of projectsData) {
+          const project = row as any;
+          if (project.name) {
+            const { error } = await supabase
+              .from('projects')
+              .insert({
+                name: project.name,
+                location: project.location || null,
+                status: project.status || 'inprogress',
+                progress: project.progress || 0,
+                start_date: project.start_date || null,
+                end_date: project.end_date || null
+              });
+              
+            if (!error) projectsCount++;
+          }
+        }
+      }
+      
+      // Get the latest projects to use their IDs
+      const { data: latestProjects } = await supabase
+        .from('projects')
+        .select('*')
+        .order('created_at', { ascending: false })
+        .limit(projectsCount || 1);
+      
+      // Process Systems
+      let systemsCount = 0;
+      if (wb.SheetNames.includes('Sistemas') && latestProjects?.length) {
+        const systemsSheet = wb.Sheets['Sistemas'];
+        const systemsData = XLSX.utils.sheet_to_json(systemsSheet);
+        
+        for (const row of systemsData) {
+          const system = row as any;
+          if (system.name) {
+            // Use the first project's ID if project_id is not specified
+            const projectId = system.project_id && system.project_id !== 'ID_PROYECTO' 
+              ? system.project_id 
+              : latestProjects[0].id;
+              
+            const { error } = await supabase
+              .from('systems')
+              .insert({
+                name: system.name,
+                project_id: projectId,
+                completion_rate: system.completion_rate || 0,
+                start_date: system.start_date || null,
+                end_date: system.end_date || null
+              });
+              
+            if (!error) systemsCount++;
+          }
+        }
+      }
+      
+      // Get the latest systems to use their IDs
+      const { data: latestSystems } = await supabase
+        .from('systems')
+        .select('*')
+        .order('created_at', { ascending: false })
+        .limit(systemsCount || 1);
+      
+      // Process Subsystems
+      let subsystemsCount = 0;
+      if (wb.SheetNames.includes('Subsistemas') && latestSystems?.length) {
+        const subsystemsSheet = wb.Sheets['Subsistemas'];
+        const subsystemsData = XLSX.utils.sheet_to_json(subsystemsSheet);
+        
+        for (const row of subsystemsData) {
+          const subsystem = row as any;
+          if (subsystem.name) {
+            // Use the first system's ID if system_id is not specified
+            const systemId = subsystem.system_id && subsystem.system_id !== 'ID_SISTEMA' 
+              ? subsystem.system_id 
+              : latestSystems[0].id;
+              
+            const { error } = await supabase
+              .from('subsystems')
+              .insert({
+                name: subsystem.name,
+                system_id: systemId,
+                completion_rate: subsystem.completion_rate || 0,
+                start_date: subsystem.start_date || null,
+                end_date: subsystem.end_date || null
+              });
+              
+            if (!error) subsystemsCount++;
+          }
+        }
+      }
+      
+      // Get the latest subsystems to use their IDs
+      const { data: latestSubsystems } = await supabase
+        .from('subsystems')
+        .select('*')
+        .order('created_at', { ascending: false })
+        .limit(subsystemsCount || 1);
+      
+      // Process ITRs
+      let itrsCount = 0;
+      if (wb.SheetNames.includes('ITRs') && latestSubsystems?.length) {
+        const itrsSheet = wb.Sheets['ITRs'];
+        const itrsData = XLSX.utils.sheet_to_json(itrsSheet);
+        
+        for (const row of itrsData) {
+          const itr = row as any;
+          if (itr.name) {
+            // Use the first subsystem's ID if subsystem_id is not specified
+            const subsystemId = itr.subsystem_id && itr.subsystem_id !== 'ID_SUBSISTEMA' 
+              ? itr.subsystem_id 
+              : latestSubsystems[0].id;
+              
+            const { error } = await supabase
+              .from('itrs')
+              .insert({
+                name: itr.name,
+                subsystem_id: subsystemId,
+                status: itr.status || 'inprogress',
+                progress: itr.progress || 0,
+                assigned_to: itr.assigned_to || null,
+                start_date: itr.start_date || null,
+                end_date: itr.end_date || null
+              });
+              
+            if (!error) itrsCount++;
+          }
+        }
+      }
+      
+      return {
+        projects: projectsCount,
+        systems: systemsCount,
+        subsystems: subsystemsCount,
+        itrs: itrsCount,
+        users: 0  // Users are not imported in this version
+      };
+    } catch (error) {
+      console.error("Error procesando el archivo Excel:", error);
+      throw error;
+    }
+  };
+
   const handleFileImport = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file) return;
@@ -85,24 +279,14 @@ export function DataImport() {
             throw new Error("Error al leer el archivo");
           }
           
-          const data = new Uint8Array(e.target.result as ArrayBuffer);
+          const data = e.target.result as ArrayBuffer;
           
           console.log("Archivo cargado, procesando importación...");
           
-          // Usar la función del servicio para procesar la importación
-          const stats = await importDataFromExcel();
+          // Procesar la importación
+          const stats = await importDataFromExcel(data);
           
           console.log("Importación completada con estadísticas:", stats);
-          
-          // Establecer estadísticas para mostrar (definimos valores por defecto)
-          const importedStats: ImportStats = {
-            projects: 0,
-            systems: 0,
-            subsystems: 0,
-            tasks: 0,
-            itrs: 0,
-            users: 0
-          };
           
           // Mostrar mensaje de éxito
           toast({
@@ -110,7 +294,7 @@ export function DataImport() {
             description: `Se han importado datos correctamente.`,
           });
           
-          setImportStats(importedStats);
+          setImportStats(stats);
           
         } catch (err: any) {
           console.error("Error procesando archivo:", err);
@@ -193,7 +377,6 @@ export function DataImport() {
               <li>Proyectos: {importStats.projects}</li>
               <li>Sistemas: {importStats.systems}</li>
               <li>Subsistemas: {importStats.subsystems}</li>
-              <li>Tareas: {importStats.tasks}</li>
               <li>ITRs: {importStats.itrs}</li>
               <li>Usuarios: {importStats.users}</li>
             </ul>
