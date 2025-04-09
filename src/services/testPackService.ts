@@ -118,7 +118,30 @@ export const deleteTestPack = async (id: string): Promise<boolean> => {
   try {
     console.log(`Deleting Test Pack with id ${id}`);
     
-    // First delete all related tags to avoid foreign key constraints
+    // First, get the test pack details for logging
+    const { data: testPackData } = await supabase
+      .from('test_packs')
+      .select('*')
+      .eq('id', id)
+      .single();
+      
+    if (!testPackData) {
+      console.error(`Test Pack with id ${id} not found`);
+      return false;
+    }
+    
+    // First delete all related entries in acciones_log to avoid foreign key constraints
+    const { error: accionesLogError } = await supabase
+      .from('acciones_log')
+      .delete()
+      .in('tag_id', supabase.from('tags').select('id').eq('test_pack_id', id));
+      
+    if (accionesLogError) {
+      console.error(`Error deleting related acciones_log entries for Test Pack ${id}:`, accionesLogError);
+      throw accionesLogError;
+    }
+    
+    // Now delete the tags
     const { error: tagsError } = await supabase
       .from('tags')
       .delete()
@@ -129,7 +152,7 @@ export const deleteTestPack = async (id: string): Promise<boolean> => {
       throw tagsError;
     }
     
-    // Now delete the test pack
+    // Finally delete the test pack
     const { error } = await supabase
       .from('test_packs')
       .delete()
@@ -140,14 +163,14 @@ export const deleteTestPack = async (id: string): Promise<boolean> => {
       throw error;
     }
 
-    console.log("Test Pack and associated tags deleted successfully");
+    console.log("Test Pack and associated data deleted successfully");
     
     // Log the activity
     await supabase.from('db_activity_log').insert({
       table_name: 'test_packs',
       action: 'DELETE',
       record_id: id,
-      details: { test_pack_id: id }
+      details: { test_pack_id: id, test_pack_name: testPackData.nombre_paquete }
     });
     
     return true;
