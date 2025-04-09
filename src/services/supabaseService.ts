@@ -1,4 +1,3 @@
-
 import { supabase } from "@/integrations/supabase/client";
 import { getUserProfile } from "./userService";
 import { getUserPermissions } from "./userPermissionService";
@@ -57,10 +56,17 @@ export const getProjects = async (): Promise<Project[]> => {
     throw error;
   }
 
-  return data || [];
+  return (data || []).map(item => ({
+    ...item,
+    status: item.status as "complete" | "inprogress" | "delayed"
+  })) as Project[];
 };
 
 export const createProject = async (project: Partial<Project>): Promise<Project> => {
+  if (!project.name) {
+    throw new Error("Project name is required");
+  }
+
   const { data, error } = await supabase
     .from("projects")
     .insert(project)
@@ -72,7 +78,10 @@ export const createProject = async (project: Partial<Project>): Promise<Project>
     throw error;
   }
 
-  return data;
+  return {
+    ...data,
+    status: data.status as "complete" | "inprogress" | "delayed"
+  } as Project;
 };
 
 export const updateProject = async (id: string, project: Partial<Project>): Promise<Project> => {
@@ -88,7 +97,10 @@ export const updateProject = async (id: string, project: Partial<Project>): Prom
     throw error;
   }
 
-  return data;
+  return {
+    ...data,
+    status: data.status as "complete" | "inprogress" | "delayed"
+  } as Project;
 };
 
 export const deleteProject = async (id: string): Promise<void> => {
@@ -134,6 +146,10 @@ export const getSystemsByProjectId = async (projectId: string): Promise<System[]
 };
 
 export const createSystem = async (system: Partial<System>): Promise<System> => {
+  if (!system.name || !system.project_id) {
+    throw new Error("System name and project_id are required");
+  }
+
   const { data, error } = await supabase
     .from("systems")
     .insert(system)
@@ -207,6 +223,10 @@ export const getSubsystemsBySystemId = async (systemId: string): Promise<Subsyst
 };
 
 export const createSubsystem = async (subsystem: Partial<Subsystem>): Promise<Subsystem> => {
+  if (!subsystem.name || !subsystem.system_id) {
+    throw new Error("Subsystem name and system_id are required");
+  }
+
   const { data, error } = await supabase
     .from("subsystems")
     .insert(subsystem)
@@ -261,10 +281,17 @@ export const getITRs = async (): Promise<ITR[]> => {
     throw error;
   }
 
-  return data || [];
+  return (data || []).map(item => ({
+    ...item,
+    status: item.status as "complete" | "inprogress" | "delayed"
+  })) as ITR[];
 };
 
 export const createITR = async (itr: Partial<ITR>): Promise<ITR> => {
+  if (!itr.name || !itr.subsystem_id) {
+    throw new Error("ITR name and subsystem_id are required");
+  }
+
   const { data, error } = await supabase
     .from("itrs")
     .insert(itr)
@@ -276,7 +303,10 @@ export const createITR = async (itr: Partial<ITR>): Promise<ITR> => {
     throw error;
   }
 
-  return data;
+  return {
+    ...data,
+    status: data.status as "complete" | "inprogress" | "delayed"
+  } as ITR;
 };
 
 export const updateITR = async (id: string, itr: Partial<ITR>): Promise<ITR> => {
@@ -292,7 +322,10 @@ export const updateITR = async (id: string, itr: Partial<ITR>): Promise<ITR> => 
     throw error;
   }
 
-  return data;
+  return {
+    ...data,
+    status: data.status as "complete" | "inprogress" | "delayed"
+  } as ITR;
 };
 
 export const deleteITR = async (id: string): Promise<void> => {
@@ -470,9 +503,11 @@ export const getTestPacks = async (): Promise<TestPack[]> => {
     throw error;
   }
 
-  return data || [];
+  return (data || []).map(item => ({
+    ...item,
+    estado: item.estado as "pendiente" | "listo"
+  })) as TestPack[];
 };
 
 // Re-export functions from other services
 export { getUserProfile, getUserPermissions };
-
