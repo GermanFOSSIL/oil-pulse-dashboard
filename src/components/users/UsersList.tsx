@@ -1,5 +1,5 @@
 
-import { useState, memo } from "react";
+import { memo } from "react";
 import { User } from "@supabase/supabase-js";
 import { UserProfile } from "@/services/userService";
 import { 
@@ -64,6 +64,7 @@ const UsersList = memo(({ users, onEdit, onDelete, onResetPassword }: UsersListP
       </TableHeader>
       <TableBody>
         {users.map(user => {
+          // Try to get email from multiple sources, using fallbacks
           const email = user.email || user.profile?.email || 'Email no disponible';
           const name = user.profile?.full_name || '-';
           

@@ -1,4 +1,3 @@
-
 import { supabase } from "@/integrations/supabase/client";
 import { BulkUserData, UserCreateData, UserUpdateData, PasswordChangeData } from "@/services/types";
 
@@ -24,7 +23,7 @@ export interface UserProfile {
   permissions?: string[];
   created_at?: string;
   updated_at?: string;
-  email?: string; // Add email property to fix TypeScript error
+  email?: string; // Add email property to fix TypeScript errors
 }
 
 export const getUserProfile = async (userId: string): Promise<UserProfile | null> => {
@@ -44,7 +43,7 @@ export const getUserProfile = async (userId: string): Promise<UserProfile | null
     }
 
     // Now get the user email from auth if possible
-    const { data: userData, error: userError } = await supabase.auth.getUser(userId);
+    const { data: userData, error: userError } = await supabase.auth.admin.getUserById(userId);
     
     let userEmail = null;
     if (!userError && userData?.user) {
@@ -94,39 +93,32 @@ export const getUserProfiles = async (): Promise<UserProfile[]> => {
     }
 
     // Get all auth users to match with profiles
-    const { data: authData, error: authError } = await supabase.auth.getUser();
+    const { data: { users: authUsers }, error: authError } = await supabase.auth.admin.listUsers();
     
     if (authError) {
-      console.error('Error fetching auth data:', authError);
+      console.error('Error fetching auth users:', authError);
     }
     
-    const currentUserId = authData?.user?.id;
+    // Create a map of user IDs to emails for faster lookup
+    const userEmailMap: Record<string, string> = {};
+    if (authUsers) {
+      authUsers.forEach(user => {
+        if (user.email) {
+          userEmailMap[user.id] = user.email;
+        }
+      });
+    }
     
     // For each profile, try to get the email
-    const enhancedProfiles = await Promise.all(profiles.map(async (profile) => {
-      try {
-        // If this is the current user, we can use the email from auth data
-        if (profile.id === currentUserId && authData?.user?.email) {
-          return {
-            ...profile,
-            email: authData.user.email,
-          };
-        }
-        
-        // For other users, try to get email from database
-        // We'll store the email in the profile during creation/update operations
-        return {
-          ...profile,
-          email: profile.email || 'Email no disponible',
-        };
-      } catch (error) {
-        console.error(`Error enhancing profile for user ${profile.id}:`, error);
-        return {
-          ...profile,
-          email: 'Email no disponible',
-        };
-      }
-    }));
+    const enhancedProfiles = profiles.map(profile => {
+      // Try to get email from auth users map
+      const email = userEmailMap[profile.id] || profile.email || 'Email no disponible';
+      
+      return {
+        ...profile,
+        email
+      };
+    });
 
     return enhancedProfiles as UserProfile[];
   } catch (error) {
@@ -146,9 +138,18 @@ export const updateUserProfile = async (userId: string, updates: Partial<UserPro
   console.log(`Updating profile for user ${userId} with:`, updates);
   
   try {
+    // Make sure we're only sending valid columns to the database
+    const validUpdates: Partial<UserProfile> = {
+      full_name: updates.full_name,
+      avatar_url: updates.avatar_url,
+      role: updates.role,
+      permissions: updates.permissions,
+      email: updates.email, // Include email in valid updates
+    };
+    
     const { data, error } = await supabase
       .from('profiles')
-      .update(updates)
+      .update(validUpdates)
       .eq('id', userId)
       .select();
 
@@ -235,13 +236,12 @@ export const createUser = async (userData: UserCreateData): Promise<{ success: b
     console.log("Creating user with data:", {...userData, password: '******'});
     
     // Use the standard auth.signUp method with email and password
-    const { data: authData, error: authError } = await supabase.auth.signUp({
+    const { data: authData, error: authError } = await supabase.auth.admin.createUser({
       email: userData.email,
       password: userData.password,
-      options: {
-        data: {
-          full_name: userData.full_name,
-        }
+      email_confirm: true,
+      user_metadata: {
+        full_name: userData.full_name,
       }
     });
 
@@ -260,25 +260,13 @@ export const createUser = async (userData: UserCreateData): Promise<{ success: b
     const userId = authData.user.id;
     console.log("User created with ID:", userId);
 
-    // Update the profile with additional information
-    const profileData: UserUpdateData = {
+    // Update the profile with additional information including email
+    const profileData = {
       full_name: userData.full_name,
       role: userData.role || 'user',
       email: userData.email, // Store email in profile for easier access
+      permissions: userData.permissions || getDefaultPermissions(userData.role || 'user')
     };
-
-    if (userData.permissions) {
-      profileData.permissions = userData.permissions;
-    } else {
-      // Set default permissions based on role
-      if (userData.role === 'admin') {
-        profileData.permissions = [...AVAILABLE_PERMISSIONS];
-      } else if (userData.role === 'tecnico') {
-        profileData.permissions = ['dashboard', 'reports', 'itrs'];
-      } else {
-        profileData.permissions = ['dashboard', 'reports'];
-      }
-    }
 
     console.log("Updating profile with data:", profileData);
     
@@ -303,7 +291,7 @@ export const createUser = async (userData: UserCreateData): Promise<{ success: b
 
     return { 
       success: true, 
-      message: "Usuario creado exitosamente. El usuario debe confirmar su correo electrónico.", 
+      message: "Usuario creado exitosamente", 
       userId 
     };
   } catch (error: any) {
@@ -312,6 +300,16 @@ export const createUser = async (userData: UserCreateData): Promise<{ success: b
       success: false, 
       message: `Error al crear usuario: ${error.message || "Error desconocido"}` 
     };
+  }
+};
+
+const getDefaultPermissions = (role: string): string[] => {
+  if (role === 'admin') {
+    return [...AVAILABLE_PERMISSIONS];
+  } else if (role === 'tecnico') {
+    return ['dashboard', 'reports', 'itrs'];
+  } else {
+    return ['dashboard', 'reports'];
   }
 };
 
