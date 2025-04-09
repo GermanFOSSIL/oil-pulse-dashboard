@@ -5,7 +5,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { useTestPacks } from "@/hooks/useTestPacks";
-import { PlusCircle, Search, FileSpreadsheet, Filter, AlertTriangle, RefreshCw } from "lucide-react";
+import { PlusCircle, Search, FileSpreadsheet, Filter, AlertTriangle, RefreshCw, FilePdf, FileDown } from "lucide-react";
 import TestPackList from "@/components/testpack/TestPackList";
 import TestPackStats from "@/components/testpack/TestPackStats";
 import TestPackFormModal from "@/components/testpack/TestPackFormModal";
@@ -13,39 +13,94 @@ import BatchUploadModal from "@/components/testpack/BatchUploadModal";
 import { DatabaseActivityTimeline } from "@/components/DatabaseActivityTimeline";
 import TestPackSkeleton from "@/components/testpack/TestPackSkeleton";
 import ErrorBoundary from "@/components/ErrorBoundary";
+import { useTimeout } from "@/hooks/useTimeout";
+import { generateReport } from "@/services/reportService";
+import { useToast } from "@/hooks/use-toast";
+import { exportToExcel } from "@/services/reportService";
 
 const TestPacks = () => {
   const { testPacks, loading, error, statsData, fetchTestPacks } = useTestPacks();
   const [searchTerm, setSearchTerm] = useState("");
   const [isFormModalOpen, setIsFormModalOpen] = useState(false);
   const [isBatchUploadModalOpen, setIsBatchUploadModalOpen] = useState(false);
-  const [showTimeoutError, setShowTimeoutError] = useState(false);
+  const [isExporting, setIsExporting] = useState(false);
+  const { toast } = useToast();
   
-  // Verificar timeout de carga
+  const { isTimedOut, startTimeout, cancelTimeout } = useTimeout(20000);
+  
+  // Iniciar el timeout cuando comienza la carga
   useEffect(() => {
-    let timer: number;
     if (loading) {
-      timer = window.setTimeout(() => {
-        setShowTimeoutError(true);
-      }, 20000); // 20 segundos
+      startTimeout();
+    } else {
+      cancelTimeout();
     }
-    
-    return () => {
-      if (timer) window.clearTimeout(timer);
-    };
-  }, [loading]);
+  }, [loading, startTimeout, cancelTimeout]);
   
   const filteredTestPacks = testPacks.filter(
     (testPack) => testPack.nombre_paquete.toLowerCase().includes(searchTerm.toLowerCase())
   );
   
   const handleRetry = () => {
-    setShowTimeoutError(false);
+    cancelTimeout();
     fetchTestPacks();
   };
   
+  const handleExportPDF = async () => {
+    try {
+      setIsExporting(true);
+      const pdfUrl = await generateReport('project_status');
+      // Abrir PDF en nueva pestaña
+      window.open(pdfUrl, '_blank');
+      toast({
+        title: "PDF generado exitosamente",
+        description: "El reporte se ha abierto en una nueva pestaña",
+      });
+    } catch (error) {
+      console.error("Error al generar PDF:", error);
+      toast({
+        title: "Error",
+        description: "No se pudo generar el reporte PDF",
+        variant: "destructive",
+      });
+    } finally {
+      setIsExporting(false);
+    }
+  };
+  
+  const handleExportExcel = () => {
+    try {
+      setIsExporting(true);
+      
+      // Preparar datos para Excel
+      const testPacksForExcel = testPacks.map(tp => ({
+        Nombre: tp.nombre_paquete,
+        ITR: tp.itr_asociado,
+        Sistema: tp.sistema,
+        Subsistema: tp.subsistema,
+        Estado: tp.estado
+      }));
+      
+      exportToExcel(testPacksForExcel, 'Test_Packs', 'test_packs_export.xlsx');
+      
+      toast({
+        title: "Excel generado exitosamente",
+        description: "El archivo se ha descargado",
+      });
+    } catch (error) {
+      console.error("Error al generar Excel:", error);
+      toast({
+        title: "Error",
+        description: "No se pudo generar el archivo Excel",
+        variant: "destructive",
+      });
+    } finally {
+      setIsExporting(false);
+    }
+  };
+  
   // Mostrar mensaje de error si hay un problema o si tarda demasiado
-  if ((error || showTimeoutError) && !loading) {
+  if ((error || isTimedOut) && !loading) {
     return (
       <div className="space-y-6">
         <div className="flex flex-col lg:flex-row justify-between gap-4">
@@ -128,6 +183,29 @@ const TestPacks = () => {
           </div>
 
           <TabsContent value="list" className="space-y-4">
+            <div className="flex justify-end space-x-2 mb-4">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleExportExcel}
+                disabled={isExporting || loading || testPacks.length === 0}
+                className="gap-2"
+              >
+                <FileDown className="h-4 w-4" />
+                Excel
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleExportPDF}
+                disabled={isExporting || loading || testPacks.length === 0}
+                className="gap-2"
+              >
+                <FilePdf className="h-4 w-4" />
+                PDF
+              </Button>
+            </div>
+            
             {loading ? (
               <TestPackSkeleton />
             ) : (
@@ -140,6 +218,29 @@ const TestPacks = () => {
           </TabsContent>
 
           <TabsContent value="dashboard" className="space-y-4">
+            <div className="flex justify-end space-x-2 mb-4">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleExportExcel}
+                disabled={isExporting || loading || testPacks.length === 0}
+                className="gap-2"
+              >
+                <FileDown className="h-4 w-4" />
+                Excel
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleExportPDF}
+                disabled={isExporting || loading || testPacks.length === 0}
+                className="gap-2"
+              >
+                <FilePdf className="h-4 w-4" />
+                PDF
+              </Button>
+            </div>
+            
             <TestPackStats statsData={statsData} />
           </TabsContent>
 

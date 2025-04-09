@@ -26,14 +26,14 @@ export const useTimeout = (initialTimeoutMs = 30000) => {
       setIsWaiting(false);
     }, customTimeoutMs || initialTimeoutMs);
     
-    setTimer(timeoutId);
+    setTimer(Number(timeoutId));
     
     return () => {
       if (timeoutId) {
         window.clearTimeout(timeoutId);
       }
     };
-  }, [initialTimeoutMs]);
+  }, [initialTimeoutMs, timer]);
 
   const cancelTimeout = useCallback(() => {
     if (timer) {
@@ -46,8 +46,8 @@ export const useTimeout = (initialTimeoutMs = 30000) => {
 
   const resetTimeout = useCallback(() => {
     cancelTimeout();
-    setIsTimedOut(false);
-  }, [cancelTimeout]);
+    startTimeout();
+  }, [cancelTimeout, startTimeout]);
 
   // Clean up on unmount
   useEffect(() => {

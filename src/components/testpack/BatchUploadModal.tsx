@@ -14,6 +14,7 @@ import { useTestPacks } from "@/hooks/useTestPacks";
 import { FileSpreadsheet, Upload, AlertCircle, CheckCircle2, X } from "lucide-react";
 import * as XLSX from 'xlsx';
 import { TestPack, Tag } from "@/services/types";
+import { useTimeout } from "@/hooks/useTimeout";
 
 interface BatchUploadModalProps {
   isOpen: boolean;
@@ -35,6 +36,8 @@ const BatchUploadModal = ({ isOpen, onClose, onSuccess }: BatchUploadModalProps)
     testPacks: number;
     tags: number;
   } | null>(null);
+  
+  const { isTimedOut, startTimeout, cancelTimeout } = useTimeout(30000);
   
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const selectedFile = e.target.files?.[0];
@@ -102,6 +105,8 @@ const BatchUploadModal = ({ isOpen, onClose, onSuccess }: BatchUploadModalProps)
     if (!file) return;
     
     setIsLoading(true);
+    startTimeout();
+    
     try {
       const reader = new FileReader();
       
@@ -118,30 +123,66 @@ const BatchUploadModal = ({ isOpen, onClose, onSuccess }: BatchUploadModalProps)
           const tagsSheet = workbook.Sheets['TAGs'];
           const tagsRawData = XLSX.utils.sheet_to_json(tagsSheet);
           
+          console.log("Test Packs raw data:", testPacksRawData);
+          console.log("Tags raw data:", tagsRawData);
+          
           // Process and validate test packs data
-          const testPacksData: Omit<TestPack, "id" | "created_at" | "updated_at">[] = testPacksRawData.map((row: any) => ({
+          const testPacksData: Omit<TestPack, "id" | "created_at" | "updated_at">[] = testPacksRawData.map((row: any, index: number) => ({
             nombre_paquete: row.nombre_paquete || `Test Pack ${Math.random().toString(36).substring(2, 7)}`,
             itr_asociado: row.itr_asociado || '',
             sistema: row.sistema || '',
             subsistema: row.subsistema || '',
-            estado: 'pendiente' as const // Explicitly type as 'pendiente'
-          })).filter((tp: any) => tp.itr_asociado && tp.sistema && tp.subsistema);
+            estado: 'pendiente' as const
+          })).filter((tp: any) => tp.nombre_paquete);
           
-          // Process tags data with index to its related test pack
+          // Fix the tag processing to properly map to test packs
+          // We'll create a mapping of test pack names for reference
+          const testPacksMapping = testPacksData.map((tp, index) => ({
+            index,
+            nombre_paquete: tp.nombre_paquete
+          }));
+          
+          console.log("Test Packs mapping:", testPacksMapping);
+          
+          // Process tags data and handle missing or invalid references
           const tagsData = tagsRawData.map((row: any) => {
-            // Find the index of the test pack this tag belongs to
-            const testPackIndex = testPacksData.findIndex((tp: any, index: number) => {
-              const testPackIdInFile = row.test_pack_id;
-              // If it's a number, treat it as an index (for example, 1, 2, 3...)
-              if (typeof testPackIdInFile === 'number') {
-                return index === testPackIdInFile - 1; // Adjust for 0-based indexing
+            // Get test pack reference either by ID or by name
+            const testPackRef = row.test_pack_id || row.test_pack_nombre;
+            
+            if (!testPackRef) {
+              console.warn(`TAG ${row.tag_name} no tiene referencia a Test Pack`);
+              return null;
+            }
+            
+            // Find the test pack index by reference
+            let testPackIndex = -1;
+            
+            // Try to find by numerical ID (adjusted for 0-based indexing)
+            if (typeof testPackRef === 'number') {
+              // Adjust for Excel 1-based indexing
+              testPackIndex = testPackRef - 1;
+              
+              // Validate the index is in range
+              if (testPackIndex < 0 || testPackIndex >= testPacksData.length) {
+                console.warn(`TAG ${row.tag_name} - Test Pack ID ${testPackRef} fuera de rango`);
+                testPackIndex = -1;
               }
-              // If it's a string, match by nombre_paquete
-              return tp.nombre_paquete === testPackIdInFile;
-            });
+            } 
+            // Try to find by name
+            else if (typeof testPackRef === 'string') {
+              const matchedTP = testPacksMapping.find(tp => 
+                tp.nombre_paquete.toLowerCase() === testPackRef.toLowerCase()
+              );
+              
+              if (matchedTP) {
+                testPackIndex = matchedTP.index;
+              } else {
+                console.warn(`TAG ${row.tag_name} - No se encontró Test Pack con nombre "${testPackRef}"`);
+              }
+            }
             
             if (testPackIndex === -1) {
-              console.warn(`No se encontró Test Pack para TAG ${row.tag_name}`);
+              console.warn(`No se pudo asociar TAG ${row.tag_name} con ningún Test Pack`);
               return null;
             }
             
@@ -155,16 +196,21 @@ const BatchUploadModal = ({ isOpen, onClose, onSuccess }: BatchUploadModalProps)
             };
           }).filter(Boolean);
           
+          console.log("Processed tags data:", tagsData);
+          
           // Create test packs and tags in database
           const result = await bulkCreateData(testPacksData, tagsData);
           
           if (result) {
+            console.log("Bulk creation successful:", result);
+            cancelTimeout();
             onSuccess();
           }
         } catch (error) {
           console.error("Error processing Excel data:", error);
           setErrorMessage(error instanceof Error ? error.message : "Error al procesar los datos del archivo Excel.");
           setFileStatus('error');
+          cancelTimeout();
         } finally {
           setIsLoading(false);
         }
@@ -174,6 +220,7 @@ const BatchUploadModal = ({ isOpen, onClose, onSuccess }: BatchUploadModalProps)
         setErrorMessage("Error al leer el archivo.");
         setFileStatus('error');
         setIsLoading(false);
+        cancelTimeout();
       };
       
       reader.readAsBinaryString(file);
@@ -182,13 +229,43 @@ const BatchUploadModal = ({ isOpen, onClose, onSuccess }: BatchUploadModalProps)
       setErrorMessage(error instanceof Error ? error.message : "Error en la carga masiva.");
       setFileStatus('error');
       setIsLoading(false);
+      cancelTimeout();
     }
   };
   
   const handleClose = () => {
     resetFileInput();
+    cancelTimeout();
     onClose();
   };
+
+  // Show timeout error
+  if (isTimedOut) {
+    return (
+      <Dialog open={isOpen} onOpenChange={(open) => !open && handleClose()}>
+        <DialogContent className="sm:max-w-[500px]">
+          <DialogHeader>
+            <DialogTitle>Error de Tiempo de Espera</DialogTitle>
+            <DialogDescription>
+              La operación está tomando demasiado tiempo. Por favor, intente con menos datos o más tarde.
+            </DialogDescription>
+          </DialogHeader>
+          <Alert variant="destructive">
+            <AlertCircle className="h-4 w-4" />
+            <AlertTitle>Tiempo de espera agotado</AlertTitle>
+            <AlertDescription>
+              La carga masiva ha excedido el tiempo máximo de espera.
+            </AlertDescription>
+          </Alert>
+          <DialogFooter>
+            <Button type="button" onClick={handleClose}>
+              Cerrar
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    );
+  }
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && handleClose()}>
