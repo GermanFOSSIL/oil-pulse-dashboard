@@ -1,4 +1,3 @@
-
 import { supabase } from "@/integrations/supabase/client";
 import { Tag, TestPack, AccionesLog, StatsData } from "./types";
 
@@ -130,15 +129,25 @@ export const deleteTestPack = async (id: string): Promise<boolean> => {
       return false;
     }
     
-    // First delete all related entries in acciones_log to avoid foreign key constraints
-    const { error: accionesLogError } = await supabase
-      .from('acciones_log')
-      .delete()
-      .in('tag_id', supabase.from('tags').select('id').eq('test_pack_id', id));
-      
-    if (accionesLogError) {
-      console.error(`Error deleting related acciones_log entries for Test Pack ${id}:`, accionesLogError);
-      throw accionesLogError;
+    // Get tag IDs associated with this test pack for deleting acciones_log
+    const { data: tagData } = await supabase
+      .from('tags')
+      .select('id')
+      .eq('test_pack_id', id);
+    
+    const tagIds = tagData ? tagData.map(tag => tag.id) : [];
+    
+    // Delete related entries in acciones_log if there are tags
+    if (tagIds.length > 0) {
+      const { error: accionesLogError } = await supabase
+        .from('acciones_log')
+        .delete()
+        .in('tag_id', tagIds);
+        
+      if (accionesLogError) {
+        console.error(`Error deleting related acciones_log entries for Test Pack ${id}:`, accionesLogError);
+        throw accionesLogError;
+      }
     }
     
     // Now delete the tags
