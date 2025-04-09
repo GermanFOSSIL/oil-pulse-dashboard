@@ -361,7 +361,7 @@ interface TestPackStatsData {
     released: number;
     progress: number;
   };
-  systems: Array<{ name: string; count: number }>;
-  subsystems: Array<{ name: string; count: number }>;
-  itrs: Array<{ name: string; count: number }>;
+  systems: Array<{ name: string; value: number }>;
+  subsystems: Array<{ name: string; value: number }>;
+  itrs: Array<{ name: string; value: number }>;
 }
