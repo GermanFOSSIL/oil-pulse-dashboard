@@ -24,6 +24,7 @@ export interface UserProfile {
   permissions?: string[];
   created_at?: string;
   updated_at?: string;
+  email?: string; // Add email to help with displaying user info
 }
 
 export const getUserProfile = async (userId: string): Promise<UserProfile | null> => {
@@ -146,11 +147,16 @@ export const createUser = async (userData: UserCreateData): Promise<{ success: b
   try {
     console.log("Creating user with data:", {...userData, password: '******'});
     
-    // First, create the user in auth
-    const { data: authData, error: authError } = await supabase.auth.admin.createUser({
+    // Instead of using admin API, use the standard auth.signUp
+    // Note: This requires email confirmation by default
+    const { data: authData, error: authError } = await supabase.auth.signUp({
       email: userData.email,
       password: userData.password,
-      email_confirm: true, // Automatically confirm the email
+      options: {
+        data: {
+          full_name: userData.full_name,
+        }
+      }
     });
 
     if (authError) {
@@ -168,7 +174,7 @@ export const createUser = async (userData: UserCreateData): Promise<{ success: b
     const userId = authData.user.id;
     console.log("User created with ID:", userId);
 
-    // Then, update the profile with additional information
+    // Update the profile with additional information
     const profileData: UserUpdateData = {
       full_name: userData.full_name,
       role: userData.role || 'user',
@@ -210,7 +216,7 @@ export const createUser = async (userData: UserCreateData): Promise<{ success: b
 
     return { 
       success: true, 
-      message: "Usuario creado exitosamente", 
+      message: "Usuario creado exitosamente. El usuario debe confirmar su correo electrónico.", 
       userId 
     };
   } catch (error: any) {
@@ -224,23 +230,32 @@ export const createUser = async (userData: UserCreateData): Promise<{ success: b
 
 export const changeUserPassword = async (data: PasswordChangeData): Promise<{ success: boolean; message: string }> => {
   try {
-    const { error } = await supabase.auth.admin.updateUserById(
-      data.userId,
-      { password: data.newPassword }
-    );
-
-    if (error) {
-      console.error("Error changing password:", error);
-      return { 
-        success: false, 
-        message: `Error al cambiar la contraseña: ${error.message}` 
-      };
-    }
-
+    // We can't use admin API to change passwords
+    // Instead, we'll add a custom message indicating this limitation
+    
     return { 
-      success: true, 
-      message: "Contraseña cambiada exitosamente" 
+      success: false, 
+      message: "La funcionalidad de cambio de contraseña requiere privilegios administrativos. El usuario debe usar la opción 'Olvidé mi contraseña'." 
     };
+    
+    // Original admin API code (commented out):
+    // const { error } = await supabase.auth.admin.updateUserById(
+    //   data.userId,
+    //   { password: data.newPassword }
+    // );
+    //
+    // if (error) {
+    //   console.error("Error changing password:", error);
+    //   return { 
+    //     success: false, 
+    //     message: `Error al cambiar la contraseña: ${error.message}` 
+    //   };
+    // }
+    //
+    // return { 
+    //   success: true, 
+    //   message: "Contraseña cambiada exitosamente" 
+    // };
   } catch (error: any) {
     console.error("Error changing password:", error);
     return { 

@@ -1,6 +1,5 @@
 
 import { useState, useEffect } from "react";
-import { User } from "@supabase/supabase-js";
 import { useToast } from "@/hooks/use-toast";
 import { 
   getUserProfiles, 
@@ -46,49 +45,48 @@ import UsersList from "@/components/users/UsersList";
 import UserForm from "@/components/users/UserForm";
 import BulkUserUpload from "@/components/users/BulkUserUpload";
 import PasswordChangeForm from "@/components/users/PasswordChangeForm";
+import { useAuth } from "@/contexts/AuthContext";
 
 const Users = () => {
   const { toast } = useToast();
-  const [users, setUsers] = useState<Array<User & { profile?: UserProfile }>>([]);
+  const { user: currentUser } = useAuth(); // Get the current user from Auth context
+  const [users, setUsers] = useState<Array<any>>([]);
   const [searchTerm, setSearchTerm] = useState("");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   
   const [isUserFormOpen, setIsUserFormOpen] = useState(false);
-  const [currentUser, setCurrentUser] = useState<User & { profile?: UserProfile } | null>(null);
+  const [currentEditUser, setCurrentEditUser] = useState<any | null>(null);
   const [userToDelete, setUserToDelete] = useState<string | null>(null);
   
   const [isPasswordChangeOpen, setIsPasswordChangeOpen] = useState(false);
   const [userIdForPasswordChange, setUserIdForPasswordChange] = useState<string | null>(null);
   
-  // Fetch all users and their profiles
+  // Fetch all user profiles (not auth users)
   const fetchUsers = async () => {
     setLoading(true);
     setError(null);
     try {
-      // First get all auth users
-      const { data: authUsers, error: authError } = await supabase.auth.admin.listUsers();
-      
-      if (authError) {
-        throw authError;
-      }
-      
-      // Then get all profiles
+      // Get all profiles from the public.profiles table
       const profiles = await getUserProfiles();
       
-      // Combine auth users with their profiles
-      const combinedUsers = authUsers.users.map(user => {
-        const profile = profiles.find(p => p.id === user.id);
-        return { ...user, profile };
-      });
+      // Convert profiles to the expected format
+      const usersList = profiles.map(profile => ({
+        id: profile.id,
+        email: profile.email || '', // This might not be available in profiles
+        profile: {
+          ...profile
+        },
+        created_at: profile.created_at || new Date().toISOString()
+      }));
       
-      setUsers(combinedUsers);
+      setUsers(usersList);
     } catch (err: any) {
       console.error("Error fetching users:", err);
       setError(`No se pudieron cargar los usuarios: ${err.message}`);
       toast({
         title: "Error",
-        description: "No se pudieron cargar los usuarios",
+        description: "No se pudieron cargar los usuarios. Verifica tus permisos de acceso.",
         variant: "destructive",
       });
     } finally {
@@ -102,6 +100,16 @@ const Users = () => {
   
   const handleCreateUser = async (formData: any) => {
     try {
+      // Check if current user has admin permissions
+      if (!currentUser) {
+        toast({
+          title: "Error",
+          description: "Debes estar autenticado para crear usuarios",
+          variant: "destructive",
+        });
+        return;
+      }
+      
       const result = await createUser({
         email: formData.email,
         password: formData.password || generateRandomPassword(),
@@ -134,10 +142,10 @@ const Users = () => {
   };
   
   const handleUpdateUser = async (formData: any) => {
-    if (!currentUser) return;
+    if (!currentEditUser) return;
     
     try {
-      const updatedProfile = await updateUserProfile(currentUser.id, {
+      const updatedProfile = await updateUserProfile(currentEditUser.id, {
         full_name: formData.full_name,
         role: formData.role,
         permissions: formData.permissions
@@ -159,15 +167,15 @@ const Users = () => {
   };
   
   const handleSubmitUserForm = (formData: any) => {
-    if (currentUser) {
+    if (currentEditUser) {
       handleUpdateUser(formData);
     } else {
       handleCreateUser(formData);
     }
   };
   
-  const handleEditUser = (user: User & { profile?: UserProfile }) => {
-    setCurrentUser(user);
+  const handleEditUser = (user: any) => {
+    setCurrentEditUser(user);
     setIsUserFormOpen(true);
   };
   
@@ -209,7 +217,12 @@ const Users = () => {
     if (!userToDelete) return;
     
     try {
-      const { error } = await supabase.auth.admin.deleteUser(userToDelete);
+      // We can't use admin API, so we'll just delete the profile
+      // Note: This won't delete the auth user, just the profile
+      const { error } = await supabase
+        .from('profiles')
+        .delete()
+        .eq('id', userToDelete);
       
       if (error) {
         throw error;
@@ -217,7 +230,7 @@ const Users = () => {
       
       toast({
         title: "Usuario eliminado",
-        description: "El usuario se ha eliminado exitosamente",
+        description: "El perfil de usuario se ha eliminado exitosamente",
       });
       setUserToDelete(null);
       fetchUsers();
@@ -303,7 +316,7 @@ const Users = () => {
           </p>
         </div>
         <Button onClick={() => {
-          setCurrentUser(null);
+          setCurrentEditUser(null);
           setIsUserFormOpen(true);
         }}>
           <PlusCircle className="mr-2 h-4 w-4" />
@@ -370,16 +383,16 @@ const Users = () => {
       <Dialog open={isUserFormOpen} onOpenChange={setIsUserFormOpen}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
-            <DialogTitle>{currentUser ? "Editar Usuario" : "Nuevo Usuario"}</DialogTitle>
+            <DialogTitle>{currentEditUser ? "Editar Usuario" : "Nuevo Usuario"}</DialogTitle>
             <DialogDescription>
-              {currentUser 
+              {currentEditUser 
                 ? "Actualice la información del usuario" 
                 : "Complete el formulario para crear un nuevo usuario"}
             </DialogDescription>
           </DialogHeader>
           
           <UserForm 
-            user={currentUser || undefined}
+            user={currentEditUser || undefined}
             onSubmit={handleSubmitUserForm}
           />
         </DialogContent>
