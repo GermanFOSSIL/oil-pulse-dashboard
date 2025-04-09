@@ -13,6 +13,7 @@ import {
   Layers,
   X,
   ClipboardCheck,
+  Package,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -109,16 +110,20 @@ const Sidebar = ({ isOpen }: SidebarProps) => {
       if (user) {
         try {
           const permissions = await getUserPermissions(user.id);
+          // Ensure 'test-packs' permission is included for all users
+          if (!permissions.includes('test-packs')) {
+            permissions.push('test-packs');
+          }
           setUserPermissions(permissions);
         } catch (error) {
           console.error("Error fetching permissions:", error);
-          // Default to dashboard only
-          setUserPermissions(['dashboard']);
+          // Default to dashboard and test-packs
+          setUserPermissions(['dashboard', 'test-packs']);
         } finally {
           setLoading(false);
         }
       } else {
-        setUserPermissions([]);
+        setUserPermissions(['test-packs']);
         setLoading(false);
       }
     };
@@ -173,6 +178,7 @@ const Sidebar = ({ isOpen }: SidebarProps) => {
                         ? "bg-sidebar-accent text-sidebar-primary font-medium"
                         : "text-sidebar-foreground/80"
                     )}
+                    onClick={closeSidebar}
                   >
                     <item.icon
                       className={cn(

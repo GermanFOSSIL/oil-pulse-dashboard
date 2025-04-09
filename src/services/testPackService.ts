@@ -118,9 +118,22 @@ export const deleteTestPack = async (id: string): Promise<boolean> => {
   try {
     console.log(`Deleting Test Pack with id ${id}`);
     
-    // Use the database function to delete the test pack and its tags
-    const { data, error } = await supabase
-      .rpc('delete_test_pack_with_tags', { test_pack_id: id });
+    // First delete all related tags to avoid foreign key constraints
+    const { error: tagsError } = await supabase
+      .from('tags')
+      .delete()
+      .eq('test_pack_id', id);
+      
+    if (tagsError) {
+      console.error(`Error deleting related tags for Test Pack ${id}:`, tagsError);
+      throw tagsError;
+    }
+    
+    // Now delete the test pack
+    const { error } = await supabase
+      .from('test_packs')
+      .delete()
+      .eq('id', id);
 
     if (error) {
       console.error(`Error deleting Test Pack with id ${id}:`, error);
@@ -128,7 +141,16 @@ export const deleteTestPack = async (id: string): Promise<boolean> => {
     }
 
     console.log("Test Pack and associated tags deleted successfully");
-    return data || false;
+    
+    // Log the activity
+    await supabase.from('db_activity_log').insert({
+      table_name: 'test_packs',
+      action: 'DELETE',
+      record_id: id,
+      details: { test_pack_id: id }
+    });
+    
+    return true;
   } catch (error) {
     console.error("Error in deleteTestPack:", error);
     throw error;
