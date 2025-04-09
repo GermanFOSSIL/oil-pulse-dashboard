@@ -48,6 +48,8 @@ const TagList = ({ tags, testPackId, onRefresh }: TagListProps) => {
   const [tagToEdit, setTagToEdit] = useState<Tag | null>(null);
   const [isFormModalOpen, setIsFormModalOpen] = useState(false);
   const [tagToDelete, setTagToDelete] = useState<string | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [isUpdating, setIsUpdating] = useState(false);
   
   const handleEdit = (tag: Tag) => {
     setTagToEdit(tag);
@@ -56,20 +58,41 @@ const TagList = ({ tags, testPackId, onRefresh }: TagListProps) => {
   
   const handleDelete = async () => {
     if (tagToDelete) {
-      await removeTag(tagToDelete);
-      setTagToDelete(null);
-      onRefresh();
+      setIsDeleting(true);
+      try {
+        await removeTag(tagToDelete);
+        setTagToDelete(null);
+        onRefresh();
+      } catch (error) {
+        console.error("Error deleting tag:", error);
+      } finally {
+        setIsDeleting(false);
+      }
     }
   };
   
   const handleReleaseTag = async (tagId: string) => {
-    await releaseTag(tagId);
-    onRefresh();
+    setIsUpdating(true);
+    try {
+      await releaseTag(tagId);
+      onRefresh();
+    } catch (error) {
+      console.error("Error releasing tag:", error);
+    } finally {
+      setIsUpdating(false);
+    }
   };
   
   const handleChangeStatus = async (tagId: string, newStatus: 'pendiente' | 'liberado') => {
-    await changeTagStatus(tagId, newStatus);
-    onRefresh();
+    setIsUpdating(true);
+    try {
+      await changeTagStatus(tagId, newStatus);
+      onRefresh();
+    } catch (error) {
+      console.error("Error changing tag status:", error);
+    } finally {
+      setIsUpdating(false);
+    }
   };
   
   const getStatusBadge = (status: string) => {
@@ -130,7 +153,7 @@ const TagList = ({ tags, testPackId, onRefresh }: TagListProps) => {
                   </TableCell>
                   <TableCell className="text-right">
                     <div className="flex justify-end gap-2">
-                      {tag.estado === 'pendiente' && (
+                      {tag.estado === 'pendiente' && !isUpdating && (
                         <Button 
                           variant="outline" 
                           size="icon" 
@@ -143,7 +166,7 @@ const TagList = ({ tags, testPackId, onRefresh }: TagListProps) => {
                       )}
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>
-                          <Button variant="ghost" size="icon" className="h-8 w-8">
+                          <Button variant="ghost" size="icon" className="h-8 w-8" disabled={isUpdating}>
                             <MoreHorizontal className="h-4 w-4" />
                             <span className="sr-only">Acciones</span>
                           </Button>
@@ -214,12 +237,13 @@ const TagList = ({ tags, testPackId, onRefresh }: TagListProps) => {
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogCancel disabled={isDeleting}>Cancelar</AlertDialogCancel>
             <AlertDialogAction 
               onClick={handleDelete}
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              disabled={isDeleting}
             >
-              Eliminar
+              {isDeleting ? "Eliminando..." : "Eliminar"}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Card, CardContent } from "@/components/ui/card";
@@ -48,6 +47,7 @@ const TestPackList = ({ testPacks, loading, onRefresh }: TestPackListProps) => {
   const [testPackToEdit, setTestPackToEdit] = useState<TestPack | null>(null);
   const [isFormModalOpen, setIsFormModalOpen] = useState(false);
   const [testPackToDelete, setTestPackToDelete] = useState<string | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
   
   const handleEdit = (testPack: TestPack) => {
     setTestPackToEdit(testPack);
@@ -56,8 +56,18 @@ const TestPackList = ({ testPacks, loading, onRefresh }: TestPackListProps) => {
   
   const handleDelete = async () => {
     if (testPackToDelete) {
-      await removeTestPack(testPackToDelete);
-      setTestPackToDelete(null);
+      setIsDeleting(true);
+      try {
+        const success = await removeTestPack(testPackToDelete);
+        if (success) {
+          setTestPackToDelete(null);
+          onRefresh();
+        }
+      } catch (error) {
+        console.error("Error deleting test pack:", error);
+      } finally {
+        setIsDeleting(false);
+      }
     }
   };
   
@@ -207,12 +217,13 @@ const TestPackList = ({ testPacks, loading, onRefresh }: TestPackListProps) => {
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogCancel disabled={isDeleting}>Cancelar</AlertDialogCancel>
             <AlertDialogAction 
               onClick={handleDelete}
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              disabled={isDeleting}
             >
-              Eliminar
+              {isDeleting ? "Eliminando..." : "Eliminar"}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
