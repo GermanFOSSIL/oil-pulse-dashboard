@@ -11,7 +11,6 @@ import { useTestPacks } from "@/hooks/useTestPacks";
 import { ErrorBoundary } from "react-error-boundary";
 import { Button } from "@/components/ui/button";
 import { AlertTriangle } from "lucide-react";
-import { useParams, useNavigate } from "react-router-dom";
 import { useEffect } from "react";
 
 // Error fallback component
@@ -29,11 +28,6 @@ const ErrorFallback = ({ error, resetErrorBoundary }: { error: Error, resetError
 );
 
 const TestPacks = () => {
-  const params = useParams();
-  const navigate = useNavigate();
-  const testPackId = params.id;
-  const isEditMode = params.action === 'edit';
-
   const {
     selectedTab,
     showImportDialog,
@@ -59,6 +53,13 @@ const TestPacks = () => {
     openEditTestPackForm
   } = useTestPacks();
 
+  // Add a console log to debug the stats data
+  useEffect(() => {
+    if (stats) {
+      console.log("Current stats data:", stats);
+    }
+  }, [stats]);
+
   return (
     <div className="container mx-auto py-6 space-y-6">
       <div className="flex justify-between items-center">
@@ -68,7 +69,10 @@ const TestPacks = () => {
           onImport={openImportDialog}
           onDownloadTemplate={handleDownloadTemplate}
           onExport={handleExportData}
-          onRefresh={() => refetchTestPacks()}
+          onRefresh={() => {
+            console.log("Refreshing test pack data...");
+            refetchTestPacks();
+          }}
           userRole={userRole}
         />
       </div>

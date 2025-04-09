@@ -499,8 +499,8 @@ export const generateImportTemplate = (): ArrayBuffer => {
   }
 };
 
-// Update the importFromExcel function to handle the new template format
-export const importFromExcel = async (excelBuffer: ArrayBuffer): Promise<{ success: boolean; count: number }> => {
+// Update the importFromExcel function to handle the new template format and to add TAGs to existing test packs
+export const importFromExcel = async (excelBuffer: ArrayBuffer): Promise<{ success: boolean; count: number; message?: string }> => {
   try {
     console.log("Importing test packs from Excel");
     
@@ -512,7 +512,7 @@ export const importFromExcel = async (excelBuffer: ArrayBuffer): Promise<{ succe
     const testPacksData = XLSX.utils.sheet_to_json(testPacksSheet) as any[];
 
     if (!testPacksData || testPacksData.length === 0) {
-      throw new Error("No test pack data found in Excel file");
+      return { success: false, count: 0, message: "No test pack data found in Excel file" };
     }
 
     console.log(`Found ${testPacksData.length} test packs to import`);
@@ -527,10 +527,19 @@ export const importFromExcel = async (excelBuffer: ArrayBuffer): Promise<{ succe
       }
     }
 
-    // Process each test pack row and create test packs
+    // Get existing test packs to avoid duplicates
+    const existingTestPacks = await getTestPacks();
+    const existingTestPacksByName = new Map();
+    existingTestPacks.forEach(tp => {
+      existingTestPacksByName.set(tp.nombre_paquete, tp);
+    });
+
+    // Track created or updated items
     let importedCount = 0;
+    let tagsAddedCount = 0;
+    
+    // Process each test pack row and create or update test packs
     for (const row of testPacksData) {
-      // Create test pack with data from Excel
       const testPackData = {
         sistema: row.sistema,
         subsistema: row.subsistema,
@@ -547,19 +556,38 @@ export const importFromExcel = async (excelBuffer: ArrayBuffer): Promise<{ succe
       }
 
       try {
-        // Create test pack and get its ID
-        const testPack = await createTestPack(testPackData);
-        importedCount++;
+        // Check if the test pack already exists
+        let testPack = existingTestPacksByName.get(testPackData.nombre_paquete);
         
-        // Create associated tags if any
+        // If it doesn't exist, create it
+        if (!testPack) {
+          testPack = await createTestPack(testPackData);
+          importedCount++;
+          existingTestPacksByName.set(testPackData.nombre_paquete, testPack);
+          console.log(`Created new test pack: ${testPack.nombre_paquete}`);
+        } else {
+          console.log(`Using existing test pack: ${testPack.nombre_paquete}`);
+        }
+        
+        // Process tags for this test pack
         if (tagsData && tagsData.length > 0) {
+          // Get existing tags for this test pack to avoid duplicates
+          const existingTags = testPack.tags || [];
+          const existingTagNames = new Set(existingTags.map(t => t.tag_name));
+          
           // Filter tags for this test pack
           const testPackTags = tagsData.filter(tag => 
             tag.test_pack_nombre === testPackData.nombre_paquete);
           
-          // Create each tag for this test pack
+          // Create each tag for this test pack if it doesn't already exist
           for (const tagRow of testPackTags) {
             try {
+              // Skip if tag already exists for this test pack
+              if (existingTagNames.has(tagRow.tag_name)) {
+                console.log(`Tag ${tagRow.tag_name} already exists for test pack ${testPack.nombre_paquete}, skipping.`);
+                continue;
+              }
+              
               const tagData = {
                 tag_name: tagRow.tag_name,
                 test_pack_id: testPack.id,
@@ -574,6 +602,8 @@ export const importFromExcel = async (excelBuffer: ArrayBuffer): Promise<{ succe
               }
               
               await createTag(tagData);
+              tagsAddedCount++;
+              console.log(`Added tag ${tagData.tag_name} to test pack ${testPack.nombre_paquete}`);
             } catch (tagError) {
               console.error("Error creating tag:", tagError);
               // Continue with other tags even if one fails
@@ -581,16 +611,25 @@ export const importFromExcel = async (excelBuffer: ArrayBuffer): Promise<{ succe
           }
         }
       } catch (testPackError) {
-        console.error("Error creating test pack:", testPackError);
+        console.error("Error processing test pack:", testPackError);
         // Continue with other test packs even if one fails
       }
     }
 
-    console.log(`Successfully imported ${importedCount} test packs`);
-    return { success: true, count: importedCount };
+    const totalImported = importedCount + tagsAddedCount;
+    console.log(`Successfully imported ${importedCount} test packs and ${tagsAddedCount} tags`);
+    return { 
+      success: true, 
+      count: totalImported,
+      message: `Se crearon ${importedCount} Test Packs y se añadieron ${tagsAddedCount} TAGs`
+    };
   } catch (error) {
     console.error("Error importing from Excel:", error);
-    throw error;
+    return { 
+      success: false, 
+      count: 0, 
+      message: error instanceof Error ? error.message : "Error desconocido en la importación"
+    };
   }
 };
 

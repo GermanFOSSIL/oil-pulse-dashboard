@@ -20,10 +20,9 @@ const TestPackImportDialog = ({
   onSuccess
 }: TestPackImportDialogProps) => {
   const { toast } = useToast();
-  const [isUploading, setIsUploading] = useState(false);
   const [uploadedFile, setUploadedFile] = useState<File | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
-  const [result, setResult] = useState<{ success: boolean; count: number } | null>(null);
+  const [result, setResult] = useState<{ success: boolean; count: number; message?: string } | null>(null);
 
   const handleFileUpload = (files: File[]) => {
     if (files.length > 0) {
@@ -51,7 +50,7 @@ const TestPackImportDialog = ({
       if (importResult.success) {
         toast({
           title: "Importación exitosa",
-          description: `Se importaron ${importResult.count} test packs correctamente.`,
+          description: `Se importaron ${importResult.count} elementos correctamente.`,
         });
         setTimeout(() => {
           onSuccess();
@@ -60,7 +59,7 @@ const TestPackImportDialog = ({
       } else {
         toast({
           title: "Error de importación",
-          description: "No se pudieron importar los datos. Por favor, revise el formato del archivo.",
+          description: importResult.message || "No se pudieron importar los datos. Por favor, revise el formato del archivo.",
           variant: "destructive"
         });
       }
@@ -68,7 +67,8 @@ const TestPackImportDialog = ({
       console.error("Error importing file:", error);
       setResult({
         success: false,
-        count: 0
+        count: 0,
+        message: error instanceof Error ? error.message : "Error desconocido"
       });
       toast({
         title: "Error de importación",
@@ -139,8 +139,8 @@ const TestPackImportDialog = ({
                   </h4>
                   <p className="text-sm text-muted-foreground mt-1">
                     {result.success 
-                      ? `Se importaron ${result.count} test packs correctamente.`
-                      : 'No se pudieron importar los datos. Por favor, revise el formato del archivo.'}
+                      ? `Se importaron ${result.count} elementos correctamente.`
+                      : result.message || 'No se pudieron importar los datos. Por favor, revise el formato del archivo.'}
                   </p>
                 </div>
               </div>

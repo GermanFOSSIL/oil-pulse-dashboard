@@ -166,7 +166,7 @@ export const useTestPacks = () => {
 
   const handleDeleteTestPack = async (id: string) => {
     try {
-      // Since deleteTestPack isn't exported, we'll implement it directly here
+      // Use the correct endpoint for deletion and handle the response properly
       const response = await fetch(`/api/testpacks/${id}`, {
         method: 'DELETE',
       });
@@ -176,12 +176,17 @@ export const useTestPacks = () => {
         throw new Error(data.error?.message || 'Failed to delete test pack');
       }
       
+      // Success - update the local state to remove the deleted test pack
+      setTestPacks(prevTestPacks => prevTestPacks ? prevTestPacks.filter(tp => tp.id !== id) : null);
+      
       toast({
         title: "Success",
         description: "Test pack deleted successfully.",
       });
-      fetchTestPacks(); // Refresh test packs after deleting
-      fetchStats(); // Refresh stats after deleting
+      
+      // Refresh data
+      fetchTestPacks();
+      fetchStats();
     } catch (error: any) {
       console.error("Error deleting test pack:", error);
       toast({
