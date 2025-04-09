@@ -441,35 +441,108 @@ export const bulkCreateTestPacksAndTags = async (
     console.log(`Test Packs to create: ${testPacksData.length}`);
     console.log(`Tags to create: ${tagsData.length}`);
     
-    // Insert all test packs
-    const { data: createdTestPacks, error: testPacksError } = await supabase
-      .from('test_packs')
-      .insert(testPacksData)
-      .select();
+    // First, check for duplicate test packs by package name pattern
+    const createdTestPacks: TestPack[] = [];
+    
+    for (const testPackData of testPacksData) {
+      // Check if this test pack is already in our list (by name pattern)
+      // Extract the base name without ITR-specific suffixes
+      const basePackageName = testPackData.nombre_paquete.replace(/-\d+$/, '');
+      console.log(`Processing test pack: ${testPackData.nombre_paquete}, base name: ${basePackageName}`);
       
-    if (testPacksError) {
-      console.error("Error bulk creating Test Packs:", testPacksError);
-      throw testPacksError;
+      // Check if we already have a similar test pack in our results
+      const similarPackIndex = createdTestPacks.findIndex(tp => 
+        tp.nombre_paquete.startsWith(basePackageName) && 
+        tp.sistema === testPackData.sistema &&
+        tp.subsistema === testPackData.subsistema
+      );
+      
+      if (similarPackIndex >= 0) {
+        console.log(`Found similar test pack at index ${similarPackIndex}: ${createdTestPacks[similarPackIndex].nombre_paquete}`);
+        // Skip this test pack but record the mapping for tags
+        continue;
+      }
+      
+      // Check if a similar test pack already exists in the database
+      const { data: existingPacks, error: checkError } = await supabase
+        .from('test_packs')
+        .select('*')
+        .ilike('nombre_paquete', `${basePackageName}%`)
+        .eq('sistema', testPackData.sistema)
+        .eq('subsistema', testPackData.subsistema);
+        
+      if (checkError) {
+        console.error("Error checking for existing test packs:", checkError);
+        throw checkError;
+      }
+      
+      if (existingPacks && existingPacks.length > 0) {
+        console.log(`Found ${existingPacks.length} existing similar test packs in database for ${basePackageName}`);
+        // Add the existing pack to our list
+        createdTestPacks.push(existingPacks[0] as TestPack);
+        continue;
+      }
+      
+      // If we get here, we need to create a new test pack
+      const { data: newTestPack, error: insertError } = await supabase
+        .from('test_packs')
+        .insert(testPackData)
+        .select()
+        .single();
+        
+      if (insertError) {
+        console.error("Error creating test pack:", insertError);
+        throw insertError;
+      }
+      
+      console.log(`Created new test pack: ${newTestPack.nombre_paquete} with ID ${newTestPack.id}`);
+      createdTestPacks.push(newTestPack as TestPack);
     }
     
-    console.log(`Created ${createdTestPacks.length} Test Packs`);
+    console.log(`Created ${createdTestPacks.length} unique Test Packs`);
     
     // Prepare tags with test_pack_id
-    const tagsToInsert = tagsData.map(tagItem => {
-      const testPackId = createdTestPacks[tagItem.testPackIndex]?.id;
-      if (!testPackId) {
-        console.error(`No Test Pack found at index ${tagItem.testPackIndex}`);
-        return null;
+    const tagsToInsert: Array<Omit<Tag, "id" | "created_at" | "updated_at">> = [];
+    const processedTagNames = new Set<string>();
+    
+    for (const tagItem of tagsData) {
+      if (tagItem.testPackIndex >= testPacksData.length) {
+        console.error(`Invalid test pack index: ${tagItem.testPackIndex}`);
+        continue;
       }
-      return {
+      
+      const testPackData = testPacksData[tagItem.testPackIndex];
+      const basePackageName = testPackData.nombre_paquete.replace(/-\d+$/, '');
+      
+      // Find the corresponding test pack
+      const testPack = createdTestPacks.find(tp => 
+        tp.nombre_paquete.startsWith(basePackageName) && 
+        tp.sistema === testPackData.sistema &&
+        tp.subsistema === testPackData.subsistema
+      );
+      
+      if (!testPack) {
+        console.error(`No matching test pack found for tag ${tagItem.tagData.tag_name}`);
+        continue;
+      }
+      
+      // Avoid duplicate tags
+      const tagKey = `${testPack.id}-${tagItem.tagData.tag_name}`;
+      if (processedTagNames.has(tagKey)) {
+        console.log(`Skipping duplicate tag: ${tagItem.tagData.tag_name} for test pack ${testPack.nombre_paquete}`);
+        continue;
+      }
+      
+      processedTagNames.add(tagKey);
+      tagsToInsert.push({
         ...tagItem.tagData,
-        test_pack_id: testPackId
-      };
-    }).filter(Boolean) as Omit<Tag, "id" | "created_at" | "updated_at">[];
+        test_pack_id: testPack.id
+      });
+    }
     
     if (tagsToInsert.length === 0) {
       console.log("No tags to insert");
-      return { testPacks: createdTestPacks as TestPack[], tags: [] };
+      return { testPacks: createdTestPacks, tags: [] };
     }
     
     // Insert all tags
@@ -483,7 +556,7 @@ export const bulkCreateTestPacksAndTags = async (
       throw tagsError;
     }
     
-    console.log(`Created ${createdTags.length} Tags`);
+    console.log(`Created ${createdTags?.length || 0} Tags`);
     
     // Log the activity
     await supabase.from('db_activity_log').insert({
@@ -491,13 +564,13 @@ export const bulkCreateTestPacksAndTags = async (
       action: 'BULK_INSERT',
       details: { 
         test_packs_count: createdTestPacks.length,
-        tags_count: createdTags.length
+        tags_count: createdTags?.length || 0
       }
     });
     
     return { 
-      testPacks: createdTestPacks as TestPack[],
-      tags: createdTags as Tag[]
+      testPacks: createdTestPacks,
+      tags: (createdTags || []) as Tag[]
     };
   } catch (error) {
     console.error("Error in bulkCreateTestPacksAndTags:", error);
