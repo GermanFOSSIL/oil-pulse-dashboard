@@ -1,11 +1,11 @@
 
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { getTestPackWithTags, updateTag, Tag, TestPack, createTag } from "@/services/testPackService";
+import { getTestPackWithTags, updateTag, Tag, TestPack, createTag, deleteTag } from "@/services/testPackService";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { PlusCircle } from "lucide-react";
+import { PlusCircle, Trash2 } from "lucide-react";
 import { useState } from "react";
 import { Input } from "@/components/ui/input";
 import { 
@@ -19,6 +19,16 @@ import {
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tag as TagIcon } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 interface TestPackTagsProps {
   testPackId: string;
@@ -35,6 +45,8 @@ const TestPackTags = ({
   const queryClient = useQueryClient();
   const [newTagName, setNewTagName] = useState("");
   const [isAddingTag, setIsAddingTag] = useState(false);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [tagToDelete, setTagToDelete] = useState<string | null>(null);
 
   const { data: testPack, isLoading, refetch } = useQuery({
     queryKey: ['testPack', testPackId],
@@ -96,6 +108,28 @@ const TestPackTags = ({
     }
   });
 
+  const deleteTagMutation = useMutation({
+    mutationFn: (tagId: string) => {
+      return deleteTag(tagId);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['testPack', testPackId] });
+      toast({
+        title: "TAG eliminado",
+        description: "El TAG ha sido eliminado exitosamente."
+      });
+      refetch();
+    },
+    onError: (error) => {
+      console.error("Error al eliminar TAG:", error);
+      toast({
+        title: "Error",
+        description: "No se pudo eliminar el TAG. Por favor, inténtelo de nuevo.",
+        variant: "destructive"
+      });
+    }
+  });
+
   const handleAddTag = () => {
     if (!newTagName.trim()) {
       toast({
@@ -112,6 +146,19 @@ const TestPackTags = ({
   const handleTagStatusToggle = (tag: Tag) => {
     const newStatus = tag.estado === 'liberado' ? 'pendiente' : 'liberado';
     updateTagMutation.mutate({ tagId: tag.id, newStatus });
+  };
+
+  const handleDeleteClick = (tagId: string) => {
+    setTagToDelete(tagId);
+    setDeleteDialogOpen(true);
+  };
+
+  const confirmDelete = () => {
+    if (tagToDelete) {
+      deleteTagMutation.mutate(tagToDelete);
+      setDeleteDialogOpen(false);
+      setTagToDelete(null);
+    }
   };
 
   if (isLoading) {
@@ -218,7 +265,7 @@ const TestPackTags = ({
               <TableHead>TAG</TableHead>
               <TableHead>Estado</TableHead>
               <TableHead>Fecha Liberación</TableHead>
-              <TableHead>Estado</TableHead>
+              <TableHead>Acciones</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -239,16 +286,26 @@ const TestPackTags = ({
                   <span>{tag.fecha_liberacion ? new Date(tag.fecha_liberacion).toLocaleString() : 'Pendiente'}</span>
                 </TableCell>
                 <TableCell>
-                  <div className="flex items-center">
+                  <div className="flex items-center gap-2">
                     {(userRole === 'admin' || userRole === 'tecnico') ? (
-                      <Button 
-                        variant="outline" 
-                        size="sm"
-                        onClick={() => handleTagStatusToggle(tag)}
-                        disabled={updateTagMutation.isPending}
-                      >
-                        {tag.estado === 'liberado' ? 'Marcar Pendiente' : 'Marcar Liberado'}
-                      </Button>
+                      <>
+                        <Button 
+                          variant="outline" 
+                          size="sm"
+                          onClick={() => handleTagStatusToggle(tag)}
+                          disabled={updateTagMutation.isPending}
+                        >
+                          {tag.estado === 'liberado' ? 'Marcar Pendiente' : 'Marcar Liberado'}
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="icon"
+                          className="h-8 w-8 text-destructive hover:bg-destructive hover:text-white"
+                          onClick={() => handleDeleteClick(tag.id)}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </>
                     ) : (
                       <Checkbox
                         checked={tag.estado === 'liberado'}
@@ -262,6 +319,24 @@ const TestPackTags = ({
           </TableBody>
         </Table>
       </CardContent>
+
+      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>¿Está seguro?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Esta acción eliminará permanentemente el TAG seleccionado.
+              Esta acción no se puede deshacer.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction onClick={confirmDelete} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+              Eliminar
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </Card>
   );
 };

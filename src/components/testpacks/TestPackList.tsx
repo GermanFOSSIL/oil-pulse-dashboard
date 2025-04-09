@@ -19,6 +19,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { useToast } from "@/hooks/use-toast";
 
 interface TestPackListProps {
   testPacks: TestPack[] | undefined;
@@ -39,6 +40,7 @@ const TestPackList = ({
   onEdit,
   onDelete
 }: TestPackListProps) => {
+  const { toast } = useToast();
   const [expandedTestPack, setExpandedTestPack] = useState<string | null>(null);
   const [filter, setFilter] = useState({
     search: "",
@@ -66,11 +68,12 @@ const TestPackList = ({
     ? testPacks.filter(tp => {
         const matchesSearch = 
           tp.nombre_paquete.toLowerCase().includes(filter.search.toLowerCase()) ||
-          tp.itr_asociado.toLowerCase().includes(filter.search.toLowerCase());
+          (tp.itr_asociado && tp.itr_asociado.toLowerCase().includes(filter.search.toLowerCase())) ||
+          (tp.itr_name && tp.itr_name.toLowerCase().includes(filter.search.toLowerCase()));
         
-        const matchesSistema = !filter.sistema || tp.sistema === filter.sistema;
-        const matchesSubsistema = !filter.subsistema || tp.subsistema === filter.subsistema;
-        const matchesEstado = !filter.estado || tp.estado === filter.estado;
+        const matchesSistema = !filter.sistema || filter.sistema === "all" || tp.sistema === filter.sistema;
+        const matchesSubsistema = !filter.subsistema || filter.subsistema === "all" || tp.subsistema === filter.subsistema;
+        const matchesEstado = !filter.estado || filter.estado === "all" || tp.estado === filter.estado;
         
         return matchesSearch && matchesSistema && matchesSubsistema && matchesEstado;
       })
@@ -97,9 +100,22 @@ const TestPackList = ({
 
   const confirmDelete = () => {
     if (testPackToDelete) {
-      onDelete(testPackToDelete);
-      setDeleteDialogOpen(false);
-      setTestPackToDelete(null);
+      try {
+        onDelete(testPackToDelete);
+        setDeleteDialogOpen(false);
+        setTestPackToDelete(null);
+        toast({
+          title: "Test Pack eliminado",
+          description: "El Test Pack ha sido eliminado correctamente",
+        });
+      } catch (error) {
+        console.error('Error al eliminar el Test Pack:', error);
+        toast({
+          title: "Error",
+          description: "No se pudo eliminar el Test Pack. Inténtelo de nuevo.",
+          variant: "destructive"
+        });
+      }
     }
   };
 

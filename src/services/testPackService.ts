@@ -1,4 +1,3 @@
-
 import { supabase } from "@/integrations/supabase/client";
 import * as XLSX from 'xlsx';
 
@@ -837,4 +836,48 @@ export const getTestPacksByITR = async (itrName: string): Promise<TestPack[]> =>
 const isUUID = (str: string): boolean => {
   const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
   return uuidRegex.test(str);
+};
+
+// Delete a tag
+export const deleteTag = async (tagId: string): Promise<void> => {
+  try {
+    console.log(`Deleting tag ${tagId}`);
+    
+    // Log the tag deletion action first
+    try {
+      const { data: tagData } = await supabase
+        .from('tags')
+        .select('tag_name')
+        .eq('id', tagId)
+        .single();
+      
+      const { data: session } = await supabase.auth.getSession();
+      const userId = session.session?.user.id || 'system';
+      
+      await logTagAction({
+        usuario_id: userId,
+        tag_id: tagId,
+        accion: 'eliminó'
+      });
+    } catch (err) {
+      console.error("Error logging tag deletion:", err);
+      // Continue with deletion even if logging fails
+    }
+    
+    // Now delete the tag
+    const { error } = await supabase
+      .from('tags')
+      .delete()
+      .eq('id', tagId);
+
+    if (error) {
+      console.error(`Error deleting tag ${tagId}:`, error);
+      throw error;
+    }
+    
+    console.log(`Tag ${tagId} deleted successfully`);
+  } catch (error) {
+    console.error(`Error in deleteTag for ${tagId}:`, error);
+    throw error;
+  }
 };
