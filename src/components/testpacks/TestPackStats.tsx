@@ -3,7 +3,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Progress } from "@/components/ui/progress";
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, Legend } from "recharts";
 import { Button } from "@/components/ui/button";
-import { Download, Image, FilePdf } from "lucide-react";
+import { Download, Image, FileText } from "lucide-react";
 import { useState } from "react";
 import { useToast } from "@/hooks/use-toast";
 import html2canvas from "html2canvas";
@@ -194,7 +194,7 @@ const TestPackStats = ({ stats }: TestPackStatsProps) => {
           disabled={isExporting}
           className="flex items-center gap-1"
         >
-          <FilePdf className="h-4 w-4 mr-1" />
+          <FileText className="h-4 w-4 mr-1" />
           Descargar como PDF
         </Button>
       </div>
