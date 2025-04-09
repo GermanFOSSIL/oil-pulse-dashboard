@@ -168,11 +168,15 @@ const TestPackFormModal = ({ isOpen, onClose, onSuccess, testPack }: TestPackFor
         // Update existing Test Pack
         await updateTestPack(testPack.id, values);
       } else {
-        // Create new Test Pack
-        await addTestPack({
-          ...values,
+        // Create new Test Pack with required fields
+        const newTestPack: Omit<TestPack, "id" | "created_at" | "updated_at"> = {
+          nombre_paquete: values.nombre_paquete,
+          itr_asociado: values.itr_asociado,
+          sistema: values.sistema,
+          subsistema: values.subsistema,
           estado: 'pendiente'
-        });
+        };
+        await addTestPack(newTestPack);
       }
       onSuccess();
     } catch (error) {

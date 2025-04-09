@@ -2,7 +2,6 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, Legend } from "recharts";
-import { ChartContainer } from "@/components/ui/chart";
 import { StatsData } from "@/services/types";
 
 interface TestPackStatsProps {
@@ -64,7 +63,7 @@ const TestPackStats = ({ statsData }: TestPackStatsProps) => {
         <CardContent>
           <div className="h-[200px]">
             {itrs.length > 0 ? (
-              <ChartContainer>
+              <div className="w-full h-full">
                 <ResponsiveContainer width="100%" height="100%">
                   <PieChart>
                     <Pie
@@ -86,7 +85,7 @@ const TestPackStats = ({ statsData }: TestPackStatsProps) => {
                     <Legend />
                   </PieChart>
                 </ResponsiveContainer>
-              </ChartContainer>
+              </div>
             ) : (
               <div className="flex h-full items-center justify-center">
                 <p className="text-muted-foreground">No hay datos disponibles</p>
@@ -104,7 +103,7 @@ const TestPackStats = ({ statsData }: TestPackStatsProps) => {
         <CardContent>
           <div className="h-[200px]">
             {systems.length > 0 ? (
-              <ChartContainer>
+              <div className="w-full h-full">
                 <ResponsiveContainer width="100%" height="100%">
                   <PieChart>
                     <Pie
@@ -124,7 +123,7 @@ const TestPackStats = ({ statsData }: TestPackStatsProps) => {
                     <Legend />
                   </PieChart>
                 </ResponsiveContainer>
-              </ChartContainer>
+              </div>
             ) : (
               <div className="flex h-full items-center justify-center">
                 <p className="text-muted-foreground">No hay datos disponibles</p>
@@ -142,7 +141,7 @@ const TestPackStats = ({ statsData }: TestPackStatsProps) => {
         <CardContent>
           <div className="h-[200px]">
             {subsystems.length > 0 ? (
-              <ChartContainer>
+              <div className="w-full h-full">
                 <ResponsiveContainer width="100%" height="100%">
                   <PieChart>
                     <Pie
@@ -162,7 +161,7 @@ const TestPackStats = ({ statsData }: TestPackStatsProps) => {
                     <Legend />
                   </PieChart>
                 </ResponsiveContainer>
-              </ChartContainer>
+              </div>
             ) : (
               <div className="flex h-full items-center justify-center">
                 <p className="text-muted-foreground">No hay datos disponibles</p>

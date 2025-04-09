@@ -119,12 +119,12 @@ const BatchUploadModal = ({ isOpen, onClose, onSuccess }: BatchUploadModalProps)
           const tagsRawData = XLSX.utils.sheet_to_json(tagsSheet);
           
           // Process and validate test packs data
-          const testPacksData = testPacksRawData.map((row: any) => ({
+          const testPacksData: Omit<TestPack, "id" | "created_at" | "updated_at">[] = testPacksRawData.map((row: any) => ({
             nombre_paquete: row.nombre_paquete || `Test Pack ${Math.random().toString(36).substring(2, 7)}`,
             itr_asociado: row.itr_asociado || '',
             sistema: row.sistema || '',
             subsistema: row.subsistema || '',
-            estado: 'pendiente'
+            estado: 'pendiente' as const // Explicitly type as 'pendiente'
           })).filter((tp: any) => tp.itr_asociado && tp.sistema && tp.subsistema);
           
           // Process tags data with index to its related test pack
@@ -149,7 +149,7 @@ const BatchUploadModal = ({ isOpen, onClose, onSuccess }: BatchUploadModalProps)
               testPackIndex: testPackIndex,
               tagData: {
                 tag_name: row.tag_name || `TAG ${Math.random().toString(36).substring(2, 7)}`,
-                estado: 'pendiente',
+                estado: 'pendiente' as const,
                 fecha_liberacion: null
               }
             };

@@ -1,7 +1,6 @@
 
 import { supabase } from "@/integrations/supabase/client";
 import { Tag, TestPack, AccionesLog, StatsData } from "./types";
-import { useAuth } from "@/contexts/AuthContext";
 
 export const getTestPacks = async (): Promise<TestPack[]> => {
   try {

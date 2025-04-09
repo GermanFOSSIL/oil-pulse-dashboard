@@ -96,7 +96,7 @@ export type PasswordChangeData = {
   newPassword: string;
 };
 
-// New types for Test Pack module
+// Test Pack module types
 export type TestPack = {
   id: string;
   created_at: string;
@@ -144,4 +144,15 @@ export type StatsData = {
   systems: { name: string; value: number; }[];
   subsystems: { name: string; value: number; }[];
   itrs: { name: string; value: number; }[];
+};
+
+// Database activity log
+export type DbActivityLog = {
+  id: string;
+  created_at: string;
+  action: string;
+  table_name: string;
+  record_id: string | null;
+  details: any;
+  user_id: string | null;
 };
