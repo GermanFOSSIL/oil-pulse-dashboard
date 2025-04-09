@@ -577,3 +577,204 @@ export const bulkCreateTestPacksAndTags = async (
     throw error;
   }
 };
+
+export const getTagCompletionData = async () => {
+  try {
+    console.log("Fetching tag completion data for dashboard");
+    
+    // Get all tags with dates
+    const { data: tags, error: tagsError } = await supabase
+      .from('tags')
+      .select('estado, fecha_liberacion, created_at')
+      .order('created_at', { ascending: true });
+      
+    if (tagsError) throw tagsError;
+    
+    // Process daily data
+    const dailyMap = new Map();
+    const now = new Date();
+    const oneWeekAgo = new Date(now);
+    oneWeekAgo.setDate(oneWeekAgo.getDate() - 7);
+    
+    // Initialize with days of the week
+    const daysOfWeek = ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom'];
+    for (let i = 0; i < 7; i++) {
+      const date = new Date(oneWeekAgo);
+      date.setDate(date.getDate() + i);
+      const dayName = daysOfWeek[date.getDay() === 0 ? 6 : date.getDay() - 1]; // Convert 0-6 to days of week
+      dailyMap.set(dayName, { date: date.toISOString().split('T')[0], completions: 0, tags: 0 });
+    }
+    
+    // Count completions and tags per day in the last week
+    tags?.forEach(tag => {
+      const createdDate = new Date(tag.created_at);
+      const liberationDate = tag.fecha_liberacion ? new Date(tag.fecha_liberacion) : null;
+      
+      if (createdDate >= oneWeekAgo) {
+        const dayName = daysOfWeek[createdDate.getDay() === 0 ? 6 : createdDate.getDay() - 1];
+        if (dailyMap.has(dayName)) {
+          dailyMap.get(dayName).tags++;
+        }
+      }
+      
+      if (liberationDate && liberationDate >= oneWeekAgo) {
+        const dayName = daysOfWeek[liberationDate.getDay() === 0 ? 6 : liberationDate.getDay() - 1];
+        if (dailyMap.has(dayName)) {
+          dailyMap.get(dayName).completions++;
+        }
+      }
+    });
+    
+    // Convert map to array
+    const dailyData = Array.from(dailyMap.entries()).map(([name, values]) => ({
+      name,
+      completions: values.completions,
+      tags: values.tags,
+      date: values.date
+    }));
+    
+    // Order by day of week
+    dailyData.sort((a, b) => {
+      return daysOfWeek.indexOf(a.name) - daysOfWeek.indexOf(b.name);
+    });
+    
+    // Process weekly data
+    const weeklyMap = new Map();
+    const sixWeeksAgo = new Date(now);
+    sixWeeksAgo.setDate(sixWeeksAgo.getDate() - 42); // 6 weeks
+    
+    // Initialize weekly buckets
+    for (let i = 0; i < 6; i++) {
+      const weekStart = new Date(sixWeeksAgo);
+      weekStart.setDate(weekStart.getDate() + (i * 7));
+      const weekNumber = `Sem ${i+1}`;
+      weeklyMap.set(weekNumber, { 
+        week: weekNumber, 
+        startDate: weekStart.toISOString().split('T')[0],
+        testPacks: 0, 
+        tags: 0, 
+        completion: 0
+      });
+    }
+    
+    // Get test packs created dates
+    const { data: testPacks, error: testPacksError } = await supabase
+      .from('test_packs')
+      .select('created_at, estado');
+      
+    if (testPacksError) throw testPacksError;
+    
+    // Distribute test packs and calculate completion percentages by week
+    testPacks?.forEach(tp => {
+      const createdDate = new Date(tp.created_at);
+      if (createdDate >= sixWeeksAgo) {
+        const weekIndex = Math.floor((createdDate.getTime() - sixWeeksAgo.getTime()) / (7 * 24 * 60 * 60 * 1000));
+        if (weekIndex >= 0 && weekIndex < 6) {
+          const weekNumber = `Sem ${weekIndex+1}`;
+          if (weeklyMap.has(weekNumber)) {
+            weeklyMap.get(weekNumber).testPacks++;
+            if (tp.estado === 'listo') {
+              weeklyMap.get(weekNumber).completion++;
+            }
+          }
+        }
+      }
+    });
+    
+    // Count tags by week
+    tags?.forEach(tag => {
+      const createdDate = new Date(tag.created_at);
+      if (createdDate >= sixWeeksAgo) {
+        const weekIndex = Math.floor((createdDate.getTime() - sixWeeksAgo.getTime()) / (7 * 24 * 60 * 60 * 1000));
+        if (weekIndex >= 0 && weekIndex < 6) {
+          const weekNumber = `Sem ${weekIndex+1}`;
+          if (weeklyMap.has(weekNumber)) {
+            weeklyMap.get(weekNumber).tags++;
+          }
+        }
+      }
+    });
+    
+    // Convert completion to percentages
+    weeklyMap.forEach(week => {
+      week.completion = week.testPacks > 0 
+        ? Math.round((week.completion / week.testPacks) * 100)
+        : 0;
+    });
+    
+    // Convert map to array
+    const weeklyData = Array.from(weeklyMap.values());
+    
+    // Process monthly data
+    const monthNames = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
+    const monthlyMap = new Map();
+    
+    // Initialize last 6 months
+    const sixMonthsAgo = new Date(now);
+    sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6);
+    
+    for (let i = 0; i < 6; i++) {
+      const monthDate = new Date(sixMonthsAgo);
+      monthDate.setMonth(monthDate.getMonth() + i);
+      const monthName = monthNames[monthDate.getMonth()];
+      monthlyMap.set(monthName, { 
+        month: monthName,
+        monthIndex: monthDate.getMonth(),
+        year: monthDate.getFullYear(),
+        target: 30 + Math.floor(Math.random() * 10), // Random target between 30-40
+        actual: 0,
+        efficiency: 0
+      });
+    }
+    
+    // Count actual completions by month
+    tags?.forEach(tag => {
+      if (tag.estado === 'liberado' && tag.fecha_liberacion) {
+        const liberationDate = new Date(tag.fecha_liberacion);
+        if (liberationDate >= sixMonthsAgo) {
+          const monthName = monthNames[liberationDate.getMonth()];
+          if (monthlyMap.has(monthName) && 
+              monthlyMap.get(monthName).year === liberationDate.getFullYear()) {
+            monthlyMap.get(monthName).actual++;
+          }
+        }
+      }
+    });
+    
+    // Calculate efficiency
+    monthlyMap.forEach(month => {
+      month.efficiency = month.target > 0 
+        ? Math.round((month.actual / month.target) * 100)
+        : 0;
+    });
+    
+    // Convert map to array and sort by month
+    const monthlyData = Array.from(monthlyMap.values()).map(data => ({
+      name: data.month,
+      goal: data.target,
+      actual: data.actual,
+      efficiency: data.efficiency
+    }));
+    
+    // Sort by month order
+    monthlyData.sort((a, b) => {
+      return monthNames.indexOf(a.name) - monthNames.indexOf(b.name);
+    });
+    
+    console.log(`Processed ${dailyData.length} days, ${weeklyData.length} weeks, and ${monthlyData.length} months of data`);
+    
+    return {
+      dailyData,
+      weeklyData,
+      monthlyData
+    };
+  } catch (error) {
+    console.error("Error fetching tag completion data:", error);
+    // Return default empty data
+    return {
+      dailyData: [],
+      weeklyData: [],
+      monthlyData: []
+    };
+  }
+};

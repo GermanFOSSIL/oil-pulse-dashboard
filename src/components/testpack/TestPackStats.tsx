@@ -1,5 +1,5 @@
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -19,6 +19,7 @@ import {
   LineChart as LineChartIcon, 
   TrendingUp, Activity, Calendar 
 } from "lucide-react";
+import { getTagCompletionData } from "@/services/testPackService";
 
 interface TestPackStatsProps {
   statsData: StatsData;
@@ -26,63 +27,100 @@ interface TestPackStatsProps {
 
 const COLORS = ["#3b82f6", "#10b981", "#f97316", "#8b5cf6", "#ec4899"];
 
-// Sample daily completion data (would come from API in real implementation)
-const dailyCompletionData = [
-  { name: "Lun", completions: 4, tags: 8 },
-  { name: "Mar", completions: 2, tags: 5 },
-  { name: "Mié", completions: 5, tags: 12 },
-  { name: "Jue", completions: 8, tags: 15 },
-  { name: "Vie", completions: 6, tags: 10 },
-  { name: "Sáb", completions: 1, tags: 3 },
-  { name: "Dom", completions: 0, tags: 1 },
-];
-
-// Weekly trend data (would come from API in real implementation)
-const weeklyTrendData = [
-  { name: "Sem 1", testPacks: 12, tags: 45, completion: 35 },
-  { name: "Sem 2", testPacks: 15, tags: 52, completion: 40 },
-  { name: "Sem 3", testPacks: 18, tags: 60, completion: 48 },
-  { name: "Sem 4", testPacks: 14, tags: 48, completion: 42 },
-  { name: "Sem 5", testPacks: 20, tags: 65, completion: 55 },
-  { name: "Sem 6", testPacks: 22, tags: 72, completion: 60 }
-];
-
-// Efficiency trend (would come from API in real implementation)
-const efficiencyData = [
-  { name: "Ene", goal: 40, actual: 35, efficiency: 87.5 },
-  { name: "Feb", goal: 42, actual: 40, efficiency: 95.2 },
-  { name: "Mar", goal: 45, actual: 38, efficiency: 84.4 },
-  { name: "Abr", goal: 48, actual: 45, efficiency: 93.8 },
-  { name: "May", goal: 50, actual: 48, efficiency: 96.0 },
-  { name: "Jun", goal: 52, actual: 49, efficiency: 94.2 }
-];
+// Helper to map an array to recharts format
+const mapDataToChartFormat = (data: any[], keyMap: Record<string, string>) => {
+  return data.map(item => {
+    const result: Record<string, any> = {};
+    for (const [apiKey, chartKey] of Object.entries(keyMap)) {
+      result[chartKey] = item[apiKey];
+    }
+    return result;
+  });
+};
 
 const TestPackStats = ({ statsData }: TestPackStatsProps) => {
   const { testPacks, tags, systems, subsystems, itrs } = statsData;
   const [chartView, setChartView] = useState("daily");
+  const [timeRange, setTimeRange] = useState("week");
+  
+  const [dailyCompletionData, setDailyCompletionData] = useState<any[]>([]);
+  const [weeklyCompletionData, setWeeklyCompletionData] = useState<any[]>([]);
+  const [monthlyEfficiencyData, setMonthlyEfficiencyData] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  
+  useEffect(() => {
+    const fetchCompletionData = async () => {
+      setLoading(true);
+      try {
+        // Fetch actual completion data
+        const { dailyData, weeklyData, monthlyData } = await getTagCompletionData();
+        
+        // Process and format the data
+        const formattedDailyData = mapDataToChartFormat(dailyData, {
+          date: 'name',
+          completions: 'completions',
+          tags: 'tags'
+        });
+        
+        const formattedWeeklyData = mapDataToChartFormat(weeklyData, {
+          week: 'name',
+          testPacks: 'testPacks',
+          tags: 'tags',
+          completionRate: 'completion'
+        });
+        
+        const formattedMonthlyData = mapDataToChartFormat(monthlyData, {
+          month: 'name',
+          target: 'goal',
+          actual: 'actual',
+          efficiency: 'efficiency'
+        });
+        
+        setDailyCompletionData(formattedDailyData);
+        setWeeklyCompletionData(formattedWeeklyData);
+        setMonthlyEfficiencyData(formattedMonthlyData);
+      } catch (error) {
+        console.error("Error fetching completion data:", error);
+        // Fallback to empty arrays if data fetch fails
+        setDailyCompletionData([]);
+        setWeeklyCompletionData([]);
+        setMonthlyEfficiencyData([]);
+      } finally {
+        setLoading(false);
+      }
+    };
+    
+    fetchCompletionData();
+  }, []);
   
   const formatPercent = (value: number) => `${value}%`;
   
-  const avgDailyCompletions = dailyCompletionData.reduce((sum, day) => sum + day.completions, 0) / 
-    dailyCompletionData.length;
-
-  const avgTagsPerDay = dailyCompletionData.reduce((sum, day) => sum + day.tags, 0) / 
-    dailyCompletionData.length;
-
-  const calculateWeeklyAvg = () => {
-    const lastWeek = weeklyTrendData[weeklyTrendData.length - 1];
-    const prevWeek = weeklyTrendData[weeklyTrendData.length - 2];
+  const calculateAverage = (data: any[], key: string) => {
+    if (!data.length) return 0;
+    return data.reduce((sum, item) => sum + (item[key] || 0), 0) / data.length;
+  };
+  
+  const avgDailyCompletions = calculateAverage(dailyCompletionData, 'completions');
+  const avgTagsPerDay = calculateAverage(dailyCompletionData, 'tags');
+  
+  const calculateWeeklyTrend = () => {
+    if (weeklyCompletionData.length < 2) {
+      return { trend: 0, positive: true };
+    }
+    
+    const lastWeek = weeklyCompletionData[weeklyCompletionData.length - 1];
+    const prevWeek = weeklyCompletionData[weeklyCompletionData.length - 2];
     
     if (!lastWeek || !prevWeek) return { trend: 0, positive: true };
     
-    const diff = ((lastWeek.completion - prevWeek.completion) / prevWeek.completion) * 100;
+    const diff = ((lastWeek.completion - prevWeek.completion) / Math.max(prevWeek.completion, 1)) * 100;
     return {
       trend: Math.abs(parseFloat(diff.toFixed(1))),
       positive: diff >= 0
     };
   };
   
-  const weeklyAvg = calculateWeeklyAvg();
+  const weeklyTrend = calculateWeeklyTrend();
   
   return (
     <div className="space-y-6">
@@ -93,8 +131,8 @@ const TestPackStats = ({ statsData }: TestPackStatsProps) => {
           description={`${testPacks.completed} completados (${formatPercent(testPacks.progress)})`}
           icon={<BarChart2 className="h-4 w-4" />}
           trend={{
-            value: weeklyAvg.trend,
-            positive: weeklyAvg.positive
+            value: weeklyTrend.trend,
+            positive: weeklyTrend.positive
           }}
         />
         
@@ -104,7 +142,7 @@ const TestPackStats = ({ statsData }: TestPackStatsProps) => {
           description={`${tags.released} liberados (${formatPercent(tags.progress)})`}
           icon={<ChartPie className="h-4 w-4" />}
           trend={{
-            value: 4.2,
+            value: Math.abs(tags.progress - (tags.progress > 0 ? 5 : 0)),
             positive: true
           }}
         />
@@ -146,83 +184,101 @@ const TestPackStats = ({ statsData }: TestPackStatsProps) => {
           </CardHeader>
           <CardContent className="px-2">
             <div className="h-[300px]">
-              <ChartContainer
-                config={{
-                  completions: {
-                    color: "#3b82f6",
-                    label: "Completados"
-                  },
-                  tags: {
-                    color: "#f97316",
-                    label: "TAGs procesados"
-                  },
-                  testPacks: {
-                    color: "#10b981",
-                    label: "Test Packs"
-                  },
-                  completion: {
-                    color: "#8b5cf6",
-                    label: "% Completado"
-                  }
-                }}
-              >
-                {chartView === "daily" ? (
-                  <ComposedChart data={dailyCompletionData}>
-                    <CartesianGrid strokeDasharray="3 3" vertical={false} />
-                    <XAxis dataKey="name" />
-                    <YAxis yAxisId="left" />
-                    <YAxis yAxisId="right" orientation="right" />
-                    <ChartTooltip 
-                      content={
-                        <ChartTooltipContent/>
-                      }
-                    />
-                    <Legend />
-                    <Bar 
-                      yAxisId="left"
-                      dataKey="completions" 
-                      name="completions" 
-                      fill="var(--color-completions)" 
-                      radius={[4, 4, 0, 0]}
-                    />
-                    <Bar 
-                      yAxisId="left"
-                      dataKey="tags" 
-                      name="tags" 
-                      fill="var(--color-tags)" 
-                      radius={[4, 4, 0, 0]}
-                    />
-                  </ComposedChart>
-                ) : (
-                  <ComposedChart data={weeklyTrendData}>
-                    <CartesianGrid strokeDasharray="3 3" vertical={false} />
-                    <XAxis dataKey="name" />
-                    <YAxis yAxisId="left" />
-                    <YAxis yAxisId="right" orientation="right" />
-                    <ChartTooltip 
-                      content={
-                        <ChartTooltipContent/>
-                      }
-                    />
-                    <Legend />
-                    <Bar 
-                      yAxisId="left"
-                      dataKey="testPacks" 
-                      name="testPacks" 
-                      fill="var(--color-testPacks)" 
-                      radius={[4, 4, 0, 0]}
-                    />
-                    <Line 
-                      yAxisId="right"
-                      type="monotone" 
-                      dataKey="completion" 
-                      name="completion" 
-                      stroke="var(--color-completion)" 
-                      strokeWidth={2}
-                    />
-                  </ComposedChart>
-                )}
-              </ChartContainer>
+              {loading ? (
+                <div className="flex items-center justify-center h-full">
+                  <div className="text-muted-foreground">Cargando datos...</div>
+                </div>
+              ) : (
+                <ChartContainer
+                  config={{
+                    completions: {
+                      color: "#3b82f6",
+                      label: "Completados"
+                    },
+                    tags: {
+                      color: "#f97316",
+                      label: "TAGs procesados"
+                    },
+                    testPacks: {
+                      color: "#10b981",
+                      label: "Test Packs"
+                    },
+                    completion: {
+                      color: "#8b5cf6",
+                      label: "% Completado"
+                    }
+                  }}
+                >
+                  {chartView === "daily" ? (
+                    dailyCompletionData.length > 0 ? (
+                      <ComposedChart data={dailyCompletionData}>
+                        <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                        <XAxis dataKey="name" />
+                        <YAxis yAxisId="left" />
+                        <YAxis yAxisId="right" orientation="right" />
+                        <ChartTooltip 
+                          content={
+                            <ChartTooltipContent/>
+                          }
+                        />
+                        <Legend />
+                        <Bar 
+                          yAxisId="left"
+                          dataKey="completions" 
+                          name="completions" 
+                          fill="var(--color-completions)" 
+                          radius={[4, 4, 0, 0]}
+                        />
+                        <Bar 
+                          yAxisId="left"
+                          dataKey="tags" 
+                          name="tags" 
+                          fill="var(--color-tags)" 
+                          radius={[4, 4, 0, 0]}
+                        />
+                      </ComposedChart>
+                    ) : (
+                      <div className="flex items-center justify-center h-full">
+                        <div className="text-muted-foreground">No hay datos disponibles</div>
+                      </div>
+                    )
+                  ) : (
+                    weeklyCompletionData.length > 0 ? (
+                      <ComposedChart data={weeklyCompletionData}>
+                        <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                        <XAxis dataKey="name" />
+                        <YAxis yAxisId="left" />
+                        <YAxis yAxisId="right" orientation="right" />
+                        <ChartTooltip 
+                          content={
+                            <ChartTooltipContent/>
+                          }
+                        />
+                        <Legend />
+                        <Bar 
+                          yAxisId="left"
+                          dataKey="testPacks" 
+                          name="testPacks" 
+                          fill="var(--color-testPacks)" 
+                          radius={[4, 4, 0, 0]}
+                        />
+                        <Line 
+                          yAxisId="right"
+                          type="monotone" 
+                          dataKey="completion" 
+                          name="completion" 
+                          stroke="var(--color-completion)" 
+                          strokeWidth={2}
+                        />
+                      </ComposedChart>
+                    ) : (
+                      <div className="flex items-center justify-center h-full">
+                        <div className="text-muted-foreground">No hay datos disponibles</div>
+                      </div>
+                    )
+                  )}
+                </ChartContainer>
+              )}
             </div>
           </CardContent>
         </Card>
@@ -236,57 +292,69 @@ const TestPackStats = ({ statsData }: TestPackStatsProps) => {
           </CardHeader>
           <CardContent>
             <div className="h-[300px]">
-              <ChartContainer
-                config={{
-                  goal: {
-                    color: "#3b82f6",
-                    label: "Objetivo"
-                  },
-                  actual: {
-                    color: "#10b981",
-                    label: "Real"
-                  },
-                  efficiency: {
-                    color: "#f97316",
-                    label: "Eficiencia %"
-                  }
-                }}
-              >
-                <ComposedChart data={efficiencyData}>
-                  <CartesianGrid strokeDasharray="3 3" vertical={false} />
-                  <XAxis dataKey="name" />
-                  <YAxis yAxisId="left" />
-                  <YAxis yAxisId="right" orientation="right" />
-                  <ChartTooltip 
-                    content={
-                      <ChartTooltipContent/>
-                    }
-                  />
-                  <Legend />
-                  <Bar 
-                    yAxisId="left"
-                    dataKey="goal" 
-                    name="goal" 
-                    fill="var(--color-goal)" 
-                    radius={[4, 4, 0, 0]}
-                  />
-                  <Bar 
-                    yAxisId="left"
-                    dataKey="actual" 
-                    name="actual" 
-                    fill="var(--color-actual)" 
-                    radius={[4, 4, 0, 0]}
-                  />
-                  <Line 
-                    yAxisId="right"
-                    type="monotone" 
-                    dataKey="efficiency" 
-                    name="efficiency" 
-                    stroke="var(--color-efficiency)" 
-                    strokeWidth={2}
-                  />
-                </ComposedChart>
-              </ChartContainer>
+              {loading ? (
+                <div className="flex items-center justify-center h-full">
+                  <div className="text-muted-foreground">Cargando datos...</div>
+                </div>
+              ) : (
+                monthlyEfficiencyData.length > 0 ? (
+                  <ChartContainer
+                    config={{
+                      goal: {
+                        color: "#3b82f6",
+                        label: "Objetivo"
+                      },
+                      actual: {
+                        color: "#10b981",
+                        label: "Real"
+                      },
+                      efficiency: {
+                        color: "#f97316",
+                        label: "Eficiencia %"
+                      }
+                    }}
+                  >
+                    <ComposedChart data={monthlyEfficiencyData}>
+                      <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                      <XAxis dataKey="name" />
+                      <YAxis yAxisId="left" />
+                      <YAxis yAxisId="right" orientation="right" />
+                      <ChartTooltip 
+                        content={
+                          <ChartTooltipContent/>
+                        }
+                      />
+                      <Legend />
+                      <Bar 
+                        yAxisId="left"
+                        dataKey="goal" 
+                        name="goal" 
+                        fill="var(--color-goal)" 
+                        radius={[4, 4, 0, 0]}
+                      />
+                      <Bar 
+                        yAxisId="left"
+                        dataKey="actual" 
+                        name="actual" 
+                        fill="var(--color-actual)" 
+                        radius={[4, 4, 0, 0]}
+                      />
+                      <Line 
+                        yAxisId="right"
+                        type="monotone" 
+                        dataKey="efficiency" 
+                        name="efficiency" 
+                        stroke="var(--color-efficiency)" 
+                        strokeWidth={2}
+                      />
+                    </ComposedChart>
+                  </ChartContainer>
+                ) : (
+                  <div className="flex items-center justify-center h-full">
+                    <div className="text-muted-foreground">No hay datos disponibles</div>
+                  </div>
+                )
+              )}
             </div>
           </CardContent>
         </Card>

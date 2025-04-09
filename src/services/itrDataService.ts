@@ -1,23 +1,87 @@
-
 import { supabase } from "@/integrations/supabase/client";
-import { ITR } from "@/services/types";
+import { ITR, ITRWithDetails } from "@/types/itr-types";
 
 export const getITRs = async (): Promise<ITR[]> => {
   try {
     console.log("Fetching all ITRs");
     const { data, error } = await supabase
       .from('itrs')
-      .select('*');
+      .select('*')
+      .order('name', { ascending: true });
 
     if (error) {
       console.error("Error fetching ITRs:", error);
       throw error;
     }
 
-    console.log("ITRs fetched successfully:", data?.length || 0);
-    return (data as unknown as ITR[]) || [];
+    console.log(`Retrieved ${data?.length || 0} ITRs`);
+    return data as ITR[];
   } catch (error) {
     console.error("Error in getITRs:", error);
+    throw error;
+  }
+};
+
+export const getITRsBySubsystemId = async (subsystemId: string): Promise<ITR[]> => {
+  try {
+    console.log(`Fetching ITRs for subsystem ${subsystemId}`);
+    const { data, error } = await supabase
+      .from('itrs')
+      .select('*')
+      .eq('subsystem_id', subsystemId)
+      .order('name', { ascending: true });
+
+    if (error) {
+      console.error(`Error fetching ITRs for subsystem ${subsystemId}:`, error);
+      throw error;
+    }
+
+    console.log(`Retrieved ${data?.length || 0} ITRs for subsystem ${subsystemId}`);
+    return data as ITR[];
+  } catch (error) {
+    console.error("Error in getITRsBySubsystemId:", error);
+    throw error;
+  }
+};
+
+export const getITRDetails = async (itrIds: string[]): Promise<ITRWithDetails[]> => {
+  try {
+    console.log(`Fetching ITR details for ${itrIds.length} ITRs`);
+    const { data, error } = await supabase
+      .from('itrs')
+      .select(`
+        *,
+        subsystems:subsystem_id (
+          name,
+          systems:system_id (
+            name,
+            projects:project_id (
+              name
+            )
+          )
+        )
+      `)
+      .in('id', itrIds);
+
+    if (error) {
+      console.error("Error fetching ITR details:", error);
+      throw error;
+    }
+
+    const itrsWithDetails: ITRWithDetails[] = data.map((itr: any) => {
+      return {
+        ...itr,
+        subsystemName: itr.subsystems?.name,
+        systemName: itr.subsystems?.systems?.name,
+        projectName: itr.subsystems?.systems?.projects?.name,
+        quantity: itr.quantity || 1
+      };
+    });
+
+    console.log(`Retrieved details for ${itrsWithDetails.length} ITRs`);
+    return itrsWithDetails;
+  } catch (error) {
+    console.error("Error in getITRDetails:", error);
     throw error;
   }
 };
@@ -164,108 +228,6 @@ export const deleteITR = async (id: string): Promise<void> => {
     console.log("ITR deleted successfully");
   } catch (error) {
     console.error("Error in deleteITR:", error);
-    throw error;
-  }
-};
-
-export const getITRsBySubsystemId = async (subsystemId: string): Promise<ITR[]> => {
-  try {
-    console.log(`Fetching ITRs for subsystem ${subsystemId}`);
-    const { data, error } = await supabase
-      .from('itrs')
-      .select('*')
-      .eq('subsystem_id', subsystemId);
-
-    if (error) {
-      console.error(`Error fetching ITRs for subsystem ${subsystemId}:`, error);
-      throw error;
-    }
-
-    console.log(`ITRs fetched successfully for subsystem ${subsystemId}:`, data?.length || 0);
-    return (data as unknown as ITR[]) || [];
-  } catch (error) {
-    console.error("Error in getITRsBySubsystemId:", error);
-    throw error;
-  }
-};
-
-export const getITRWithDetails = async (itrId: string): Promise<any> => {
-  try {
-    console.log(`Fetching detailed information for ITR with id ${itrId}`);
-    const { data: itr, error: itrError } = await supabase
-      .from('itrs')
-      .select('*')
-      .eq('id', itrId)
-      .maybeSingle();
-      
-    if (itrError) {
-      console.error(`Error fetching ITR with id ${itrId}:`, itrError);
-      throw itrError;
-    }
-    
-    if (!itr) {
-      const error = new Error("ITR no encontrado");
-      console.error(error);
-      throw error;
-    }
-    
-    console.log("ITR encontrado:", itr);
-    
-    const { data: subsystem, error: subsystemError } = await supabase
-      .from('subsystems')
-      .select('*, systems(*)')
-      .eq('id', itr.subsystem_id)
-      .maybeSingle();
-      
-    if (subsystemError) {
-      console.error(`Error fetching subsystem for ITR ${itrId}:`, subsystemError);
-      throw subsystemError;
-    }
-    
-    if (!subsystem) {
-      const error = new Error("Subsistema no encontrado");
-      console.error(error);
-      throw error;
-    }
-    
-    console.log("Subsistema encontrado:", subsystem.name);
-    
-    const system = subsystem.systems;
-    console.log("Sistema asociado:", system.name);
-    
-    const { data: project, error: projectError } = await supabase
-      .from('projects')
-      .select('*')
-      .eq('id', system.project_id)
-      .maybeSingle();
-      
-    if (projectError) {
-      console.error(`Error fetching project for system ${system.id}:`, projectError);
-      throw projectError;
-    }
-    
-    console.log("Proyecto asociado:", project?.name || "No encontrado");
-    
-    const result = {
-      ...itr,
-      subsystem: {
-        id: subsystem.id,
-        name: subsystem.name
-      },
-      system: {
-        id: system.id,
-        name: system.name
-      },
-      project: project ? {
-        id: project.id,
-        name: project.name
-      } : null
-    };
-    
-    console.log("Detalles completos recuperados:", result);
-    return result;
-  } catch (error) {
-    console.error("Error in getITRWithDetails:", error);
     throw error;
   }
 };

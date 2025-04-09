@@ -114,7 +114,7 @@ const TestPacks = () => {
         />
 
         <Tabs defaultValue="dashboard" className="space-y-4">
-          <div className="flex justify-between items-center">
+          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
             <TabsList>
               <TabsTrigger value="dashboard">Dashboard</TabsTrigger>
               <TabsTrigger value="list">Lista</TabsTrigger>

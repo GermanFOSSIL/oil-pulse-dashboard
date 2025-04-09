@@ -24,12 +24,15 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useTestPacks } from "@/hooks/useTestPacks";
 import { TestPack } from "@/services/types";
-import { getITRs } from "@/services/itrDataService";
+import { getITRs, getITRsBySubsystemId } from "@/services/itrDataService";
 import { getSystemsByProjectId, getSystemsWithSubsystems } from "@/services/systemService";
 import { getSubsystemsBySystemId } from "@/services/subsystemService";
 import { getProjects } from "@/services/projectService";
-import { Loader2 } from "lucide-react";
+import { Loader2, X } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { Badge } from "@/components/ui/badge";
+import { Checkbox } from "@/components/ui/checkbox";
+import { ScrollArea } from "@/components/ui/scroll-area";
 
 interface TestPackFormModalProps {
   isOpen: boolean;
@@ -40,7 +43,7 @@ interface TestPackFormModalProps {
 
 const formSchema = z.object({
   nombre_paquete: z.string().min(1, "El nombre es requerido"),
-  itr_asociado: z.string().min(1, "El ITR es requerido"),
+  itrs_asociados: z.array(z.string()).min(1, "Al menos un ITR es requerido"),
   sistema: z.string().min(1, "El sistema es requerido"),
   subsistema: z.string().min(1, "El subsistema es requerido"),
 });
@@ -55,18 +58,20 @@ const TestPackFormModal = ({ isOpen, onClose, onSuccess, testPack }: TestPackFor
   
   const [projects, setProjects] = useState<{ id: string; name: string }[]>([]);
   const [systems, setSystems] = useState<{ id: string; name: string; project_id: string }[]>([]);
-  const [subsystems, setSubsystems] = useState<{ id: string; name: string; system_id: string }[]>([]);
+  const [subsystems, setSubsystems] = useState<{ id: string; name: string; system_id: string; id_db: string }[]>([]);
   const [itrs, setItrs] = useState<{ id: string; name: string }[]>([]);
+  const [selectedItrs, setSelectedItrs] = useState<string[]>([]);
   
   const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null);
   const [selectedSystemId, setSelectedSystemId] = useState<string | null>(null);
+  const [selectedSubsystemId, setSelectedSubsystemId] = useState<string | null>(null);
   const [loadingData, setLoadingData] = useState<boolean>(false);
   
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
     defaultValues: {
       nombre_paquete: testPack?.nombre_paquete || "",
-      itr_asociado: testPack?.itr_asociado || "",
+      itrs_asociados: testPack?.itr_asociado ? [testPack.itr_asociado] : [],
       sistema: testPack?.sistema || "",
       subsistema: testPack?.subsistema || "",
     },
@@ -75,12 +80,19 @@ const TestPackFormModal = ({ isOpen, onClose, onSuccess, testPack }: TestPackFor
   // Reset form when modal opens or testPack changes
   useEffect(() => {
     if (isOpen) {
+      // If editing, pre-populate with existing values (including comma-separated ITRs)
+      const existingItrs = testPack?.itr_asociado ? 
+        testPack.itr_asociado.split(',').map(itr => itr.trim()) : 
+        [];
+        
       form.reset({
         nombre_paquete: testPack?.nombre_paquete || "",
-        itr_asociado: testPack?.itr_asociado || "",
+        itrs_asociados: existingItrs,
         sistema: testPack?.sistema || "",
         subsistema: testPack?.subsistema || "",
       });
+      
+      setSelectedItrs(existingItrs);
       setError(null);
     }
   }, [isOpen, testPack, form]);
@@ -128,12 +140,22 @@ const TestPackFormModal = ({ isOpen, onClose, onSuccess, testPack }: TestPackFor
             );
             
             if (matchingSubsystem) {
+              setSelectedSubsystemId(matchingSubsystem.id);
+              
               // Get subsystems for this system
               const subsystemsForSystem = await getSubsystemsBySystemId(matchingSystem.id);
               setSubsystems(subsystemsForSystem.map(s => ({ 
                 id: s.id, 
                 name: s.name, 
-                system_id: s.system_id 
+                system_id: s.system_id,
+                id_db: s.id
+              })));
+              
+              // Now load ITRs for this subsystem
+              const itrsForSubsystem = await getITRsBySubsystemId(matchingSubsystem.id);
+              setItrs(itrsForSubsystem.map(itr => ({ 
+                id: itr.id, 
+                name: itr.name 
               })));
             }
           }
@@ -157,8 +179,11 @@ const TestPackFormModal = ({ isOpen, onClose, onSuccess, testPack }: TestPackFor
   const handleProjectChange = async (projectId: string) => {
     setSelectedProjectId(projectId);
     setSelectedSystemId(null);
+    setSelectedSubsystemId(null);
+    setSelectedItrs([]);
     form.setValue("sistema", "");
     form.setValue("subsistema", "");
+    form.setValue("itrs_asociados", []);
     setLoadingData(true);
     
     try {
@@ -170,6 +195,7 @@ const TestPackFormModal = ({ isOpen, onClose, onSuccess, testPack }: TestPackFor
         project_id: s.project_id 
       })));
       setSubsystems([]);
+      setItrs([]);
     } catch (err) {
       console.error("Error cargando sistemas:", err);
       toast({
@@ -184,8 +210,11 @@ const TestPackFormModal = ({ isOpen, onClose, onSuccess, testPack }: TestPackFor
   
   const handleSystemChange = async (systemId: string, systemName: string) => {
     setSelectedSystemId(systemId);
+    setSelectedSubsystemId(null);
+    setSelectedItrs([]);
     form.setValue("sistema", systemName);
     form.setValue("subsistema", "");
+    form.setValue("itrs_asociados", []);
     setLoadingData(true);
     
     try {
@@ -194,8 +223,10 @@ const TestPackFormModal = ({ isOpen, onClose, onSuccess, testPack }: TestPackFor
       setSubsystems(subsystemsData.map(s => ({ 
         id: s.id, 
         name: s.name, 
-        system_id: s.system_id 
+        system_id: s.system_id,
+        id_db: s.id
       })));
+      setItrs([]);
     } catch (err) {
       console.error("Error cargando subsistemas:", err);
       toast({
@@ -208,16 +239,65 @@ const TestPackFormModal = ({ isOpen, onClose, onSuccess, testPack }: TestPackFor
     }
   };
   
+  const handleSubsystemChange = async (subsystemId: string, subsystemName: string) => {
+    setSelectedSubsystemId(subsystemId);
+    form.setValue("subsistema", subsystemName);
+    form.setValue("itrs_asociados", []);
+    setSelectedItrs([]);
+    setLoadingData(true);
+    
+    try {
+      console.log("Cargando ITRs para subsistema:", subsystemId);
+      const itrsData = await getITRsBySubsystemId(subsystemId);
+      setItrs(itrsData.map(itr => ({ 
+        id: itr.id, 
+        name: itr.name 
+      })));
+    } catch (err) {
+      console.error("Error cargando ITRs:", err);
+      toast({
+        title: "Error",
+        description: "No se pudieron cargar los ITRs",
+        variant: "destructive",
+      });
+    } finally {
+      setLoadingData(false);
+    }
+  };
+  
+  const handleItrToggle = (itrName: string) => {
+    const updatedItrs = selectedItrs.includes(itrName)
+      ? selectedItrs.filter(name => name !== itrName)
+      : [...selectedItrs, itrName];
+    
+    setSelectedItrs(updatedItrs);
+    form.setValue("itrs_asociados", updatedItrs);
+  };
+  
+  const removeItr = (itrName: string) => {
+    const updatedItrs = selectedItrs.filter(name => name !== itrName);
+    setSelectedItrs(updatedItrs);
+    form.setValue("itrs_asociados", updatedItrs);
+  };
+  
   const onSubmit = async (values: FormValues) => {
     setIsLoading(true);
     setError(null);
     try {
       console.log("Enviando formulario:", values);
       
+      // Join the selected ITRs with commas for storage
+      const itrAsociado = values.itrs_asociados.join(", ");
+      
       if (testPack) {
         // Update existing Test Pack
         console.log("Actualizando Test Pack:", testPack.id);
-        await updateTestPack(testPack.id, values);
+        await updateTestPack(testPack.id, {
+          nombre_paquete: values.nombre_paquete,
+          itr_asociado: itrAsociado,
+          sistema: values.sistema,
+          subsistema: values.subsistema
+        });
         toast({
           title: "Éxito",
           description: "Test Pack actualizado correctamente",
@@ -227,7 +307,7 @@ const TestPackFormModal = ({ isOpen, onClose, onSuccess, testPack }: TestPackFor
         console.log("Creando nuevo Test Pack");
         const newTestPack: Omit<TestPack, "id" | "created_at" | "updated_at"> = {
           nombre_paquete: values.nombre_paquete,
-          itr_asociado: values.itr_asociado,
+          itr_asociado: itrAsociado,
           sistema: values.sistema,
           subsistema: values.subsistema,
           estado: 'pendiente'
@@ -353,10 +433,10 @@ const TestPackFormModal = ({ isOpen, onClose, onSuccess, testPack }: TestPackFor
                         onValueChange={(value) => {
                           const subsystem = subsystems.find(s => s.id === value);
                           if (subsystem) {
-                            field.onChange(subsystem.name);
+                            handleSubsystemChange(value, subsystem.name);
                           }
                         }}
-                        value={subsystems.find(s => s.name === field.value)?.id}
+                        value={selectedSubsystemId || undefined}
                         disabled={isLoading}
                       >
                         <SelectTrigger>
@@ -376,37 +456,56 @@ const TestPackFormModal = ({ isOpen, onClose, onSuccess, testPack }: TestPackFor
                 />
               )}
               
-              <FormField
-                control={form.control}
-                name="itr_asociado"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>ITR Asociado</FormLabel>
-                    <Select
-                      onValueChange={(value) => {
-                        const itr = itrs.find(i => i.id === value);
-                        if (itr) {
-                          field.onChange(itr.name);
-                        }
-                      }}
-                      value={itrs.find(i => i.name === field.value)?.id}
-                      disabled={isLoading}
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder="Seleccione un ITR" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {itrs.map((itr) => (
-                          <SelectItem key={itr.id} value={itr.id}>
-                            {itr.name}
-                          </SelectItem>
+              {selectedSubsystemId && (
+                <FormField
+                  control={form.control}
+                  name="itrs_asociados"
+                  render={() => (
+                    <FormItem>
+                      <FormLabel>ITRs Asociados</FormLabel>
+                      <div className="mb-2 mt-1 flex flex-wrap gap-1">
+                        {selectedItrs.map(itr => (
+                          <Badge key={itr} variant="secondary" className="flex items-center gap-1 p-1">
+                            {itr}
+                            <button 
+                              type="button" 
+                              onClick={() => removeItr(itr)}
+                              className="ml-1 rounded-full hover:bg-muted p-1"
+                            >
+                              <X className="h-3 w-3" />
+                            </button>
+                          </Badge>
                         ))}
-                      </SelectContent>
-                    </Select>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
+                      </div>
+                      <ScrollArea className="h-[180px] border rounded-md p-2">
+                        <div className="space-y-2">
+                          {itrs.map(itr => (
+                            <div key={itr.id} className="flex items-center space-x-2">
+                              <Checkbox 
+                                id={itr.id} 
+                                checked={selectedItrs.includes(itr.name)}
+                                onCheckedChange={() => handleItrToggle(itr.name)}
+                              />
+                              <label 
+                                htmlFor={itr.id}
+                                className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer"
+                              >
+                                {itr.name}
+                              </label>
+                            </div>
+                          ))}
+                          {itrs.length === 0 && (
+                            <p className="text-sm text-muted-foreground">
+                              No hay ITRs disponibles para este subsistema
+                            </p>
+                          )}
+                        </div>
+                      </ScrollArea>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              )}
               
               {error && (
                 <div className="text-sm text-destructive">
@@ -418,7 +517,7 @@ const TestPackFormModal = ({ isOpen, onClose, onSuccess, testPack }: TestPackFor
                 <Button type="button" variant="outline" onClick={onClose} disabled={isLoading}>
                   Cancelar
                 </Button>
-                <Button type="submit" disabled={isLoading}>
+                <Button type="submit" disabled={isLoading || loadingData}>
                   {isLoading ? (
                     <>
                       <Loader2 className="h-4 w-4 mr-2 animate-spin" />
