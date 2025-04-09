@@ -15,7 +15,6 @@ export const getTestPacks = async (): Promise<TestPack[]> => {
     }
 
     console.log(`Retrieved ${data?.length || 0} Test Packs`);
-    // Asegurar que los datos cumplen con el tipo TestPack
     return (data || []) as TestPack[];
   } catch (error) {
     console.error("Error in getTestPacks:", error);
@@ -117,7 +116,7 @@ export const deleteTestPack = async (id: string): Promise<boolean> => {
   try {
     console.log(`Deleting Test Pack with id ${id}`);
     
-    // First, get the test pack details for logging
+    // First, get the test pack details before deletion for logging
     const { data: testPackData } = await supabase
       .from('test_packs')
       .select('*')
@@ -129,7 +128,7 @@ export const deleteTestPack = async (id: string): Promise<boolean> => {
       return false;
     }
     
-    // Get tag IDs associated with this test pack for deleting acciones_log
+    // Step 1: Get all tags associated with this test pack
     const { data: tagData } = await supabase
       .from('tags')
       .select('id')
@@ -137,38 +136,50 @@ export const deleteTestPack = async (id: string): Promise<boolean> => {
     
     const tagIds = tagData ? tagData.map(tag => tag.id) : [];
     
-    // Delete related entries in acciones_log if there are tags
+    // Step 2: Delete related entries in acciones_log if there are tags
     if (tagIds.length > 0) {
-      const { error: accionesLogError } = await supabase
+      // Check if there are any actions for these tags
+      const { data: actionsData } = await supabase
         .from('acciones_log')
-        .delete()
+        .select('id')
         .in('tag_id', tagIds);
-        
-      if (accionesLogError) {
-        console.error(`Error deleting related acciones_log entries for Test Pack ${id}:`, accionesLogError);
-        throw accionesLogError;
+      
+      if (actionsData && actionsData.length > 0) {
+        console.log(`Deleting ${actionsData.length} related action logs`);
+        const { error: accionesLogError } = await supabase
+          .from('acciones_log')
+          .delete()
+          .in('tag_id', tagIds);
+          
+        if (accionesLogError) {
+          console.error(`Error deleting related acciones_log entries:`, accionesLogError);
+          throw accionesLogError;
+        }
       }
     }
     
-    // Now delete the tags
-    const { error: tagsError } = await supabase
-      .from('tags')
-      .delete()
-      .eq('test_pack_id', id);
-      
-    if (tagsError) {
-      console.error(`Error deleting related tags for Test Pack ${id}:`, tagsError);
-      throw tagsError;
+    // Step 3: Now delete the tags
+    if (tagIds.length > 0) {
+      console.log(`Deleting ${tagIds.length} related tags`);
+      const { error: tagsError } = await supabase
+        .from('tags')
+        .delete()
+        .eq('test_pack_id', id);
+        
+      if (tagsError) {
+        console.error(`Error deleting related tags:`, tagsError);
+        throw tagsError;
+      }
     }
     
-    // Finally delete the test pack
+    // Step 4: Finally delete the test pack
     const { error } = await supabase
       .from('test_packs')
       .delete()
       .eq('id', id);
 
     if (error) {
-      console.error(`Error deleting Test Pack with id ${id}:`, error);
+      console.error(`Error deleting Test Pack:`, error);
       throw error;
     }
 

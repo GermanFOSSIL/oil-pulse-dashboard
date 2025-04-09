@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -68,7 +67,6 @@ const Subsystems = () => {
   };
 
   const handleDelete = (subsystem: Subsystem) => {
-    // Implement delete logic here
     console.log("Delete subsystem", subsystem);
   };
 
@@ -133,7 +131,7 @@ const Subsystems = () => {
       </Card>
       <SubsystemFormModal
         open={open}
-        onOpenChange={setOpen}
+        setOpen={setOpen}
         systems={systems}
         onSubmit={() => {
           fetchData();
