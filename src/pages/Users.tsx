@@ -13,6 +13,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
 import { PasswordChangeData, UserCreateData } from "@/services/types";
+import { useAuth } from "@/contexts/AuthContext";
 
 interface UserFormModalProps {
   open: boolean;
@@ -63,6 +64,7 @@ const PasswordChangeModal = ({ open, onClose, onSuccess, user }: PasswordChangeM
         newPassword: password
       };
 
+      console.log("Changing password for user:", user.id);
       const result = await changeUserPassword(data);
 
       if (result.success) {
@@ -155,6 +157,20 @@ const UserFormModal = ({ open, onClose, onSuccess, user }: UserFormModalProps) =
     confirmPassword: ""
   });
   
+  useEffect(() => {
+    if (user) {
+      setFormData({
+        full_name: user.full_name || "",
+        role: user.role || "user",
+        avatar_url: user.avatar_url || "",
+        permissions: user.permissions || [],
+        email: "",
+        password: "",
+        confirmPassword: ""
+      });
+    }
+  }, [user]);
+  
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
     setFormData(prev => ({ ...prev, [name]: value }));
@@ -241,6 +257,7 @@ const UserFormModal = ({ open, onClose, onSuccess, user }: UserFormModalProps) =
     
     try {
       if (isEditMode && user) {
+        console.log("Updating user:", user.id, formData);
         await updateUserProfile(user.id, {
           full_name: formData.full_name,
           avatar_url: formData.avatar_url,
@@ -262,6 +279,7 @@ const UserFormModal = ({ open, onClose, onSuccess, user }: UserFormModalProps) =
           permissions: formData.permissions
         };
 
+        console.log("Creating new user:", userData.email, userData.full_name);
         const result = await createUser(userData);
         
         if (result.success) {
@@ -430,13 +448,15 @@ const Users = () => {
   const [showPasswordModal, setShowPasswordModal] = useState(false);
   const [selectedUser, setSelectedUser] = useState<UserProfile | undefined>(undefined);
   const { toast } = useToast();
+  const { user } = useAuth();
 
   const fetchUsers = async () => {
     setLoading(true);
     
     try {
+      console.log("Fetching user profiles");
       const profiles = await getUserProfiles();
-      console.log("Perfiles obtenidos:", profiles);
+      console.log("Profiles fetched:", profiles);
       setUsers(profiles);
     } catch (error: any) {
       console.error("Error fetching users:", error);
@@ -451,34 +471,40 @@ const Users = () => {
   };
 
   useEffect(() => {
-    fetchUsers();
-  }, []);
+    if (user) {
+      fetchUsers();
+    }
+  }, [user]);
 
   const columns = [
     {
       header: "Nombre",
       accessorKey: "full_name" as keyof UserProfile,
-      cell: (user: UserProfile) => <span>{user.full_name || 'Sin nombre'}</span>
+      cell: (info: any) => <span>{info.row.original.full_name || 'Sin nombre'}</span>
     },
     {
       header: "ID",
       accessorKey: "id" as keyof UserProfile,
-      cell: (user: UserProfile) => <span className="text-xs text-muted-foreground">{user.id.substring(0, 8)}...</span>
+      cell: (info: any) => <span className="text-xs text-muted-foreground">{info.row.original.id.substring(0, 8)}...</span>
     },
     {
       header: "Rol",
       accessorKey: "role" as keyof UserProfile,
-      cell: (user: UserProfile) => (
-        <Badge variant={user.role === "admin" ? "default" : user.role === "tecnico" ? "outline" : "secondary"}>
-          {user.role === "admin" ? "Administrador" : 
-           user.role === "tecnico" ? "Técnico" : "Usuario"}
-        </Badge>
-      ),
+      cell: (info: any) => {
+        const role = info.row.original.role;
+        return (
+          <Badge variant={role === "admin" ? "default" : role === "tecnico" ? "outline" : "secondary"}>
+            {role === "admin" ? "Administrador" : 
+             role === "tecnico" ? "Técnico" : "Usuario"}
+          </Badge>
+        );
+      }
     },
     {
       header: "Permisos",
       accessorKey: "permissions" as keyof UserProfile,
-      cell: (user: UserProfile) => {
+      cell: (info: any) => {
+        const user = info.row.original;
         const permissionsCount = user.permissions?.length || 0;
         return (
           <span className="text-xs text-muted-foreground">
@@ -504,20 +530,20 @@ const Users = () => {
     {
       header: "Fecha Creación",
       accessorKey: "created_at" as keyof UserProfile,
-      cell: (user: UserProfile) => {
-        const date = new Date(user.created_at || '');
+      cell: (info: any) => {
+        const date = new Date(info.row.original.created_at || '');
         return <span>{date.toLocaleDateString('es-ES')}</span>;
       }
     },
     {
       header: "Acciones",
       accessorKey: "id" as keyof UserProfile,
-      cell: (user: UserProfile) => (
+      cell: (info: any) => (
         <div className="flex space-x-2">
           <Button 
             variant="ghost" 
             size="icon" 
-            onClick={() => handleChangePassword(user)}
+            onClick={() => handleChangePassword(info.row.original)}
             title="Cambiar contraseña"
           >
             <Key className="h-4 w-4" />
@@ -528,12 +554,13 @@ const Users = () => {
   ];
 
   const handleEditUser = (user: UserProfile) => {
-    console.log("Editando usuario:", user);
+    console.log("Editing user:", user);
     setSelectedUser(user);
     setShowModal(true);
   };
 
   const handleChangePassword = (user: UserProfile) => {
+    console.log("Change password for user:", user);
     setSelectedUser(user);
     setShowPasswordModal(true);
   };
@@ -547,6 +574,7 @@ const Users = () => {
   };
 
   const handleNewUser = () => {
+    console.log("Creating new user");
     setSelectedUser(undefined);
     setShowModal(true);
   };

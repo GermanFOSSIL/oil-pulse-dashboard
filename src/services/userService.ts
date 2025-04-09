@@ -27,47 +27,64 @@ export interface UserProfile {
 }
 
 export const getUserProfile = async (userId: string): Promise<UserProfile | null> => {
-  const { data, error } = await supabase
-    .from('profiles')
-    .select('*')
-    .eq('id', userId)
-    .single();
+  try {
+    const { data, error } = await supabase
+      .from('profiles')
+      .select('*')
+      .eq('id', userId)
+      .single();
 
-  if (error) {
-    console.error(`Error fetching profile for user ${userId}:`, error);
+    if (error) {
+      console.error(`Error fetching profile for user ${userId}:`, error);
+      throw error;
+    }
+
+    return data as unknown as UserProfile;
+  } catch (error) {
+    console.error(`Error in getUserProfile for ${userId}:`, error);
     throw error;
   }
-
-  return data as unknown as UserProfile;
 };
 
 export const getUserProfiles = async (): Promise<UserProfile[]> => {
-  const { data, error } = await supabase
-    .from('profiles')
-    .select('*');
+  try {
+    const { data, error } = await supabase
+      .from('profiles')
+      .select('*');
 
-  if (error) {
-    console.error('Error fetching user profiles:', error);
+    if (error) {
+      console.error('Error fetching user profiles:', error);
+      throw error;
+    }
+
+    return data as unknown as UserProfile[];
+  } catch (error) {
+    console.error('Error in getUserProfiles:', error);
     throw error;
   }
-
-  return data as unknown as UserProfile[];
 };
 
 export const updateUserProfile = async (userId: string, updates: Partial<UserProfile>): Promise<UserProfile> => {
-  const { data, error } = await supabase
-    .from('profiles')
-    .update(updates)
-    .eq('id', userId)
-    .select()
-    .single();
+  try {
+    console.log(`Updating profile for user ${userId}:`, updates);
+    
+    const { data, error } = await supabase
+      .from('profiles')
+      .update(updates)
+      .eq('id', userId)
+      .select()
+      .single();
 
-  if (error) {
-    console.error(`Error updating profile for user ${userId}:`, error);
+    if (error) {
+      console.error(`Error updating profile for user ${userId}:`, error);
+      throw error;
+    }
+
+    return data as unknown as UserProfile;
+  } catch (error) {
+    console.error(`Error in updateUserProfile for ${userId}:`, error);
     throw error;
   }
-
-  return data as unknown as UserProfile;
 };
 
 export const getUserPermissions = async (userId: string): Promise<string[]> => {
@@ -134,6 +151,12 @@ export const bulkCreateUsers = async (users: BulkUserData[]): Promise<number> =>
 
 export const createUser = async (userData: UserCreateData): Promise<{ success: boolean; message: string; userId?: string }> => {
   try {
+    console.log("Creating user with data:", { 
+      email: userData.email, 
+      full_name: userData.full_name, 
+      role: userData.role 
+    });
+    
     // First, create the user in auth
     const { data: authData, error: authError } = await supabase.auth.admin.createUser({
       email: userData.email,
@@ -154,6 +177,7 @@ export const createUser = async (userData: UserCreateData): Promise<{ success: b
     }
 
     const userId = authData.user.id;
+    console.log("User created successfully with ID:", userId);
 
     // Then, update the profile with additional information
     const profileData: UserUpdateData = {
@@ -174,6 +198,8 @@ export const createUser = async (userData: UserCreateData): Promise<{ success: b
       }
     }
 
+    console.log("Updating profile for new user with data:", profileData);
+    
     const { error: profileError } = await supabase
       .from('profiles')
       .update(profileData)
@@ -204,6 +230,8 @@ export const createUser = async (userData: UserCreateData): Promise<{ success: b
 
 export const changeUserPassword = async (data: PasswordChangeData): Promise<{ success: boolean; message: string }> => {
   try {
+    console.log("Changing password for user:", data.userId);
+    
     const { error } = await supabase.auth.admin.updateUserById(
       data.userId,
       { password: data.newPassword }
