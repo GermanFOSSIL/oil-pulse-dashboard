@@ -1,6 +1,6 @@
 
 import { useState, useEffect } from "react";
-import { Tabs, TabsContent } from "@/components/ui/tabs";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useTestPacks } from "@/hooks/useTestPacks";
 import TestPackList from "@/components/testpack/TestPackList";
 import TestPackStats from "@/components/testpack/TestPackStats";
@@ -110,14 +110,39 @@ const TestPacks = () => {
         <TestPacksHeader 
           onCreateNew={() => setIsFormModalOpen(true)}
           onBatchUpload={() => setIsBatchUploadModalOpen(true)}
+          statsData={statsData?.testPacks}
         />
 
-        <Tabs defaultValue="list" className="space-y-4">
-          <TestPacksSearch 
-            searchTerm={searchTerm}
-            onSearchChange={setSearchTerm}
-          />
+        <Tabs defaultValue="dashboard" className="space-y-4">
+          <div className="flex justify-between items-center">
+            <TabsList>
+              <TabsTrigger value="dashboard">Dashboard</TabsTrigger>
+              <TabsTrigger value="list">Lista</TabsTrigger>
+              <TabsTrigger value="activity">Actividad</TabsTrigger>
+            </TabsList>
+            
+            <TestPacksSearch 
+              searchTerm={searchTerm}
+              onSearchChange={setSearchTerm}
+            />
+          </div>
 
+          <TabsContent value="dashboard" className="space-y-4">
+            <TestPacksExportButtons 
+              isExporting={isExporting}
+              isLoading={loading}
+              hasData={testPacks.length > 0}
+              onExportExcel={handleExportExcel}
+              onExportPDF={handleExportPDF}
+            />
+            
+            {loading ? (
+              <TestPackSkeleton />
+            ) : (
+              <TestPackStats statsData={statsData} />
+            )}
+          </TabsContent>
+          
           <TabsContent value="list" className="space-y-4">
             <TestPacksExportButtons 
               isExporting={isExporting}
@@ -136,18 +161,6 @@ const TestPacks = () => {
                 onRefresh={fetchTestPacks}
               />
             )}
-          </TabsContent>
-
-          <TabsContent value="dashboard" className="space-y-4">
-            <TestPacksExportButtons 
-              isExporting={isExporting}
-              isLoading={loading}
-              hasData={testPacks.length > 0}
-              onExportExcel={handleExportExcel}
-              onExportPDF={handleExportPDF}
-            />
-            
-            <TestPackStats statsData={statsData} />
           </TabsContent>
 
           <TabsContent value="activity" className="space-y-4">
