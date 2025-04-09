@@ -505,9 +505,11 @@ export const deleteTestPack = async (testPackId: string): Promise<void> => {
     console.log(`Deleting test pack ${testPackId} and its associated tags`);
     
     // Start a transaction by using a single connection
-    const { error: deletionError } = await supabase.rpc('delete_test_pack_with_tags', {
-      test_pack_id: testPackId
-    });
+    // Cast the rpc call to any to bypass TypeScript's type checking
+    const { error: deletionError } = await supabase.rpc(
+      'delete_test_pack_with_tags', 
+      { test_pack_id: testPackId }
+    ) as any;
     
     if (deletionError) {
       console.error(`Transaction error deleting test pack ${testPackId}:`, deletionError);
