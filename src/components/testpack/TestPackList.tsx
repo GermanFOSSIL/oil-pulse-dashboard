@@ -1,3 +1,4 @@
+
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Card, CardContent } from "@/components/ui/card";
@@ -72,7 +73,11 @@ const TestPackList = ({ testPacks, loading, onRefresh }: TestPackListProps) => {
   };
   
   const handleViewDetails = (testPackId: string) => {
-    navigate(`/test-packs/${testPackId}`);
+    try {
+      navigate(`/test-packs/${testPackId}`);
+    } catch (error) {
+      console.error("Navigation error:", error);
+    }
   };
   
   const getStatusBadge = (status: string) => {
@@ -158,23 +163,32 @@ const TestPackList = ({ testPacks, loading, onRefresh }: TestPackListProps) => {
                         <TableCell className="text-right">
                           <DropdownMenu>
                             <DropdownMenuTrigger asChild>
-                              <Button variant="ghost" size="icon">
+                              <Button variant="ghost" size="icon" onClick={(e) => e.stopPropagation()}>
                                 <MoreHorizontal className="h-4 w-4" />
                                 <span className="sr-only">Acciones</span>
                               </Button>
                             </DropdownMenuTrigger>
-                            <DropdownMenuContent align="end">
-                              <DropdownMenuItem onClick={() => handleViewDetails(testPack.id)}>
+                            <DropdownMenuContent align="end" onClick={(e) => e.stopPropagation()}>
+                              <DropdownMenuItem onClick={(e) => {
+                                e.stopPropagation();
+                                handleViewDetails(testPack.id);
+                              }}>
                                 <Tags className="h-4 w-4 mr-2" />
                                 Ver TAGs
                               </DropdownMenuItem>
-                              <DropdownMenuItem onClick={() => handleEdit(testPack)}>
+                              <DropdownMenuItem onClick={(e) => {
+                                e.stopPropagation();
+                                handleEdit(testPack);
+                              }}>
                                 <Edit className="h-4 w-4 mr-2" />
                                 Editar
                               </DropdownMenuItem>
                               <DropdownMenuItem 
                                 className="text-destructive focus:text-destructive"
-                                onClick={() => setTestPackToDelete(testPack.id)}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setTestPackToDelete(testPack.id);
+                                }}
                               >
                                 <Trash2 className="h-4 w-4 mr-2" />
                                 Eliminar
@@ -219,7 +233,10 @@ const TestPackList = ({ testPacks, loading, onRefresh }: TestPackListProps) => {
           <AlertDialogFooter>
             <AlertDialogCancel disabled={isDeleting}>Cancelar</AlertDialogCancel>
             <AlertDialogAction 
-              onClick={handleDelete}
+              onClick={(e) => {
+                e.stopPropagation();
+                handleDelete();
+              }}
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
               disabled={isDeleting}
             >
