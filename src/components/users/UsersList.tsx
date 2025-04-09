@@ -1,5 +1,5 @@
 
-import { useState } from "react";
+import { useState, memo } from "react";
 import { User } from "@supabase/supabase-js";
 import { UserProfile } from "@/services/userService";
 import { 
@@ -12,6 +12,7 @@ import {
 } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Edit, Trash2, MoreHorizontal, KeyRound } from "lucide-react";
 import {
   DropdownMenu,
@@ -28,7 +29,7 @@ interface UsersListProps {
   onResetPassword: (userId: string) => void;
 }
 
-const UsersList = ({ users, onEdit, onDelete, onResetPassword }: UsersListProps) => {
+const UsersList = memo(({ users, onEdit, onDelete, onResetPassword }: UsersListProps) => {
   const getRoleBadge = (role?: string) => {
     switch (role) {
       case 'admin':
@@ -40,12 +41,22 @@ const UsersList = ({ users, onEdit, onDelete, onResetPassword }: UsersListProps)
     }
   };
 
+  const getInitials = (name?: string): string => {
+    if (!name) return '?';
+    return name
+      .split(' ')
+      .map(part => part[0])
+      .join('')
+      .toUpperCase()
+      .substring(0, 2);
+  };
+
   return (
     <Table>
       <TableHeader>
         <TableRow>
+          <TableHead>Usuario</TableHead>
           <TableHead>Email</TableHead>
-          <TableHead>Nombre</TableHead>
           <TableHead>Rol</TableHead>
           <TableHead>Fecha Creación</TableHead>
           <TableHead className="text-right">Acciones</TableHead>
@@ -53,19 +64,18 @@ const UsersList = ({ users, onEdit, onDelete, onResetPassword }: UsersListProps)
       </TableHeader>
       <TableBody>
         {users.map(user => {
-          // Log each user to debug email display issues
-          console.log(`Rendering user ${user.id}:`, {
-            email: user.email, 
-            profile_email: user.profile?.email,
-            name: user.profile?.full_name
-          });
+          const email = user.email || user.profile?.email || 'Email no disponible';
+          const name = user.profile?.full_name || '-';
           
           return (
             <TableRow key={user.id}>
-              <TableCell className="font-medium">
-                {user.email || user.profile?.email || 'Email no disponible'}
+              <TableCell className="flex items-center gap-2">
+                <Avatar className="h-8 w-8">
+                  <AvatarFallback>{getInitials(name)}</AvatarFallback>
+                </Avatar>
+                <span className="font-medium">{name}</span>
               </TableCell>
-              <TableCell>{user.profile?.full_name || '-'}</TableCell>
+              <TableCell>{email}</TableCell>
               <TableCell>{getRoleBadge(user.profile?.role)}</TableCell>
               <TableCell>
                 {user.created_at ? new Date(user.created_at).toLocaleDateString() : '-'}
@@ -104,6 +114,8 @@ const UsersList = ({ users, onEdit, onDelete, onResetPassword }: UsersListProps)
       </TableBody>
     </Table>
   );
-};
+});
+
+UsersList.displayName = "UsersList";
 
 export default UsersList;

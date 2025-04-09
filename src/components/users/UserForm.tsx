@@ -23,7 +23,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
-import { useEffect } from "react";
+import { useEffect, memo } from "react";
 
 const formSchema = z.object({
   email: z.string().email({
@@ -46,7 +46,7 @@ interface UserFormProps {
   onSubmit: (values: FormValues) => void;
 }
 
-const UserForm = ({ user, onSubmit }: UserFormProps) => {
+const UserForm = memo(({ user, onSubmit }: UserFormProps) => {
   console.log("UserForm user data:", user);
   
   const form = useForm<FormValues>({
@@ -63,15 +63,17 @@ const UserForm = ({ user, onSubmit }: UserFormProps) => {
   // Initialize form values when user data is available
   useEffect(() => {
     if (user) {
+      const email = user.email || user.profile?.email || "";
+      
       console.log("Setting form values from user:", {
-        email: user.email,
+        email,
         full_name: user.profile?.full_name,
         role: user.profile?.role,
         permissions: user.profile?.permissions
       });
       
       form.reset({
-        email: user.email || "",
+        email,
         password: "",
         full_name: user.profile?.full_name || "",
         role: user.profile?.role || "user",
@@ -218,6 +220,8 @@ const UserForm = ({ user, onSubmit }: UserFormProps) => {
       </form>
     </Form>
   );
-};
+});
+
+UserForm.displayName = "UserForm";
 
 export default UserForm;

@@ -1,4 +1,5 @@
-import { useState, useEffect } from "react";
+
+import { useState, useEffect, useCallback, useMemo } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { 
   getUserProfiles, 
@@ -28,7 +29,6 @@ import {
   DialogDescription,
   DialogHeader,
   DialogTitle,
-  DialogFooter,
 } from "@/components/ui/dialog";
 import {
   AlertDialog,
@@ -66,7 +66,7 @@ const Users = () => {
   const [adminSetSuccess, setAdminSetSuccess] = useState(false);
   
   // Fetch all user profiles (not auth users)
-  const fetchUsers = async () => {
+  const fetchUsers = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
@@ -74,12 +74,8 @@ const Users = () => {
       // Get all profiles from the public.profiles table with enhanced data
       const profiles = await getUserProfiles();
       
-      // Enhanced logging to check what we got
-      console.log("Received profiles:", profiles);
-      
       // Convert profiles to the expected format with explicit email handling
       const usersList = profiles.map(profile => {
-        console.log(`Processing profile ${profile.id} with email:`, profile.email);
         return {
           id: profile.id,
           email: profile.email || 'Email no disponible',
@@ -90,7 +86,6 @@ const Users = () => {
         };
       });
       
-      console.log("Processed user list:", usersList);
       setUsers(usersList);
     } catch (err: any) {
       console.error("Error fetching users:", err);
@@ -103,10 +98,10 @@ const Users = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [toast]);
   
   // Handle setting Rodrigo as admin
-  const handleSetRodrigoAsAdmin = async () => {
+  const handleSetRodrigoAsAdmin = useCallback(async () => {
     setIsSettingAdmin(true);
     try {
       const success = await setRodrigoAsAdmin();
@@ -134,16 +129,18 @@ const Users = () => {
     } finally {
       setIsSettingAdmin(false);
     }
-  };
+  }, [fetchUsers, toast]);
   
   useEffect(() => {
     fetchUsers();
     
-    // Try to set Rodrigo as admin on first load
-    handleSetRodrigoAsAdmin();
-  }, []);
+    // Try to set Rodrigo as admin on first load if not already done
+    if (!adminSetSuccess) {
+      handleSetRodrigoAsAdmin();
+    }
+  }, [fetchUsers, handleSetRodrigoAsAdmin, adminSetSuccess]);
   
-  const handleCreateUser = async (formData: any) => {
+  const handleCreateUser = useCallback(async (formData: any) => {
     try {
       // Check if current user has admin permissions
       if (!currentUser) {
@@ -184,16 +181,17 @@ const Users = () => {
         variant: "destructive",
       });
     }
-  };
+  }, [currentUser, fetchUsers, toast]);
   
-  const handleUpdateUser = async (formData: any) => {
+  const handleUpdateUser = useCallback(async (formData: any) => {
     if (!currentEditUser) return;
     
     try {
-      const updatedProfile = await updateUserProfile(currentEditUser.id, {
+      await updateUserProfile(currentEditUser.id, {
         full_name: formData.full_name,
         role: formData.role,
-        permissions: formData.permissions
+        permissions: formData.permissions,
+        email: formData.email // Store email in profile
       });
       
       toast({
@@ -209,62 +207,56 @@ const Users = () => {
         variant: "destructive",
       });
     }
-  };
+  }, [currentEditUser, fetchUsers, toast]);
   
-  const handleSubmitUserForm = (formData: any) => {
+  const handleSubmitUserForm = useCallback((formData: any) => {
     if (currentEditUser) {
       handleUpdateUser(formData);
     } else {
       handleCreateUser(formData);
     }
-  };
+  }, [currentEditUser, handleCreateUser, handleUpdateUser]);
   
-  const handleEditUser = (user: any) => {
-    console.log("Editing user:", user);
+  const handleEditUser = useCallback((user: any) => {
     setCurrentEditUser(user);
     setIsUserFormOpen(true);
-  };
+  }, []);
   
-  const handleResetPassword = (userId: string) => {
+  const handleResetPassword = useCallback((userId: string) => {
     setUserIdForPasswordChange(userId);
     setIsPasswordChangeOpen(true);
-  };
+  }, []);
   
-  const handleChangePassword = async (userId: string, newPassword: string) => {
+  const handleChangePassword = useCallback(async (userId: string, newPassword: string) => {
     try {
       const result = await changeUserPassword({
         userId,
         newPassword
       });
       
+      toast({
+        title: result.success ? "Operación Exitosa" : "Aviso",
+        description: result.message,
+        variant: result.success ? "default" : "destructive",
+      });
+      
       if (result.success) {
-        toast({
-          title: "Contraseña actualizada",
-          description: "La contraseña se ha cambiado exitosamente",
-        });
         setIsPasswordChangeOpen(false);
-      } else {
-        toast({
-          title: "Error",
-          description: result.message,
-          variant: "destructive",
-        });
       }
     } catch (err: any) {
       toast({
         title: "Error",
-        description: `No se pudo cambiar la contraseña: ${err.message}`,
+        description: `No se pudo procesar la solicitud: ${err.message}`,
         variant: "destructive",
       });
     }
-  };
+  }, [toast]);
   
-  const handleDeleteUser = async () => {
+  const handleDeleteUser = useCallback(async () => {
     if (!userToDelete) return;
     
     try {
-      // We can't use admin API, so we'll just delete the profile
-      // Note: This won't delete the auth user, just the profile
+      // Delete the profile from database
       const { error } = await supabase
         .from('profiles')
         .delete()
@@ -287,9 +279,9 @@ const Users = () => {
         variant: "destructive",
       });
     }
-  };
+  }, [fetchUsers, toast, userToDelete]);
   
-  const handleBulkUpload = async (users: BulkUserData[]): Promise<number> => {
+  const handleBulkUpload = useCallback(async (users: BulkUserData[]): Promise<number> => {
     try {
       const successCount = await bulkCreateUsers(users);
       toast({
@@ -306,7 +298,7 @@ const Users = () => {
       });
       return 0;
     }
-  };
+  }, [fetchUsers, toast]);
   
   const generateRandomPassword = () => {
     const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789!@#$%^&*";
@@ -317,11 +309,11 @@ const Users = () => {
     return password;
   };
   
-  // Filter users based on search term
-  const filteredUsers = users.filter(user => 
+  // Filter users based on search term - using memoization for performance
+  const filteredUsers = useMemo(() => users.filter(user => 
     user.email?.toLowerCase().includes(searchTerm.toLowerCase()) || 
     user.profile?.full_name?.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  ), [users, searchTerm]);
   
   if (error) {
     return (

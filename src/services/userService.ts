@@ -1,3 +1,4 @@
+
 import { supabase } from "@/integrations/supabase/client";
 import { BulkUserData, UserCreateData, UserUpdateData, PasswordChangeData } from "@/services/types";
 
@@ -23,17 +24,14 @@ export interface UserProfile {
   permissions?: string[];
   created_at?: string;
   updated_at?: string;
-  email?: string; // Add email to help with displaying user info
+  email?: string; // Add email property to fix TypeScript error
 }
 
 export const getUserProfile = async (userId: string): Promise<UserProfile | null> => {
   try {
     console.log(`Fetching profile for user ${userId}`);
     
-    // First get the user email from auth.users via admin API (if available) or from the profiles table
-    let userEmail;
-    
-    // Get the profile data
+    // First get the profile data
     const { data: profileData, error: profileError } = await supabase
       .from('profiles')
       .select('*')
@@ -46,8 +44,9 @@ export const getUserProfile = async (userId: string): Promise<UserProfile | null
     }
 
     // Now get the user email from auth if possible
-    const { data: userData, error: userError } = await supabase.auth.admin.getUserById(userId);
+    const { data: userData, error: userError } = await supabase.auth.getUser(userId);
     
+    let userEmail = null;
     if (!userError && userData?.user) {
       userEmail = userData.user.email;
       console.log(`Got email ${userEmail} for user ${userId} from auth`);
@@ -94,23 +93,38 @@ export const getUserProfiles = async (): Promise<UserProfile[]> => {
       throw profilesError;
     }
 
-    // For each profile, try to get the email from auth
+    // Get all auth users to match with profiles
+    const { data: authData, error: authError } = await supabase.auth.getUser();
+    
+    if (authError) {
+      console.error('Error fetching auth data:', authError);
+    }
+    
+    const currentUserId = authData?.user?.id;
+    
+    // For each profile, try to get the email
     const enhancedProfiles = await Promise.all(profiles.map(async (profile) => {
       try {
-        const { data: userData, error: userError } = await supabase.auth.admin.getUserById(profile.id);
-        
-        let email = null;
-        if (!userError && userData?.user) {
-          email = userData.user.email;
+        // If this is the current user, we can use the email from auth data
+        if (profile.id === currentUserId && authData?.user?.email) {
+          return {
+            ...profile,
+            email: authData.user.email,
+          };
         }
         
+        // For other users, try to get email from database
+        // We'll store the email in the profile during creation/update operations
         return {
           ...profile,
-          email: email || profile.email,
+          email: profile.email || 'Email no disponible',
         };
       } catch (error) {
-        console.error(`Error fetching auth data for user ${profile.id}:`, error);
-        return profile;
+        console.error(`Error enhancing profile for user ${profile.id}:`, error);
+        return {
+          ...profile,
+          email: 'Email no disponible',
+        };
       }
     }));
 
@@ -220,8 +234,7 @@ export const createUser = async (userData: UserCreateData): Promise<{ success: b
   try {
     console.log("Creating user with data:", {...userData, password: '******'});
     
-    // Instead of using admin API, use the standard auth.signUp
-    // Note: This requires email confirmation by default
+    // Use the standard auth.signUp method with email and password
     const { data: authData, error: authError } = await supabase.auth.signUp({
       email: userData.email,
       password: userData.password,
@@ -251,6 +264,7 @@ export const createUser = async (userData: UserCreateData): Promise<{ success: b
     const profileData: UserUpdateData = {
       full_name: userData.full_name,
       role: userData.role || 'user',
+      email: userData.email, // Store email in profile for easier access
     };
 
     if (userData.permissions) {
@@ -304,17 +318,24 @@ export const createUser = async (userData: UserCreateData): Promise<{ success: b
 export const changeUserPassword = async (data: PasswordChangeData): Promise<{ success: boolean; message: string }> => {
   try {
     // We can't use admin API to change passwords
-    // Instead, we'll add a custom message indicating this limitation
+    // Send a password reset link instead
+    const { error } = await supabase.auth.resetPasswordForEmail(data.userId, {
+      redirectTo: window.location.origin + '/auth/reset-password',
+    });
+    
+    if (error) {
+      throw error;
+    }
     
     return { 
-      success: false, 
-      message: "La funcionalidad de cambio de contraseña requiere privilegios administrativos. El usuario debe usar la opción 'Olvidé mi contraseña'." 
+      success: true, 
+      message: "Se ha enviado un correo electrónico con instrucciones para cambiar la contraseña." 
     };
   } catch (error: any) {
-    console.error("Error changing password:", error);
+    console.error("Error sending password reset:", error);
     return { 
       success: false, 
-      message: `Error al cambiar la contraseña: ${error.message || "Error desconocido"}` 
+      message: `Error al enviar el correo de cambio de contraseña: ${error.message || "Error desconocido"}` 
     };
   }
 };
