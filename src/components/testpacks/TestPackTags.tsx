@@ -1,4 +1,3 @@
-
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { getTestPackWithTags, updateTag, Tag, TestPack, createTag, deleteTag } from "@/services/testPackService";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -110,14 +109,19 @@ const TestPackTags = ({
 
   const deleteTagMutation = useMutation({
     mutationFn: (tagId: string) => {
+      console.log("Deleting tag ID:", tagId);
       return deleteTag(tagId);
     },
     onSuccess: () => {
+      console.log("Tag deleted successfully, invalidating queries");
       queryClient.invalidateQueries({ queryKey: ['testPack', testPackId] });
+      queryClient.invalidateQueries({ queryKey: ['testPacks'] });
+      
       toast({
         title: "TAG eliminado",
         description: "El TAG ha sido eliminado exitosamente."
       });
+      
       refetch();
     },
     onError: (error) => {
@@ -149,12 +153,14 @@ const TestPackTags = ({
   };
 
   const handleDeleteClick = (tagId: string) => {
+    console.log("Preparing to delete tag ID:", tagId);
     setTagToDelete(tagId);
     setDeleteDialogOpen(true);
   };
 
   const confirmDelete = () => {
     if (tagToDelete) {
+      console.log("Confirming deletion of tag ID:", tagToDelete);
       deleteTagMutation.mutate(tagToDelete);
       setDeleteDialogOpen(false);
       setTagToDelete(null);
@@ -331,7 +337,13 @@ const TestPackTags = ({
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancelar</AlertDialogCancel>
-            <AlertDialogAction onClick={confirmDelete} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+            <AlertDialogAction 
+              onClick={(e) => {
+                e.preventDefault();
+                confirmDelete();
+              }} 
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
               Eliminar
             </AlertDialogAction>
           </AlertDialogFooter>

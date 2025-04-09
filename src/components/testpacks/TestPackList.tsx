@@ -101,13 +101,18 @@ const TestPackList = ({
   const confirmDelete = () => {
     if (testPackToDelete) {
       try {
+        console.log("Deleting test pack with ID:", testPackToDelete);
         onDelete(testPackToDelete);
         setDeleteDialogOpen(false);
         setTestPackToDelete(null);
-        toast({
-          title: "Test Pack eliminado",
-          description: "El Test Pack ha sido eliminado correctamente",
-        });
+        
+        // Wait for the state update to complete
+        setTimeout(() => {
+          toast({
+            title: "Test Pack eliminado",
+            description: "El Test Pack ha sido eliminado correctamente",
+          });
+        }, 300);
       } catch (error) {
         console.error('Error al eliminar el Test Pack:', error);
         toast({

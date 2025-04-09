@@ -50,15 +50,44 @@ const TestPacks = () => {
     openImportDialog,
     handleFormSuccess,
     handleImportSuccess,
-    openEditTestPackForm
+    openEditTestPackForm,
+    fetchTestPacks,
+    fetchStats
   } = useTestPacks();
 
-  // Add a console log to debug the stats data
+  // Add a more robust initialization and refresh strategy
+  useEffect(() => {
+    console.log("Initial data fetch for Test Packs page");
+    fetchTestPacks();
+    fetchStats();
+    
+    // Set up a refresh interval for real-time updates
+    const refreshInterval = setInterval(() => {
+      console.log("Refreshing test packs data (interval)");
+      fetchTestPacks();
+      fetchStats();
+    }, 30000); // Refresh every 30 seconds
+    
+    return () => clearInterval(refreshInterval);
+  }, [fetchTestPacks, fetchStats]);
+
+  // Ensure stats are updated when the tab changes
+  useEffect(() => {
+    if (selectedTab === "dashboard") {
+      console.log("Dashboard tab selected, fetching latest stats");
+      fetchStats();
+    }
+  }, [selectedTab, fetchStats]);
+
+  // Add data logging to help debug
   useEffect(() => {
     if (stats) {
       console.log("Current stats data:", stats);
     }
-  }, [stats]);
+    if (testPacks) {
+      console.log(`Loaded ${testPacks.length} test packs`);
+    }
+  }, [stats, testPacks]);
 
   return (
     <div className="container mx-auto py-6 space-y-6">
@@ -70,14 +99,19 @@ const TestPacks = () => {
           onDownloadTemplate={handleDownloadTemplate}
           onExport={handleExportData}
           onRefresh={() => {
-            console.log("Refreshing test pack data...");
-            refetchTestPacks();
+            console.log("Manual refresh requested");
+            fetchTestPacks();
+            fetchStats();
           }}
           userRole={userRole}
         />
       </div>
 
-      <ErrorBoundary FallbackComponent={ErrorFallback} onReset={() => refetchTestPacks()}>
+      <ErrorBoundary FallbackComponent={ErrorFallback} onReset={() => {
+        console.log("Error boundary reset, fetching fresh data");
+        fetchTestPacks();
+        fetchStats();
+      }}>
         <Tabs value={selectedTab} onValueChange={setSelectedTab}>
           <TabsList className="grid w-full grid-cols-3">
             <TabsTrigger value="list">Lista de Test Packs</TabsTrigger>
@@ -91,9 +125,15 @@ const TestPacks = () => {
               isLoading={isLoadingTestPacks}
               onTagRelease={handleTagRelease}
               userRole={userRole}
-              onClearFilters={() => refetchTestPacks()}
+              onClearFilters={() => {
+                console.log("Clearing filters and refreshing data");
+                fetchTestPacks();
+              }}
               onEdit={openEditTestPackForm}
-              onDelete={handleDeleteTestPack}
+              onDelete={(id) => {
+                console.log("Delete request received for test pack ID:", id);
+                handleDeleteTestPack(id);
+              }}
             />
           </TabsContent>
           

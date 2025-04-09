@@ -499,7 +499,53 @@ export const generateImportTemplate = (): ArrayBuffer => {
   }
 };
 
-// Update the importFromExcel function to handle the new template format and to add TAGs to existing test packs
+// Delete a test pack and all its associated tags
+export const deleteTestPack = async (testPackId: string): Promise<void> => {
+  try {
+    console.log(`Deleting test pack ${testPackId} and its associated tags`);
+    
+    // Start a transaction by using a single connection
+    const { error: deletionError } = await supabase.rpc('delete_test_pack_with_tags', {
+      test_pack_id: testPackId
+    });
+    
+    if (deletionError) {
+      console.error(`Transaction error deleting test pack ${testPackId}:`, deletionError);
+      
+      // Fallback method: Delete manually if the RPC doesn't exist
+      console.log("Falling back to manual deletion process");
+      
+      // First delete all associated tags
+      const { error: tagsError } = await supabase
+        .from('tags')
+        .delete()
+        .eq('test_pack_id', testPackId);
+      
+      if (tagsError) {
+        console.error(`Error deleting tags for test pack ${testPackId}:`, tagsError);
+        throw new Error("No se pudieron eliminar los TAGs asociados. Verifique los permisos.");
+      }
+      
+      // Then delete the test pack itself
+      const { error: testPackError } = await supabase
+        .from('test_packs')
+        .delete()
+        .eq('id', testPackId);
+      
+      if (testPackError) {
+        console.error(`Error deleting test pack ${testPackId}:`, testPackError);
+        throw new Error("No se pudo eliminar el Test Pack. Verifique los permisos.");
+      }
+    }
+    
+    console.log(`Test pack ${testPackId} and its tags successfully deleted`);
+  } catch (error) {
+    console.error(`Error in deleteTestPack for ${testPackId}:`, error);
+    throw error;
+  }
+};
+
+// Update the importFromExcel function to handle existing test packs
 export const importFromExcel = async (excelBuffer: ArrayBuffer): Promise<{ success: boolean; count: number; message?: string }> => {
   try {
     console.log("Importing test packs from Excel");
@@ -538,7 +584,7 @@ export const importFromExcel = async (excelBuffer: ArrayBuffer): Promise<{ succe
     let importedCount = 0;
     let tagsAddedCount = 0;
     
-    // Process each test pack row and create or update test packs
+    // Process each test pack row
     for (const row of testPacksData) {
       const testPackData = {
         sistema: row.sistema,
@@ -572,8 +618,17 @@ export const importFromExcel = async (excelBuffer: ArrayBuffer): Promise<{ succe
         // Process tags for this test pack
         if (tagsData && tagsData.length > 0) {
           // Get existing tags for this test pack to avoid duplicates
-          const existingTags = testPack.tags || [];
-          const existingTagNames = new Set(existingTags.map(t => t.tag_name));
+          const { data: existingTagsData } = await supabase
+            .from('tags')
+            .select('tag_name')
+            .eq('test_pack_id', testPack.id);
+          
+          const existingTagNames = new Set();
+          if (existingTagsData) {
+            existingTagsData.forEach((tag: any) => {
+              existingTagNames.add(tag.tag_name);
+            });
+          }
           
           // Filter tags for this test pack
           const testPackTags = tagsData.filter(tag => 

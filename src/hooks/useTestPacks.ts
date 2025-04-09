@@ -1,4 +1,3 @@
-
 import { useState, useEffect, useCallback } from "react";
 import { useToast } from "@/hooks/use-toast";
 import {
@@ -11,11 +10,11 @@ import {
   updateTag,
   exportToExcel,
   generateImportTemplate,
-  importFromExcel
+  importFromExcel,
+  deleteTestPack as deleteTestPackService
 } from "@/services/testPackService";
 import { useAuth } from "@/contexts/AuthContext";
 
-// Define the interface for stats data that was missing in the service
 interface TestPackStatsData {
   testPacks: {
     total: number;
@@ -166,25 +165,19 @@ export const useTestPacks = () => {
 
   const handleDeleteTestPack = async (id: string) => {
     try {
-      // Use the correct endpoint for deletion and handle the response properly
-      const response = await fetch(`/api/testpacks/${id}`, {
-        method: 'DELETE',
-      });
+      console.log("Deleting test pack ID:", id);
       
-      if (!response.ok) {
-        const data = await response.json();
-        throw new Error(data.error?.message || 'Failed to delete test pack');
-      }
+      await deleteTestPackService(id);
       
-      // Success - update the local state to remove the deleted test pack
-      setTestPacks(prevTestPacks => prevTestPacks ? prevTestPacks.filter(tp => tp.id !== id) : null);
+      setTestPacks(prevTestPacks => 
+        prevTestPacks ? prevTestPacks.filter(tp => tp.id !== id) : null
+      );
       
       toast({
-        title: "Success",
-        description: "Test pack deleted successfully.",
+        title: "Éxito",
+        description: "Test pack eliminado correctamente.",
       });
       
-      // Refresh data
       fetchTestPacks();
       fetchStats();
     } catch (error: any) {
@@ -192,7 +185,7 @@ export const useTestPacks = () => {
       toast({
         title: "Error",
         description:
-          error.message || "Failed to delete test pack. Please try again.",
+          error.message || "No se pudo eliminar el test pack. Inténtelo de nuevo.",
         variant: "destructive",
       });
     }
@@ -200,13 +193,11 @@ export const useTestPacks = () => {
 
   const handleTagRelease = async (tagId: string) => {
     try {
-      // Get the current tag to toggle its state
       const tag = testPacks?.flatMap(tp => tp.tags || []).find(t => t.id === tagId);
       if (!tag) {
         throw new Error("Tag not found");
       }
       
-      // Toggle the state
       const newState = tag.estado === 'liberado' ? 'pendiente' : 'liberado';
       const releaseDate = newState === 'liberado' ? new Date().toISOString() : null;
       
@@ -220,8 +211,8 @@ export const useTestPacks = () => {
         description: `Tag ${newState === 'liberado' ? 'released' : 'marked as pending'} successfully.`,
       });
       
-      fetchTestPacks(); // Refresh test packs after releasing tag
-      fetchStats(); // Refresh stats after releasing tag
+      fetchTestPacks();
+      fetchStats();
     } catch (error: any) {
       console.error("Error releasing tag:", error);
       toast({
@@ -234,18 +225,14 @@ export const useTestPacks = () => {
 
   const handleDownloadTemplate = async () => {
     try {
-      // Use generateImportTemplate instead of downloadTemplate
       const templateBuffer = generateImportTemplate();
       
-      // Create a blob from the buffer
       const blob = new Blob([templateBuffer], { 
         type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' 
       });
       
-      // Create a URL for the blob
       const url = URL.createObjectURL(blob);
       
-      // Create a link element and trigger the download
       const link = document.createElement('a');
       link.href = url;
       link.setAttribute('download', 'TestPacks_Template.xlsx');
@@ -270,18 +257,14 @@ export const useTestPacks = () => {
 
   const handleExportData = async () => {
     try {
-      // Use exportToExcel instead of exportDataToExcel
       const excelBuffer = await exportToExcel();
       
-      // Create a blob from the buffer
       const blob = new Blob([excelBuffer], { 
         type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' 
       });
       
-      // Create a URL for the blob
       const url = URL.createObjectURL(blob);
       
-      // Create a link element and trigger the download
       const link = document.createElement('a');
       link.href = url;
       link.setAttribute('download', 'TestPacks_Export.xlsx');
