@@ -52,6 +52,7 @@ const Subsystems = () => {
         }
         
         const systemIds = systemsData.map(system => system.id);
+        // Removed the incorrect argument here
         const subsystemsData = await getSubsystems(systemIds);
         
         const systemsMap = new Map<string, System>();

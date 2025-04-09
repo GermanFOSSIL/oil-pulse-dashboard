@@ -73,6 +73,7 @@ const ITRs = () => {
     
     setAddingSampleData(true);
     try {
+      // Removed the incorrect argument here
       const testResult = await createTestITRs();
       
       if (testResult.success) {
