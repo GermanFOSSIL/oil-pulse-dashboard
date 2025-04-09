@@ -1,5 +1,5 @@
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
@@ -23,6 +23,8 @@ import {
 import { Input } from "@/components/ui/input";
 import { useTestPacks } from "@/hooks/useTestPacks";
 import { Tag } from "@/services/types";
+import { Loader2 } from "lucide-react";
+import { useToast } from "@/hooks/use-toast";
 
 interface TagFormModalProps {
   isOpen: boolean;
@@ -39,8 +41,10 @@ const formSchema = z.object({
 type FormValues = z.infer<typeof formSchema>;
 
 const TagFormModal = ({ isOpen, onClose, onSuccess, testPackId, tag }: TagFormModalProps) => {
-  const { addTag, updateTag } = useTestPacks();
+  const { addTagWithRetry, updateTag } = useTestPacks();
   const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const { toast } = useToast();
   
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
@@ -49,24 +53,51 @@ const TagFormModal = ({ isOpen, onClose, onSuccess, testPackId, tag }: TagFormMo
     },
   });
   
+  useEffect(() => {
+    // Reset form when modal opens or when tag changes
+    if (isOpen) {
+      form.reset({
+        tag_name: tag?.tag_name || "",
+      });
+      setError(null);
+    }
+  }, [isOpen, tag, form]);
+  
   const onSubmit = async (values: FormValues) => {
     setIsLoading(true);
+    setError(null);
     try {
       if (tag) {
         // Update existing TAG
+        console.log("Actualizando TAG:", { id: tag.id, ...values });
         await updateTag(tag.id, values);
+        toast({
+          title: "Éxito",
+          description: "TAG actualizado correctamente",
+        });
       } else {
         // Create new TAG
-        await addTag({
+        console.log("Creando nuevo TAG:", { test_pack_id: testPackId, ...values });
+        await addTagWithRetry({
           test_pack_id: testPackId,
           tag_name: values.tag_name,
           estado: 'pendiente',
           fecha_liberacion: null
         });
+        toast({
+          title: "Éxito",
+          description: "TAG creado correctamente",
+        });
       }
       onSuccess();
-    } catch (error) {
-      console.error("Error submitting form:", error);
+    } catch (err) {
+      console.error("Error al enviar el formulario:", err);
+      setError("No se pudo guardar el TAG. Por favor, inténtelo de nuevo.");
+      toast({
+        title: "Error",
+        description: "No se pudo guardar el TAG",
+        variant: "destructive",
+      });
     } finally {
       setIsLoading(false);
     }
@@ -100,10 +131,25 @@ const TagFormModal = ({ isOpen, onClose, onSuccess, testPackId, tag }: TagFormMo
               )}
             />
             
+            {error && (
+              <div className="text-sm text-destructive mt-2">
+                {error}
+              </div>
+            )}
+            
             <DialogFooter>
-              <Button type="button" variant="outline" onClick={onClose}>Cancelar</Button>
+              <Button type="button" variant="outline" onClick={onClose} disabled={isLoading}>
+                Cancelar
+              </Button>
               <Button type="submit" disabled={isLoading}>
-                {isLoading ? "Guardando..." : tag ? "Guardar cambios" : "Crear TAG"}
+                {isLoading ? (
+                  <>
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    {tag ? "Guardando..." : "Creando..."}
+                  </>
+                ) : (
+                  tag ? "Guardar cambios" : "Crear TAG"
+                )}
               </Button>
             </DialogFooter>
           </form>

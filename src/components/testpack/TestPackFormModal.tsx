@@ -28,6 +28,8 @@ import { getITRs } from "@/services/itrDataService";
 import { getSystemsByProjectId, getSystemsWithSubsystems } from "@/services/systemService";
 import { getSubsystemsBySystemId } from "@/services/subsystemService";
 import { getProjects } from "@/services/projectService";
+import { Loader2 } from "lucide-react";
+import { useToast } from "@/hooks/use-toast";
 
 interface TestPackFormModalProps {
   isOpen: boolean;
@@ -48,6 +50,8 @@ type FormValues = z.infer<typeof formSchema>;
 const TestPackFormModal = ({ isOpen, onClose, onSuccess, testPack }: TestPackFormModalProps) => {
   const { addTestPack, updateTestPack } = useTestPacks();
   const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const { toast } = useToast();
   
   const [projects, setProjects] = useState<{ id: string; name: string }[]>([]);
   const [systems, setSystems] = useState<{ id: string; name: string; project_id: string }[]>([]);
@@ -56,6 +60,7 @@ const TestPackFormModal = ({ isOpen, onClose, onSuccess, testPack }: TestPackFor
   
   const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null);
   const [selectedSystemId, setSelectedSystemId] = useState<string | null>(null);
+  const [loadingData, setLoadingData] = useState<boolean>(false);
   
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
@@ -67,10 +72,27 @@ const TestPackFormModal = ({ isOpen, onClose, onSuccess, testPack }: TestPackFor
     },
   });
   
+  // Reset form when modal opens or testPack changes
+  useEffect(() => {
+    if (isOpen) {
+      form.reset({
+        nombre_paquete: testPack?.nombre_paquete || "",
+        itr_asociado: testPack?.itr_asociado || "",
+        sistema: testPack?.sistema || "",
+        subsistema: testPack?.subsistema || "",
+      });
+      setError(null);
+    }
+  }, [isOpen, testPack, form]);
+  
   // Load initial data
   useEffect(() => {
     const loadInitialData = async () => {
+      if (!isOpen) return;
+      
+      setLoadingData(true);
       try {
+        console.log("Cargando datos iniciales para el formulario");
         // Load projects
         const projectsData = await getProjects();
         setProjects(projectsData.map(p => ({ id: p.id, name: p.name })));
@@ -81,6 +103,7 @@ const TestPackFormModal = ({ isOpen, onClose, onSuccess, testPack }: TestPackFor
         
         // If editing, preset system and subsystem
         if (testPack) {
+          console.log("Cargando datos para Test Pack existente:", testPack.nombre_paquete);
           // Get systems and subsystems data to find IDs
           const allSystemsData = await getSystemsWithSubsystems();
           
@@ -115,23 +138,31 @@ const TestPackFormModal = ({ isOpen, onClose, onSuccess, testPack }: TestPackFor
             }
           }
         }
-      } catch (error) {
-        console.error("Error loading form data:", error);
+      } catch (err) {
+        console.error("Error cargando datos del formulario:", err);
+        setError("No se pudieron cargar los datos necesarios");
+        toast({
+          title: "Error",
+          description: "No se pudieron cargar los datos necesarios",
+          variant: "destructive",
+        });
+      } finally {
+        setLoadingData(false);
       }
     };
     
-    if (isOpen) {
-      loadInitialData();
-    }
-  }, [isOpen, testPack]);
+    loadInitialData();
+  }, [isOpen, testPack, toast]);
   
   const handleProjectChange = async (projectId: string) => {
     setSelectedProjectId(projectId);
     setSelectedSystemId(null);
     form.setValue("sistema", "");
     form.setValue("subsistema", "");
+    setLoadingData(true);
     
     try {
+      console.log("Cargando sistemas para proyecto:", projectId);
       const systemsData = await getSystemsByProjectId(projectId);
       setSystems(systemsData.map(s => ({ 
         id: s.id, 
@@ -139,8 +170,15 @@ const TestPackFormModal = ({ isOpen, onClose, onSuccess, testPack }: TestPackFor
         project_id: s.project_id 
       })));
       setSubsystems([]);
-    } catch (error) {
-      console.error("Error loading systems:", error);
+    } catch (err) {
+      console.error("Error cargando sistemas:", err);
+      toast({
+        title: "Error",
+        description: "No se pudieron cargar los sistemas",
+        variant: "destructive",
+      });
+    } finally {
+      setLoadingData(false);
     }
   };
   
@@ -148,27 +186,45 @@ const TestPackFormModal = ({ isOpen, onClose, onSuccess, testPack }: TestPackFor
     setSelectedSystemId(systemId);
     form.setValue("sistema", systemName);
     form.setValue("subsistema", "");
+    setLoadingData(true);
     
     try {
+      console.log("Cargando subsistemas para sistema:", systemId);
       const subsystemsData = await getSubsystemsBySystemId(systemId);
       setSubsystems(subsystemsData.map(s => ({ 
         id: s.id, 
         name: s.name, 
         system_id: s.system_id 
       })));
-    } catch (error) {
-      console.error("Error loading subsystems:", error);
+    } catch (err) {
+      console.error("Error cargando subsistemas:", err);
+      toast({
+        title: "Error",
+        description: "No se pudieron cargar los subsistemas",
+        variant: "destructive",
+      });
+    } finally {
+      setLoadingData(false);
     }
   };
   
   const onSubmit = async (values: FormValues) => {
     setIsLoading(true);
+    setError(null);
     try {
+      console.log("Enviando formulario:", values);
+      
       if (testPack) {
         // Update existing Test Pack
+        console.log("Actualizando Test Pack:", testPack.id);
         await updateTestPack(testPack.id, values);
+        toast({
+          title: "Éxito",
+          description: "Test Pack actualizado correctamente",
+        });
       } else {
         // Create new Test Pack with required fields
+        console.log("Creando nuevo Test Pack");
         const newTestPack: Omit<TestPack, "id" | "created_at" | "updated_at"> = {
           nombre_paquete: values.nombre_paquete,
           itr_asociado: values.itr_asociado,
@@ -177,10 +233,20 @@ const TestPackFormModal = ({ isOpen, onClose, onSuccess, testPack }: TestPackFor
           estado: 'pendiente'
         };
         await addTestPack(newTestPack);
+        toast({
+          title: "Éxito",
+          description: "Test Pack creado correctamente",
+        });
       }
       onSuccess();
-    } catch (error) {
-      console.error("Error submitting form:", error);
+    } catch (err) {
+      console.error("Error enviando formulario:", err);
+      setError("No se pudo guardar el Test Pack. Por favor, inténtelo de nuevo.");
+      toast({
+        title: "Error",
+        description: "No se pudo guardar el Test Pack",
+        variant: "destructive",
+      });
     } finally {
       setIsLoading(false);
     }
@@ -198,148 +264,174 @@ const TestPackFormModal = ({ isOpen, onClose, onSuccess, testPack }: TestPackFor
           </DialogDescription>
         </DialogHeader>
         
-        <Form {...form}>
-          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
-            <FormField
-              control={form.control}
-              name="nombre_paquete"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Nombre del Test Pack</FormLabel>
-                  <FormControl>
-                    <Input placeholder="Ingrese el nombre del Test Pack" {...field} />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-            
-            {!testPack && (
-              <FormItem>
-                <FormLabel>Proyecto</FormLabel>
-                <Select
-                  onValueChange={handleProjectChange}
-                  value={selectedProjectId || undefined}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Seleccione un proyecto" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {projects.map((project) => (
-                      <SelectItem key={project.id} value={project.id}>
-                        {project.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </FormItem>
-            )}
-            
-            {(selectedProjectId || testPack) && (
+        {loadingData ? (
+          <div className="flex justify-center items-center py-8">
+            <Loader2 className="h-8 w-8 animate-spin text-primary" />
+            <span className="ml-2">Cargando datos...</span>
+          </div>
+        ) : (
+          <Form {...form}>
+            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
               <FormField
                 control={form.control}
-                name="sistema"
+                name="nombre_paquete"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Sistema</FormLabel>
-                    <Select
-                      onValueChange={(systemId) => {
-                        const system = systems.find(s => s.id === systemId);
-                        if (system) {
-                          handleSystemChange(systemId, system.name);
-                        }
-                      }}
-                      value={selectedSystemId || undefined}
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder="Seleccione un sistema" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {systems.map((system) => (
-                          <SelectItem key={system.id} value={system.id}>
-                            {system.name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                    <FormLabel>Nombre del Test Pack</FormLabel>
+                    <FormControl>
+                      <Input placeholder="Ingrese el nombre del Test Pack" {...field} />
+                    </FormControl>
                     <FormMessage />
                   </FormItem>
                 )}
               />
-            )}
-            
-            {(selectedSystemId || testPack) && (
-              <FormField
-                control={form.control}
-                name="subsistema"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Subsistema</FormLabel>
-                    <Select
-                      onValueChange={(value) => {
-                        const subsystem = subsystems.find(s => s.id === value);
-                        if (subsystem) {
-                          field.onChange(subsystem.name);
-                        }
-                      }}
-                      value={subsystems.find(s => s.name === field.value)?.id}
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder="Seleccione un subsistema" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {subsystems.map((subsystem) => (
-                          <SelectItem key={subsystem.id} value={subsystem.id}>
-                            {subsystem.name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-            )}
-            
-            <FormField
-              control={form.control}
-              name="itr_asociado"
-              render={({ field }) => (
+              
+              {!testPack && (
                 <FormItem>
-                  <FormLabel>ITR Asociado</FormLabel>
+                  <FormLabel>Proyecto</FormLabel>
                   <Select
-                    onValueChange={(value) => {
-                      const itr = itrs.find(i => i.id === value);
-                      if (itr) {
-                        field.onChange(itr.name);
-                      }
-                    }}
-                    value={itrs.find(i => i.name === field.value)?.id}
+                    onValueChange={handleProjectChange}
+                    value={selectedProjectId || undefined}
+                    disabled={isLoading}
                   >
                     <SelectTrigger>
-                      <SelectValue placeholder="Seleccione un ITR" />
+                      <SelectValue placeholder="Seleccione un proyecto" />
                     </SelectTrigger>
                     <SelectContent>
-                      {itrs.map((itr) => (
-                        <SelectItem key={itr.id} value={itr.id}>
-                          {itr.name}
+                      {projects.map((project) => (
+                        <SelectItem key={project.id} value={project.id}>
+                          {project.name}
                         </SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
-                  <FormMessage />
                 </FormItem>
               )}
-            />
-            
-            <DialogFooter>
-              <Button type="button" variant="outline" onClick={onClose}>Cancelar</Button>
-              <Button type="submit" disabled={isLoading}>
-                {isLoading ? "Guardando..." : testPack ? "Guardar cambios" : "Crear Test Pack"}
-              </Button>
-            </DialogFooter>
-          </form>
-        </Form>
+              
+              {(selectedProjectId || testPack) && (
+                <FormField
+                  control={form.control}
+                  name="sistema"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Sistema</FormLabel>
+                      <Select
+                        onValueChange={(systemId) => {
+                          const system = systems.find(s => s.id === systemId);
+                          if (system) {
+                            handleSystemChange(systemId, system.name);
+                          }
+                        }}
+                        value={selectedSystemId || undefined}
+                        disabled={isLoading}
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="Seleccione un sistema" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {systems.map((system) => (
+                            <SelectItem key={system.id} value={system.id}>
+                              {system.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              )}
+              
+              {(selectedSystemId || testPack) && (
+                <FormField
+                  control={form.control}
+                  name="subsistema"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Subsistema</FormLabel>
+                      <Select
+                        onValueChange={(value) => {
+                          const subsystem = subsystems.find(s => s.id === value);
+                          if (subsystem) {
+                            field.onChange(subsystem.name);
+                          }
+                        }}
+                        value={subsystems.find(s => s.name === field.value)?.id}
+                        disabled={isLoading}
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="Seleccione un subsistema" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {subsystems.map((subsystem) => (
+                            <SelectItem key={subsystem.id} value={subsystem.id}>
+                              {subsystem.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              )}
+              
+              <FormField
+                control={form.control}
+                name="itr_asociado"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>ITR Asociado</FormLabel>
+                    <Select
+                      onValueChange={(value) => {
+                        const itr = itrs.find(i => i.id === value);
+                        if (itr) {
+                          field.onChange(itr.name);
+                        }
+                      }}
+                      value={itrs.find(i => i.name === field.value)?.id}
+                      disabled={isLoading}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Seleccione un ITR" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {itrs.map((itr) => (
+                          <SelectItem key={itr.id} value={itr.id}>
+                            {itr.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              
+              {error && (
+                <div className="text-sm text-destructive">
+                  {error}
+                </div>
+              )}
+              
+              <DialogFooter>
+                <Button type="button" variant="outline" onClick={onClose} disabled={isLoading}>
+                  Cancelar
+                </Button>
+                <Button type="submit" disabled={isLoading}>
+                  {isLoading ? (
+                    <>
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      {testPack ? "Guardando..." : "Creando..."}
+                    </>
+                  ) : (
+                    testPack ? "Guardar cambios" : "Crear Test Pack"
+                  )}
+                </Button>
+              </DialogFooter>
+            </form>
+          </Form>
+        )}
       </DialogContent>
     </Dialog>
   );

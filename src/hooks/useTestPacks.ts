@@ -1,4 +1,3 @@
-
 import { useState, useCallback, useEffect } from 'react';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts/AuthContext';
@@ -24,6 +23,7 @@ export const useTestPacks = () => {
   const [testPacks, setTestPacks] = useState<TestPack[]>([]);
   const [currentTestPack, setCurrentTestPack] = useState<TestPackWithTags | null>(null);
   const [loading, setLoading] = useState<boolean>(false);
+  const [error, setError] = useState<string | null>(null);
   const [statsData, setStatsData] = useState<StatsData>({
     testPacks: { total: 0, completed: 0, progress: 0 },
     tags: { total: 0, released: 0, progress: 0 },
@@ -37,16 +37,22 @@ export const useTestPacks = () => {
   
   const fetchTestPacks = useCallback(async () => {
     setLoading(true);
+    setError(null);
     try {
+      console.log("Iniciando fetchTestPacks");
       const data = await getTestPacks();
+      console.log("Test Packs obtenidos:", data?.length || 0);
       setTestPacks(data);
-    } catch (error) {
-      console.error("Error fetching Test Packs:", error);
+      return data;
+    } catch (err) {
+      console.error("Error fetching Test Packs:", err);
+      setError("No se pudieron cargar los Test Packs");
       toast({
         title: "Error",
         description: "No se pudieron cargar los Test Packs",
         variant: "destructive",
       });
+      return [];
     } finally {
       setLoading(false);
     }
@@ -54,26 +60,32 @@ export const useTestPacks = () => {
   
   const fetchTestPacksStats = useCallback(async () => {
     try {
+      console.log("Iniciando fetchTestPacksStats");
       const data = await getTestPacksStats();
       setStatsData(data);
-    } catch (error) {
-      console.error("Error fetching Test Packs stats:", error);
+      return data;
+    } catch (err) {
+      console.error("Error fetching Test Packs stats:", err);
       toast({
         title: "Error",
         description: "No se pudieron cargar las estadísticas de Test Packs",
         variant: "destructive",
       });
+      return null;
     }
   }, [toast]);
   
   const fetchTestPacksByITR = useCallback(async (itrName: string) => {
     setLoading(true);
+    setError(null);
     try {
+      console.log(`Iniciando fetchTestPacksByITR para ${itrName}`);
       const data = await getTestPacksByITR(itrName);
       setTestPacks(data);
       return data;
-    } catch (error) {
-      console.error(`Error fetching Test Packs for ITR ${itrName}:`, error);
+    } catch (err) {
+      console.error(`Error fetching Test Packs for ITR ${itrName}:`, err);
+      setError(`No se pudieron cargar los Test Packs para el ITR ${itrName}`);
       toast({
         title: "Error",
         description: `No se pudieron cargar los Test Packs para el ITR ${itrName}`,
@@ -87,9 +99,13 @@ export const useTestPacks = () => {
   
   const fetchTestPackWithTags = useCallback(async (id: string) => {
     setLoading(true);
+    setError(null);
     try {
+      console.log(`Iniciando fetchTestPackWithTags para ID ${id}`);
       const testPack = await getTestPackById(id);
       if (!testPack) {
+        console.log("Test Pack no encontrado");
+        setError("Test Pack no encontrado");
         toast({
           title: "Error",
           description: "Test Pack no encontrado",
@@ -99,13 +115,16 @@ export const useTestPacks = () => {
         return null;
       }
       
+      console.log("Test Pack encontrado, obteniendo TAGs");
       const tags = await getTagsByTestPackId(id);
+      console.log(`TAGs obtenidos: ${tags?.length || 0}`);
       const testPackWithTags = { ...testPack, tags };
       
       setCurrentTestPack(testPackWithTags);
       return testPackWithTags;
-    } catch (error) {
-      console.error(`Error fetching Test Pack with id ${id}:`, error);
+    } catch (err) {
+      console.error(`Error fetching Test Pack with id ${id}:`, err);
+      setError("No se pudo cargar el Test Pack");
       toast({
         title: "Error",
         description: "No se pudo cargar el Test Pack",
@@ -362,16 +381,51 @@ export const useTestPacks = () => {
     }
   }, [toast]);
   
-  // Load initial data
+  const retryOperation = useCallback(async <T,>(
+    operation: () => Promise<T>,
+    maxRetries: number = 3,
+    delay: number = 1000
+  ): Promise<T | null> => {
+    let retries = 0;
+    
+    while (retries < maxRetries) {
+      try {
+        return await operation();
+      } catch (err) {
+        retries++;
+        console.log(`Reintento ${retries}/${maxRetries}`);
+        if (retries >= maxRetries) {
+          throw err;
+        }
+        await new Promise(resolve => setTimeout(resolve, delay));
+      }
+    }
+    
+    return null;
+  }, []);
+  
+  const addTagWithRetry = useCallback(async (tagData: Omit<Tag, "id" | "created_at" | "updated_at">) => {
+    return retryOperation(() => addTag(tagData));
+  }, [addTag, retryOperation]);
+  
   useEffect(() => {
-    fetchTestPacks();
-    fetchTestPacksStats();
+    const loadInitialData = async () => {
+      try {
+        await fetchTestPacks();
+        await fetchTestPacksStats();
+      } catch (err) {
+        console.error("Error loading initial data:", err);
+      }
+    };
+    
+    loadInitialData();
   }, [fetchTestPacks, fetchTestPacksStats]);
   
   return {
     testPacks,
     currentTestPack,
     loading,
+    error,
     statsData,
     fetchTestPacks,
     fetchTestPacksStats,
@@ -381,6 +435,7 @@ export const useTestPacks = () => {
     updateTestPack: updateTestPackData,
     removeTestPack,
     addTag,
+    addTagWithRetry,
     updateTag: updateTagData,
     releaseTag,
     changeTagStatus,

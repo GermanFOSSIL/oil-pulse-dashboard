@@ -20,45 +20,56 @@ import { AuthProvider } from "./contexts/AuthContext";
 import { ProtectedRoute } from "./components/ProtectedRoute";
 import TestPacks from "./pages/TestPacks";
 import TestPackDetail from "./pages/TestPackDetail";
+import ErrorBoundary from "./components/ErrorBoundary";
 
-const queryClient = new QueryClient();
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      retry: 2,
+      refetchOnWindowFocus: false,
+      staleTime: 5 * 60 * 1000, // 5 minutos
+    },
+  },
+});
 
 const App = () => (
-  <QueryClientProvider client={queryClient}>
-    <AuthProvider>
-      <TooltipProvider>
-        <Toaster />
-        <Sonner />
-        <BrowserRouter>
-          <Routes>
-            <Route path="/auth" element={<Auth />} />
-            <Route 
-              path="/" 
-              element={
-                <ProtectedRoute>
-                  <MainLayout />
-                </ProtectedRoute>
-              }
-            >
-              <Route index element={<Navigate to="/dashboard" />} />
-              <Route path="dashboard" element={<Dashboard />} />
-              <Route path="projects" element={<Projects />} />
-              <Route path="systems" element={<Systems />} />
-              <Route path="subsystems" element={<Subsystems />} />
-              <Route path="itrs" element={<ITRs />} />
-              <Route path="test-packs" element={<TestPacks />} />
-              <Route path="test-packs/:id" element={<TestPackDetail />} />
-              <Route path="configuration" element={<Configuration />} />
-              <Route path="users" element={<Users />} />
-              <Route path="reports" element={<Reports />} />
-              <Route path="database" element={<Database />} />
-              <Route path="*" element={<NotFound />} />
-            </Route>
-          </Routes>
-        </BrowserRouter>
-      </TooltipProvider>
-    </AuthProvider>
-  </QueryClientProvider>
+  <ErrorBoundary>
+    <QueryClientProvider client={queryClient}>
+      <AuthProvider>
+        <TooltipProvider>
+          <Toaster />
+          <Sonner />
+          <BrowserRouter>
+            <Routes>
+              <Route path="/auth" element={<Auth />} />
+              <Route 
+                path="/" 
+                element={
+                  <ProtectedRoute>
+                    <MainLayout />
+                  </ProtectedRoute>
+                }
+              >
+                <Route index element={<Navigate to="/dashboard" />} />
+                <Route path="dashboard" element={<Dashboard />} />
+                <Route path="projects" element={<Projects />} />
+                <Route path="systems" element={<Systems />} />
+                <Route path="subsystems" element={<Subsystems />} />
+                <Route path="itrs" element={<ITRs />} />
+                <Route path="test-packs" element={<TestPacks />} />
+                <Route path="test-packs/:id" element={<TestPackDetail />} />
+                <Route path="configuration" element={<Configuration />} />
+                <Route path="users" element={<Users />} />
+                <Route path="reports" element={<Reports />} />
+                <Route path="database" element={<Database />} />
+                <Route path="*" element={<NotFound />} />
+              </Route>
+            </Routes>
+          </BrowserRouter>
+        </TooltipProvider>
+      </AuthProvider>
+    </QueryClientProvider>
+  </ErrorBoundary>
 );
 
 export default App;
