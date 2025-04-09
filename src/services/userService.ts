@@ -1,19 +1,9 @@
 
 import { supabase } from "@/integrations/supabase/client";
-import { BulkUserData, UserCreateData, UserUpdateData, PasswordChangeData } from "@/services/types";
-
-// Define available permissions for sidebar menu items
-export const AVAILABLE_PERMISSIONS = [
-  "dashboard",
-  "projects", 
-  "systems",
-  "subsystems",
-  "itrs",
-  "configuration",
-  "users",
-  "reports",
-  "database"
-];
+import { UserCreateData, UserUpdateData } from "@/services/types";
+import { AVAILABLE_PERMISSIONS, getDefaultPermissionsForRole } from "@/services/userPermissionService";
+import { changeUserPassword, generateRandomPassword } from "@/services/userPasswordService";
+import { bulkCreateUsers } from "@/services/userBulkService";
 
 // Use a different name to avoid conflict with the Profile in types.ts
 export interface UserProfile {
@@ -26,6 +16,17 @@ export interface UserProfile {
   updated_at?: string;
 }
 
+// Re-export functions from other modules
+export { 
+  AVAILABLE_PERMISSIONS,
+  changeUserPassword,
+  generateRandomPassword,
+  bulkCreateUsers
+};
+
+/**
+ * Get a single user profile
+ */
 export const getUserProfile = async (userId: string): Promise<UserProfile | null> => {
   try {
     const { data, error } = await supabase
@@ -46,6 +47,9 @@ export const getUserProfile = async (userId: string): Promise<UserProfile | null
   }
 };
 
+/**
+ * Get all user profiles
+ */
 export const getUserProfiles = async (): Promise<UserProfile[]> => {
   try {
     const { data, error } = await supabase
@@ -64,6 +68,9 @@ export const getUserProfiles = async (): Promise<UserProfile[]> => {
   }
 };
 
+/**
+ * Update a user profile
+ */
 export const updateUserProfile = async (userId: string, updates: Partial<UserProfile>): Promise<UserProfile> => {
   try {
     console.log(`Updating profile for user ${userId}:`, updates);
@@ -87,68 +94,9 @@ export const updateUserProfile = async (userId: string, updates: Partial<UserPro
   }
 };
 
-export const getUserPermissions = async (userId: string): Promise<string[]> => {
-  try {
-    const profile = await getUserProfile(userId);
-    
-    if (!profile) {
-      return [];
-    }
-    
-    // Default permissions based on role
-    let permissions: string[] = ['dashboard'];
-    
-    if (profile.role === 'admin') {
-      // Admins have access to everything
-      permissions = [...AVAILABLE_PERMISSIONS];
-    } else if (profile.role === 'tecnico') {
-      // Technicians have access to dashboards, reports, and ITRs
-      permissions = ['dashboard', 'reports', 'itrs'];
-    } else {
-      // Regular users have access to dashboards and reports only
-      permissions = ['dashboard', 'reports'];
-    }
-    
-    // If custom permissions exist, use those instead
-    if (profile.permissions && Array.isArray(profile.permissions)) {
-      permissions = profile.permissions;
-    }
-    
-    return permissions;
-  } catch (error) {
-    console.error("Error fetching user permissions:", error);
-    return ['dashboard']; // Fallback to dashboard only
-  }
-};
-
-export const bulkCreateUsers = async (users: BulkUserData[]): Promise<number> => {
-  try {
-    let successCount = 0;
-    
-    for (const user of users) {
-      try {
-        const result = await createUser({
-          email: user.email,
-          password: user.password || generateRandomPassword(),
-          full_name: user.full_name,
-          role: user.role || 'user'
-        });
-        
-        if (result.success) {
-          successCount++;
-        }
-      } catch (err) {
-        console.error(`Error processing user ${user.email}:`, err);
-      }
-    }
-    
-    return successCount;
-  } catch (error) {
-    console.error("Error in bulk user creation:", error);
-    throw error;
-  }
-};
-
+/**
+ * Create a new user
+ */
 export const createUser = async (userData: UserCreateData): Promise<{ success: boolean; message: string; userId?: string }> => {
   try {
     console.log("Creating user with data:", { 
@@ -189,13 +137,7 @@ export const createUser = async (userData: UserCreateData): Promise<{ success: b
       profileData.permissions = userData.permissions;
     } else {
       // Set default permissions based on role
-      if (userData.role === 'admin') {
-        profileData.permissions = [...AVAILABLE_PERMISSIONS];
-      } else if (userData.role === 'tecnico') {
-        profileData.permissions = ['dashboard', 'reports', 'itrs'];
-      } else {
-        profileData.permissions = ['dashboard', 'reports'];
-      }
+      profileData.permissions = getDefaultPermissionsForRole(userData.role || 'user');
     }
 
     console.log("Updating profile for new user with data:", profileData);
@@ -226,46 +168,4 @@ export const createUser = async (userData: UserCreateData): Promise<{ success: b
       message: `Error al crear usuario: ${error.message || "Error desconocido"}` 
     };
   }
-};
-
-export const changeUserPassword = async (data: PasswordChangeData): Promise<{ success: boolean; message: string }> => {
-  try {
-    console.log("Changing password for user:", data.userId);
-    
-    const { error } = await supabase.auth.admin.updateUserById(
-      data.userId,
-      { password: data.newPassword }
-    );
-
-    if (error) {
-      console.error("Error changing password:", error);
-      return { 
-        success: false, 
-        message: `Error al cambiar la contraseña: ${error.message}` 
-      };
-    }
-
-    return { 
-      success: true, 
-      message: "Contraseña cambiada exitosamente" 
-    };
-  } catch (error: any) {
-    console.error("Error changing password:", error);
-    return { 
-      success: false, 
-      message: `Error al cambiar la contraseña: ${error.message || "Error desconocido"}` 
-    };
-  }
-};
-
-const generateRandomPassword = () => {
-  const characters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789!@#$%^&*';
-  let password = '';
-  
-  for (let i = 0; i < 12; i++) {
-    const randomIndex = Math.floor(Math.random() * characters.length);
-    password += characters.charAt(randomIndex);
-  }
-  
-  return password;
 };
