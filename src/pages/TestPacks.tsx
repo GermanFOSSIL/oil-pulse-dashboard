@@ -32,31 +32,40 @@ const TestPacks = () => {
   const { toast } = useToast();
   
   const {
+    // State
     selectedTab,
-    showImportDialog,
-    showFormDialog,
-    selectedTestPack,
-    userRole,
     testPacks,
     stats,
     isLoadingTestPacks,
     isLoadingStats,
     isDeletingTestPack,
+    showImportDialog,
+    showFormDialog,
+    selectedTestPack,
+    userRole,
+    
+    // State setters
     setSelectedTab,
     setShowImportDialog,
     setShowFormDialog,
+    
+    // Data fetching
+    fetchTestPacks,
+    fetchStats,
+    refetchTestPacks,
+    
+    // Actions
     handleTagRelease,
     handleDeleteTestPack,
     handleDownloadTemplate,
     handleExportData,
-    refetchTestPacks,
+    
+    // Dialog handlers
     openNewTestPackForm,
+    openEditTestPackForm,
     openImportDialog,
     handleFormSuccess,
     handleImportSuccess,
-    openEditTestPackForm,
-    fetchTestPacks,
-    fetchStats
   } = useTestPacks();
 
   // Initial data fetch
@@ -172,8 +181,8 @@ const TestPacks = () => {
                   testPacks: { total: 0, completed: 0, progress: 0 },
                   tags: { total: 0, released: 0, progress: 0 },
                   systems: [],
-                  itrs: [],
-                  subsystems: []
+                  subsystems: [],
+                  itrs: []
                 }} />
               )}
             </Suspense>

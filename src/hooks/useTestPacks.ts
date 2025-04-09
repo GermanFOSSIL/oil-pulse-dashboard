@@ -1,50 +1,39 @@
+
 import { useState, useEffect, useCallback } from "react";
 import { useToast } from "@/hooks/use-toast";
 import {
   TestPack,
   getTestPacks,
   getTestPacksStats,
-  createTestPack,
-  updateTestPack,
-  updateTestPackStatusBasedOnTags,
   updateTag,
   exportToExcel,
   generateImportTemplate,
-  importFromExcel,
   deleteTestPack
 } from "@/services/testPackService";
 import { useAuth } from "@/contexts/AuthContext";
 
-interface TestPackStatsData {
-  testPacks: {
-    total: number;
-    completed: number;
-    progress: number;
-  };
-  tags: {
-    total: number;
-    released: number;
-    progress: number;
-  };
-  systems: { name: string; value: number }[];
-  subsystems: { name: string; value: number }[];
-  itrs: { name: string; value: number }[];
-}
-
+// Split useTestPacks hook into several smaller hooks
 export const useTestPacks = () => {
   const { toast } = useToast();
   const { userProfile } = useAuth();
   const userRole = userProfile?.role || 'user';
+  
+  // UI state
   const [selectedTab, setSelectedTab] = useState("list");
-  const [testPacks, setTestPacks] = useState<TestPack[] | null>(null);
-  const [stats, setStats] = useState<TestPackStatsData | null>(null);
-  const [isLoadingTestPacks, setIsLoadingTestPacks] = useState(true);
-  const [isLoadingStats, setIsLoadingStats] = useState(true);
-  const [isDeletingTestPack, setIsDeletingTestPack] = useState(false);
   const [showImportDialog, setShowImportDialog] = useState(false);
   const [showFormDialog, setShowFormDialog] = useState(false);
   const [selectedTestPack, setSelectedTestPack] = useState<TestPack | null>(null);
+  
+  // Data state
+  const [testPacks, setTestPacks] = useState<TestPack[] | null>(null);
+  const [stats, setStats] = useState<TestPackStatsData | null>(null);
+  
+  // Loading states
+  const [isLoadingTestPacks, setIsLoadingTestPacks] = useState(true);
+  const [isLoadingStats, setIsLoadingStats] = useState(true);
+  const [isDeletingTestPack, setIsDeletingTestPack] = useState(false);
 
+  // Fetch test packs
   const fetchTestPacks = useCallback(async () => {
     setIsLoadingTestPacks(true);
     try {
@@ -65,6 +54,7 @@ export const useTestPacks = () => {
     }
   }, [toast]);
 
+  // Fetch statistics
   const fetchStats = useCallback(async () => {
     setIsLoadingStats(true);
     try {
@@ -85,6 +75,7 @@ export const useTestPacks = () => {
     }
   }, [toast]);
 
+  // Initial data loading and polling
   useEffect(() => {
     fetchTestPacks();
     fetchStats();
@@ -100,47 +91,7 @@ export const useTestPacks = () => {
     return () => clearInterval(pollingInterval);
   }, [fetchTestPacks, fetchStats, selectedTab]);
 
-  const handleFormSuccess = () => {
-    setShowFormDialog(false);
-    setSelectedTestPack(null);
-    
-    console.log("Test pack saved successfully, refreshing data...");
-    fetchTestPacks();
-    fetchStats();
-    
-    toast({
-      title: "Éxito",
-      description: "Test pack guardado correctamente.",
-    });
-  };
-
-  const handleImportSuccess = () => {
-    setShowImportDialog(false);
-    
-    console.log("Test packs imported successfully, refreshing data...");
-    fetchTestPacks();
-    fetchStats();
-    
-    toast({
-      title: "Éxito",
-      description: "Test packs importados correctamente.",
-    });
-  };
-
-  const openNewTestPackForm = () => {
-    setSelectedTestPack(null);
-    setShowFormDialog(true);
-  };
-
-  const openEditTestPackForm = (testPack: TestPack) => {
-    setSelectedTestPack(testPack);
-    setShowFormDialog(true);
-  };
-
-  const openImportDialog = () => {
-    setShowImportDialog(true);
-  };
-
+  // Handle tag release/unrelease
   const handleTagRelease = async (tagId: string) => {
     try {
       console.log(`Toggling release status for tag: ${tagId}`);
@@ -179,6 +130,7 @@ export const useTestPacks = () => {
     }
   };
 
+  // Handle test pack deletion
   const handleDeleteTestPack = async (id: string): Promise<boolean> => {
     if (isDeletingTestPack) {
       console.log("Delete operation already in progress, ignoring request");
@@ -239,6 +191,7 @@ export const useTestPacks = () => {
     }
   };
 
+  // Handle template download
   const handleDownloadTemplate = async () => {
     try {
       console.log("Generating and downloading template...");
@@ -272,6 +225,7 @@ export const useTestPacks = () => {
     }
   };
 
+  // Handle data export
   const handleExportData = async () => {
     try {
       console.log("Exporting test pack data...");
@@ -305,12 +259,56 @@ export const useTestPacks = () => {
     }
   };
 
+  // Dialog handling
+  const openNewTestPackForm = () => {
+    setSelectedTestPack(null);
+    setShowFormDialog(true);
+  };
+
+  const openEditTestPackForm = (testPack: TestPack) => {
+    setSelectedTestPack(testPack);
+    setShowFormDialog(true);
+  };
+
+  const openImportDialog = () => {
+    setShowImportDialog(true);
+  };
+
+  const handleFormSuccess = () => {
+    setShowFormDialog(false);
+    setSelectedTestPack(null);
+    
+    console.log("Test pack saved successfully, refreshing data...");
+    fetchTestPacks();
+    fetchStats();
+    
+    toast({
+      title: "Éxito",
+      description: "Test pack guardado correctamente.",
+    });
+  };
+
+  const handleImportSuccess = () => {
+    setShowImportDialog(false);
+    
+    console.log("Test packs imported successfully, refreshing data...");
+    fetchTestPacks();
+    fetchStats();
+    
+    toast({
+      title: "Éxito",
+      description: "Test packs importados correctamente.",
+    });
+  };
+
+  // Manual refresh
   const refetchTestPacks = () => {
     console.log("Manual refresh requested");
     fetchTestPacks();
   };
 
   return {
+    // State
     selectedTab,
     testPacks,
     stats,
@@ -321,21 +319,24 @@ export const useTestPacks = () => {
     showFormDialog,
     selectedTestPack,
     userRole,
+    
+    // State setters
     setSelectedTab,
-    setTestPacks,
-    setStats,
-    setIsLoadingTestPacks,
-    setIsLoadingStats,
     setShowImportDialog,
     setShowFormDialog,
-    setSelectedTestPack,
+    
+    // Data fetching
     fetchTestPacks,
     fetchStats,
+    refetchTestPacks,
+    
+    // Actions
     handleTagRelease,
     handleDeleteTestPack,
     handleDownloadTemplate,
     handleExportData,
-    refetchTestPacks,
+    
+    // Dialog handlers
     openNewTestPackForm,
     openEditTestPackForm,
     openImportDialog,
@@ -343,3 +344,20 @@ export const useTestPacks = () => {
     handleImportSuccess,
   };
 };
+
+// Define type for stats data
+interface TestPackStatsData {
+  testPacks: {
+    total: number;
+    completed: number;
+    progress: number;
+  };
+  tags: {
+    total: number;
+    released: number;
+    progress: number;
+  };
+  systems: { name: string; value: number }[];
+  subsystems: { name: string; value: number }[];
+  itrs: { name: string; value: number }[];
+}
