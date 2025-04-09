@@ -141,9 +141,11 @@ export const deleteTestPack = async (testPackId: string): Promise<{ success: boo
       };
     }
     
+    console.log(`RPC result for deletion of test pack ${testPackId}:`, data);
+    
     // The function returns a boolean indicating success
     if (data !== true) {
-      console.error(`Test pack ${testPackId} deletion failed.`);
+      console.error(`Test pack ${testPackId} deletion failed, RPC returned:`, data);
       return { 
         success: false, 
         message: "El test pack no se eliminó correctamente. Puede que no exista o que ya haya sido eliminado." 

@@ -115,6 +115,7 @@ const TestPackList = ({
       setIsDeleting(true);
       setDeleteError(null);
       
+      // Call the provided onDelete function and await its result
       const success = await onDelete(testPackToDelete.id);
       
       if (success) {
