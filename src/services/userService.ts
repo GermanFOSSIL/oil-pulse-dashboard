@@ -1,4 +1,3 @@
-
 import { supabase } from "@/integrations/supabase/client";
 import { BulkUserData, UserCreateData, UserUpdateData, PasswordChangeData } from "@/services/types";
 
@@ -28,31 +27,105 @@ export interface UserProfile {
 }
 
 export const getUserProfile = async (userId: string): Promise<UserProfile | null> => {
-  const { data, error } = await supabase
-    .from('profiles')
-    .select('*')
-    .eq('id', userId)
-    .single();
+  try {
+    console.log(`Fetching profile for user ${userId}`);
+    
+    // First get the user email from auth.users via admin API (if available) or from the profiles table
+    let userEmail;
+    
+    // Get the profile data
+    const { data: profileData, error: profileError } = await supabase
+      .from('profiles')
+      .select('*')
+      .eq('id', userId)
+      .single();
 
-  if (error) {
-    console.error(`Error fetching profile for user ${userId}:`, error);
-    throw error;
+    if (profileError) {
+      console.error(`Error fetching profile for user ${userId}:`, profileError);
+      throw profileError;
+    }
+
+    // Now get the user email from auth if possible
+    const { data: userData, error: userError } = await supabase.auth.admin.getUserById(userId);
+    
+    if (!userError && userData?.user) {
+      userEmail = userData.user.email;
+      console.log(`Got email ${userEmail} for user ${userId} from auth`);
+    } else {
+      console.log(`Could not get email from auth for user ${userId}, error:`, userError);
+    }
+
+    // Combine profile data with email
+    return {
+      ...profileData,
+      email: userEmail || profileData?.email,
+    } as UserProfile;
+  } catch (error) {
+    console.error(`Error in getUserProfile for ${userId}:`, error);
+    
+    // Fallback: Try to get the profile directly
+    try {
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', userId)
+        .single();
+
+      if (error) throw error;
+      return data as unknown as UserProfile;
+    } catch (fallbackError) {
+      console.error(`Fallback also failed for user ${userId}:`, fallbackError);
+      return null;
+    }
   }
-
-  return data as unknown as UserProfile;
 };
 
 export const getUserProfiles = async (): Promise<UserProfile[]> => {
-  const { data, error } = await supabase
-    .from('profiles')
-    .select('*');
+  try {
+    console.log('Fetching all user profiles');
+    
+    // First get all profiles
+    const { data: profiles, error: profilesError } = await supabase
+      .from('profiles')
+      .select('*');
 
-  if (error) {
-    console.error('Error fetching user profiles:', error);
-    throw error;
+    if (profilesError) {
+      console.error('Error fetching profiles:', profilesError);
+      throw profilesError;
+    }
+
+    // For each profile, try to get the email from auth
+    const enhancedProfiles = await Promise.all(profiles.map(async (profile) => {
+      try {
+        const { data: userData, error: userError } = await supabase.auth.admin.getUserById(profile.id);
+        
+        let email = null;
+        if (!userError && userData?.user) {
+          email = userData.user.email;
+        }
+        
+        return {
+          ...profile,
+          email: email || profile.email,
+        };
+      } catch (error) {
+        console.error(`Error fetching auth data for user ${profile.id}:`, error);
+        return profile;
+      }
+    }));
+
+    return enhancedProfiles as UserProfile[];
+  } catch (error) {
+    console.error('Error in getUserProfiles:', error);
+    
+    // Fallback: Just return profiles without emails
+    const { data, error: fallbackError } = await supabase
+      .from('profiles')
+      .select('*');
+
+    if (fallbackError) throw fallbackError;
+    return data as unknown as UserProfile[];
   }
-
-  return data as unknown as UserProfile[];
 };
 
 export const updateUserProfile = async (userId: string, updates: Partial<UserProfile>): Promise<UserProfile> => {
@@ -237,31 +310,58 @@ export const changeUserPassword = async (data: PasswordChangeData): Promise<{ su
       success: false, 
       message: "La funcionalidad de cambio de contraseña requiere privilegios administrativos. El usuario debe usar la opción 'Olvidé mi contraseña'." 
     };
-    
-    // Original admin API code (commented out):
-    // const { error } = await supabase.auth.admin.updateUserById(
-    //   data.userId,
-    //   { password: data.newPassword }
-    // );
-    //
-    // if (error) {
-    //   console.error("Error changing password:", error);
-    //   return { 
-    //     success: false, 
-    //     message: `Error al cambiar la contraseña: ${error.message}` 
-    //   };
-    // }
-    //
-    // return { 
-    //   success: true, 
-    //   message: "Contraseña cambiada exitosamente" 
-    // };
   } catch (error: any) {
     console.error("Error changing password:", error);
     return { 
       success: false, 
       message: `Error al cambiar la contraseña: ${error.message || "Error desconocido"}` 
     };
+  }
+};
+
+export const setRodrigoAsAdmin = async (): Promise<boolean> => {
+  try {
+    console.log("Looking for Rodrigo Peredo in profiles");
+    
+    // Find Rodrigo's profile by name
+    const { data: profiles, error: findError } = await supabase
+      .from('profiles')
+      .select('*')
+      .ilike('full_name', '%Rodrigo Peredo%');
+    
+    if (findError) {
+      console.error("Error finding Rodrigo Peredo:", findError);
+      return false;
+    }
+    
+    if (!profiles || profiles.length === 0) {
+      console.log("No profile found for Rodrigo Peredo");
+      return false;
+    }
+    
+    const rodrigoProfile = profiles[0];
+    console.log("Found profile for Rodrigo Peredo:", rodrigoProfile);
+    
+    // Update to admin role with all permissions
+    const { error: updateError } = await supabase
+      .from('profiles')
+      .update({
+        role: 'admin',
+        permissions: AVAILABLE_PERMISSIONS,
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', rodrigoProfile.id);
+    
+    if (updateError) {
+      console.error("Error updating Rodrigo to admin:", updateError);
+      return false;
+    }
+    
+    console.log("Successfully set Rodrigo Peredo as admin with all permissions");
+    return true;
+  } catch (error) {
+    console.error("Error in setRodrigoAsAdmin:", error);
+    return false;
   }
 };
 

@@ -52,42 +52,55 @@ const UsersList = ({ users, onEdit, onDelete, onResetPassword }: UsersListProps)
         </TableRow>
       </TableHeader>
       <TableBody>
-        {users.map(user => (
-          <TableRow key={user.id}>
-            <TableCell className="font-medium">{user.email}</TableCell>
-            <TableCell>{user.profile?.full_name || '-'}</TableCell>
-            <TableCell>{getRoleBadge(user.profile?.role)}</TableCell>
-            <TableCell>{new Date(user.created_at).toLocaleDateString()}</TableCell>
-            <TableCell className="text-right">
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button variant="ghost" size="icon" className="h-8 w-8">
-                    <MoreHorizontal className="h-4 w-4" />
-                    <span className="sr-only">Opciones</span>
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end">
-                  <DropdownMenuItem onClick={() => onEdit(user)}>
-                    <Edit className="mr-2 h-4 w-4" />
-                    Editar
-                  </DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => onResetPassword(user.id)}>
-                    <KeyRound className="mr-2 h-4 w-4" />
-                    Cambiar contraseña
-                  </DropdownMenuItem>
-                  <DropdownMenuSeparator />
-                  <DropdownMenuItem 
-                    onClick={() => onDelete(user.id)}
-                    className="text-destructive focus:text-destructive"
-                  >
-                    <Trash2 className="mr-2 h-4 w-4" />
-                    Eliminar
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
-            </TableCell>
-          </TableRow>
-        ))}
+        {users.map(user => {
+          // Log each user to debug email display issues
+          console.log(`Rendering user ${user.id}:`, {
+            email: user.email, 
+            profile_email: user.profile?.email,
+            name: user.profile?.full_name
+          });
+          
+          return (
+            <TableRow key={user.id}>
+              <TableCell className="font-medium">
+                {user.email || user.profile?.email || 'Email no disponible'}
+              </TableCell>
+              <TableCell>{user.profile?.full_name || '-'}</TableCell>
+              <TableCell>{getRoleBadge(user.profile?.role)}</TableCell>
+              <TableCell>
+                {user.created_at ? new Date(user.created_at).toLocaleDateString() : '-'}
+              </TableCell>
+              <TableCell className="text-right">
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="ghost" size="icon" className="h-8 w-8">
+                      <MoreHorizontal className="h-4 w-4" />
+                      <span className="sr-only">Opciones</span>
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end">
+                    <DropdownMenuItem onClick={() => onEdit(user)}>
+                      <Edit className="mr-2 h-4 w-4" />
+                      Editar
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => onResetPassword(user.id)}>
+                      <KeyRound className="mr-2 h-4 w-4" />
+                      Cambiar contraseña
+                    </DropdownMenuItem>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem 
+                      onClick={() => onDelete(user.id)}
+                      className="text-destructive focus:text-destructive"
+                    >
+                      <Trash2 className="mr-2 h-4 w-4" />
+                      Eliminar
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              </TableCell>
+            </TableRow>
+          );
+        })}
       </TableBody>
     </Table>
   );

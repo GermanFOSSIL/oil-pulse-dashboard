@@ -23,6 +23,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
+import { useEffect } from "react";
 
 const formSchema = z.object({
   email: z.string().email({
@@ -46,16 +47,38 @@ interface UserFormProps {
 }
 
 const UserForm = ({ user, onSubmit }: UserFormProps) => {
+  console.log("UserForm user data:", user);
+  
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
     defaultValues: {
-      email: user?.email || "",
+      email: "",
       password: "",
-      full_name: user?.profile?.full_name || "",
-      role: user?.profile?.role || "user",
-      permissions: user?.profile?.permissions || [],
+      full_name: "",
+      role: "user",
+      permissions: [],
     },
   });
+
+  // Initialize form values when user data is available
+  useEffect(() => {
+    if (user) {
+      console.log("Setting form values from user:", {
+        email: user.email,
+        full_name: user.profile?.full_name,
+        role: user.profile?.role,
+        permissions: user.profile?.permissions
+      });
+      
+      form.reset({
+        email: user.email || "",
+        password: "",
+        full_name: user.profile?.full_name || "",
+        role: user.profile?.role || "user",
+        permissions: user.profile?.permissions || [],
+      });
+    }
+  }, [form, user]);
 
   return (
     <Form {...form}>

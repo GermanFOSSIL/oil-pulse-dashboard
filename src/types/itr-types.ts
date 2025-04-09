@@ -1,7 +1,7 @@
 
 import { ITR } from "@/services/supabaseService";
 
-// Re-export the ITR type
+// Re-export the ITR type using 'export type' to avoid isolatedModules error
 export type { ITR };
 
 export interface ITRWithDetails extends ITR {

@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { 
@@ -7,7 +6,8 @@ import {
   createUser, 
   updateUserProfile,
   changeUserPassword,
-  bulkCreateUsers
+  bulkCreateUsers,
+  setRodrigoAsAdmin
 } from "@/services/userService";
 import { supabase } from "@/integrations/supabase/client";
 import { BulkUserData } from "@/services/types";
@@ -21,7 +21,7 @@ import {
 } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Search, PlusCircle, RefreshCw, AlertTriangle } from "lucide-react";
+import { Search, PlusCircle, RefreshCw, AlertTriangle, Check } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -62,24 +62,35 @@ const Users = () => {
   const [isPasswordChangeOpen, setIsPasswordChangeOpen] = useState(false);
   const [userIdForPasswordChange, setUserIdForPasswordChange] = useState<string | null>(null);
   
+  const [isSettingAdmin, setIsSettingAdmin] = useState(false);
+  const [adminSetSuccess, setAdminSetSuccess] = useState(false);
+  
   // Fetch all user profiles (not auth users)
   const fetchUsers = async () => {
     setLoading(true);
     setError(null);
     try {
-      // Get all profiles from the public.profiles table
+      console.log("Fetching user profiles");
+      // Get all profiles from the public.profiles table with enhanced data
       const profiles = await getUserProfiles();
       
-      // Convert profiles to the expected format
-      const usersList = profiles.map(profile => ({
-        id: profile.id,
-        email: profile.email || '', // This might not be available in profiles
-        profile: {
-          ...profile
-        },
-        created_at: profile.created_at || new Date().toISOString()
-      }));
+      // Enhanced logging to check what we got
+      console.log("Received profiles:", profiles);
       
+      // Convert profiles to the expected format with explicit email handling
+      const usersList = profiles.map(profile => {
+        console.log(`Processing profile ${profile.id} with email:`, profile.email);
+        return {
+          id: profile.id,
+          email: profile.email || 'Email no disponible',
+          profile: {
+            ...profile
+          },
+          created_at: profile.created_at || new Date().toISOString()
+        };
+      });
+      
+      console.log("Processed user list:", usersList);
       setUsers(usersList);
     } catch (err: any) {
       console.error("Error fetching users:", err);
@@ -94,8 +105,42 @@ const Users = () => {
     }
   };
   
+  // Handle setting Rodrigo as admin
+  const handleSetRodrigoAsAdmin = async () => {
+    setIsSettingAdmin(true);
+    try {
+      const success = await setRodrigoAsAdmin();
+      if (success) {
+        setAdminSetSuccess(true);
+        toast({
+          title: "¡Éxito!",
+          description: "Rodrigo Peredo ha sido configurado como administrador con todos los permisos.",
+        });
+        // Refresh the user list to show the changes
+        fetchUsers();
+      } else {
+        toast({
+          title: "Error",
+          description: "No se pudo configurar a Rodrigo Peredo como administrador.",
+          variant: "destructive",
+        });
+      }
+    } catch (err: any) {
+      toast({
+        title: "Error",
+        description: `No se pudo configurar el administrador: ${err.message}`,
+        variant: "destructive",
+      });
+    } finally {
+      setIsSettingAdmin(false);
+    }
+  };
+  
   useEffect(() => {
     fetchUsers();
+    
+    // Try to set Rodrigo as admin on first load
+    handleSetRodrigoAsAdmin();
   }, []);
   
   const handleCreateUser = async (formData: any) => {
@@ -175,6 +220,7 @@ const Users = () => {
   };
   
   const handleEditUser = (user: any) => {
+    console.log("Editing user:", user);
     setCurrentEditUser(user);
     setIsUserFormOpen(true);
   };
@@ -315,13 +361,35 @@ const Users = () => {
             Gestión de usuarios del sistema
           </p>
         </div>
-        <Button onClick={() => {
-          setCurrentEditUser(null);
-          setIsUserFormOpen(true);
-        }}>
-          <PlusCircle className="mr-2 h-4 w-4" />
-          Nuevo Usuario
-        </Button>
+        <div className="flex gap-2">
+          {!adminSetSuccess && (
+            <Button 
+              onClick={handleSetRodrigoAsAdmin}
+              variant="outline"
+              disabled={isSettingAdmin}
+              className="flex items-center gap-2"
+            >
+              {isSettingAdmin ? (
+                <>
+                  <span className="animate-spin rounded-full h-4 w-4 border-b-2 border-primary"></span>
+                  <span>Configurando admin...</span>
+                </>
+              ) : (
+                <>
+                  <Check className="h-4 w-4" />
+                  <span>Configurar Admin</span>
+                </>
+              )}
+            </Button>
+          )}
+          <Button onClick={() => {
+            setCurrentEditUser(null);
+            setIsUserFormOpen(true);
+          }}>
+            <PlusCircle className="mr-2 h-4 w-4" />
+            Nuevo Usuario
+          </Button>
+        </div>
       </div>
 
       <Tabs defaultValue="list" className="space-y-4">
@@ -348,7 +416,7 @@ const Users = () => {
               className="ml-2"
               disabled={loading}
             >
-              <RefreshCw className="h-4 w-4" />
+              <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
             </Button>
           </div>
 
