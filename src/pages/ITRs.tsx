@@ -10,6 +10,8 @@ import { fetchITRsWithDetails, createTestITRs } from "@/services/itrService";
 import { addSampleITRs } from "@/scripts/addSampleData";
 import { DatabaseActivityTimeline } from "@/components/DatabaseActivityTimeline";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { AlertCircle } from "lucide-react";
 
 const ITRs = () => {
   const [itrs, setITRs] = useState<ITRWithDetails[]>([]);
@@ -24,18 +26,20 @@ const ITRs = () => {
   const fetchData = async () => {
     setLoading(true);
     try {
-      const subsystemsData = await getSubsystems();
-      setSubsystems(subsystemsData);
-      
       if (selectedProjectId) {
         const systemsData = await getSystemsByProjectId(selectedProjectId);
         setSystems(systemsData);
         
+        const subsystemIds = systemsData.map(system => system.id);
+        const subsystemsData = await getSubsystems(subsystemIds);
+        setSubsystems(subsystemsData);
+        
         const enrichedITRs = await fetchITRsWithDetails(selectedProjectId);
         setITRs(enrichedITRs);
       } else {
-        const enrichedITRs = await fetchITRsWithDetails(null);
-        setITRs(enrichedITRs);
+        setSystems([]);
+        setSubsystems([]);
+        setITRs([]);
       }
     } catch (error) {
       console.error("Error fetching data:", error);
@@ -58,9 +62,18 @@ const ITRs = () => {
   };
 
   const handleAddSampleData = async () => {
+    if (!selectedProjectId) {
+      toast({
+        title: "Error",
+        description: "Debe seleccionar un proyecto primero",
+        variant: "destructive"
+      });
+      return;
+    }
+    
     setAddingSampleData(true);
     try {
-      const testResult = await createTestITRs();
+      const testResult = await createTestITRs(selectedProjectId);
       
       if (testResult.success) {
         toast({
@@ -69,15 +82,12 @@ const ITRs = () => {
         });
         fetchData();
       } else {
-        const result = await addSampleITRs();
+        const result = await addSampleITRs(selectedProjectId);
         if (result.success) {
           toast({
             title: "Datos de muestra añadidos",
             description: "Se han añadido ITRs de muestra correctamente",
           });
-          if (result.data && result.data.project) {
-            setSelectedProjectId(result.data.project.id);
-          }
           fetchData();
         } else {
           toast({
@@ -116,6 +126,16 @@ const ITRs = () => {
         </div>
       </div>
 
+      {!selectedProjectId && (
+        <Alert variant="destructive">
+          <AlertCircle className="h-4 w-4" />
+          <AlertTitle>Selección requerida</AlertTitle>
+          <AlertDescription>
+            Debe seleccionar un proyecto para ver y gestionar los ITRs.
+          </AlertDescription>
+        </Alert>
+      )}
+
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
         <TabsList className="grid w-full md:w-[400px] grid-cols-2">
           <TabsTrigger value="itrs">ITRs</TabsTrigger>
@@ -123,16 +143,26 @@ const ITRs = () => {
         </TabsList>
         
         <TabsContent value="itrs" className="mt-6">
-          <ITRList 
-            itrs={itrs}
-            subsystems={subsystems}
-            systems={systems}
-            loading={loading}
-            selectedProjectId={selectedProjectId}
-            onRefresh={fetchData}
-            onAddSampleData={handleAddSampleData}
-            addingSampleData={addingSampleData}
-          />
+          {selectedProjectId ? (
+            <ITRList 
+              itrs={itrs}
+              subsystems={subsystems}
+              systems={systems}
+              loading={loading}
+              selectedProjectId={selectedProjectId}
+              onRefresh={fetchData}
+              onAddSampleData={handleAddSampleData}
+              addingSampleData={addingSampleData}
+            />
+          ) : (
+            <Card className="border-dashed border-muted">
+              <CardContent className="pt-6 pb-6 text-center">
+                <p className="text-muted-foreground">
+                  Seleccione un proyecto para ver los ITRs asociados.
+                </p>
+              </CardContent>
+            </Card>
+          )}
         </TabsContent>
         
         <TabsContent value="activity" className="mt-6">

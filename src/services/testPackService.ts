@@ -16,7 +16,8 @@ export const getTestPacks = async (): Promise<TestPack[]> => {
     }
 
     console.log(`Retrieved ${data?.length || 0} Test Packs`);
-    return data || [];
+    // Asegurar que los datos cumplen con el tipo TestPack
+    return (data || []) as TestPack[];
   } catch (error) {
     console.error("Error in getTestPacks:", error);
     throw error;
@@ -43,7 +44,7 @@ export const getTestPackById = async (id: string): Promise<TestPack | null> => {
     }
 
     console.log(`Retrieved Test Pack: ${data.nombre_paquete}`);
-    return data;
+    return data as TestPack;
   } catch (error) {
     console.error("Error in getTestPackById:", error);
     throw error;
@@ -74,7 +75,7 @@ export const createTestPack = async (testPack: Omit<TestPack, "id" | "created_at
       details: { name: data.nombre_paquete }
     });
 
-    return data;
+    return data as TestPack;
   } catch (error) {
     console.error("Error in createTestPack:", error);
     throw error;
@@ -106,7 +107,7 @@ export const updateTestPack = async (id: string, updates: Partial<TestPack>): Pr
       details: { name: data.nombre_paquete, updates }
     });
 
-    return data;
+    return data as TestPack;
   } catch (error) {
     console.error("Error in updateTestPack:", error);
     throw error;
@@ -149,7 +150,7 @@ export const getTagsByTestPackId = async (testPackId: string): Promise<Tag[]> =>
     }
 
     console.log(`Retrieved ${data?.length || 0} tags for Test Pack ${testPackId}`);
-    return data || [];
+    return (data || []) as Tag[];
   } catch (error) {
     console.error("Error in getTagsByTestPackId:", error);
     throw error;
@@ -180,7 +181,7 @@ export const createTag = async (tag: Omit<Tag, "id" | "created_at" | "updated_at
       details: { name: data.tag_name, test_pack_id: data.test_pack_id }
     });
 
-    return data;
+    return data as Tag;
   } catch (error) {
     console.error("Error in createTag:", error);
     throw error;
@@ -235,7 +236,7 @@ export const updateTag = async (id: string, updates: Partial<Tag>, userId?: stri
       });
     }
 
-    return data;
+    return data as Tag;
   } catch (error) {
     console.error("Error in updateTag:", error);
     throw error;
@@ -387,7 +388,7 @@ export const getTestPacksByITR = async (itrName: string): Promise<TestPack[]> =>
     }
 
     console.log(`Retrieved ${data?.length || 0} Test Packs for ITR ${itrName}`);
-    return data || [];
+    return (data || []) as TestPack[];
   } catch (error) {
     console.error("Error in getTestPacksByITR:", error);
     throw error;
@@ -431,7 +432,7 @@ export const bulkCreateTestPacksAndTags = async (
     
     if (tagsToInsert.length === 0) {
       console.log("No tags to insert");
-      return { testPacks: createdTestPacks, tags: [] };
+      return { testPacks: createdTestPacks as TestPack[], tags: [] };
     }
     
     // Insert all tags
@@ -458,8 +459,8 @@ export const bulkCreateTestPacksAndTags = async (
     });
     
     return { 
-      testPacks: createdTestPacks,
-      tags: createdTags
+      testPacks: createdTestPacks as TestPack[],
+      tags: createdTags as Tag[]
     };
   } catch (error) {
     console.error("Error in bulkCreateTestPacksAndTags:", error);

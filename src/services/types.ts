@@ -105,7 +105,7 @@ export type TestPack = {
   itr_asociado: string;
   sistema: string;
   subsistema: string;
-  estado: 'pendiente' | 'listo';
+  estado: "pendiente" | "listo";
 };
 
 export type Tag = {
@@ -114,7 +114,7 @@ export type Tag = {
   updated_at: string;
   test_pack_id: string;
   tag_name: string;
-  estado: 'pendiente' | 'liberado';
+  estado: "pendiente" | "liberado";
   fecha_liberacion: string | null;
 };
 

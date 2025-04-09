@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { Link, useLocation } from "react-router-dom";
 import {
@@ -11,6 +12,7 @@ import {
   FilePieChart,
   Layers,
   X,
+  ClipboardCheck,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -30,7 +32,7 @@ type NavItem = {
 const navItems: NavItem[] = [
   {
     label: "Dashboard",
-    href: "/",
+    href: "/dashboard",
     icon: LayoutDashboard,
     permission: "dashboard"
   },
@@ -59,6 +61,12 @@ const navItems: NavItem[] = [
     permission: "itrs"
   },
   {
+    label: "Test Packs",
+    href: "/test-packs",
+    icon: ClipboardCheck,
+    permission: "test-packs"
+  },
+  {
     label: "Configuration",
     href: "/configuration",
     icon: Cog,
@@ -81,12 +89,6 @@ const navItems: NavItem[] = [
     href: "/database",
     icon: Database,
     permission: "database"
-  },
-  {
-    label: "Test Packs",
-    href: "/test-packs",
-    icon: FileText,
-    permission: "test-packs"
   },
 ];
 
