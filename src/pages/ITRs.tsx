@@ -10,7 +10,8 @@ import { fetchITRsWithDetails, createTestITRs } from "@/services/itrService";
 import { addSampleITRs } from "@/scripts/addSampleData";
 import { DatabaseActivityTimeline } from "@/components/DatabaseActivityTimeline";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Alert, AlertDescription, AlertTitle, AlertCircle } from "@/components/ui/alert";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { AlertCircle } from "lucide-react";
 
 const ITRs = () => {
   const [itrs, setITRs] = useState<ITRWithDetails[]>([]);
@@ -73,7 +74,6 @@ const ITRs = () => {
     
     setAddingSampleData(true);
     try {
-      // Removed the incorrect argument here
       const testResult = await createTestITRs();
       
       if (testResult.success) {

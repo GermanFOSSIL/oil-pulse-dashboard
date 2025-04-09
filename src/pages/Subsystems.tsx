@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { DataTable } from "@/components/ui/data-table";
@@ -10,7 +9,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { SubsystemFormModal } from "@/components/modals/SubsystemFormModal";
 import { DatabaseActivityTimeline } from "@/components/DatabaseActivityTimeline";
 import { ProjectSelector } from "@/components/ProjectSelector";
-import { Alert, AlertDescription, AlertTitle, AlertCircle } from "@/components/ui/alert";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { AlertCircle } from "lucide-react";
 import {
   Select,
   SelectContent,
@@ -52,7 +52,6 @@ const Subsystems = () => {
         }
         
         const systemIds = systemsData.map(system => system.id);
-        // Removed the incorrect argument here
         const subsystemsData = await getSubsystems(systemIds);
         
         const systemsMap = new Map<string, System>();
