@@ -1,11 +1,10 @@
-
 import { useState, useEffect } from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { useTestPacks } from "@/hooks/useTestPacks";
-import { PlusCircle, Search, FileSpreadsheet, Filter, AlertTriangle, RefreshCw, FilePdf, FileDown } from "lucide-react";
+import { PlusCircle, Search, FileSpreadsheet, Filter, AlertTriangle, RefreshCw, FileText, FileDown } from "lucide-react";
 import TestPackList from "@/components/testpack/TestPackList";
 import TestPackStats from "@/components/testpack/TestPackStats";
 import TestPackFormModal from "@/components/testpack/TestPackFormModal";
@@ -28,7 +27,6 @@ const TestPacks = () => {
   
   const { isTimedOut, startTimeout, cancelTimeout } = useTimeout(20000);
   
-  // Iniciar el timeout cuando comienza la carga
   useEffect(() => {
     if (loading) {
       startTimeout();
@@ -50,7 +48,6 @@ const TestPacks = () => {
     try {
       setIsExporting(true);
       const pdfUrl = await generateReport('project_status');
-      // Abrir PDF en nueva pestaña
       window.open(pdfUrl, '_blank');
       toast({
         title: "PDF generado exitosamente",
@@ -72,7 +69,6 @@ const TestPacks = () => {
     try {
       setIsExporting(true);
       
-      // Preparar datos para Excel
       const testPacksForExcel = testPacks.map(tp => ({
         Nombre: tp.nombre_paquete,
         ITR: tp.itr_asociado,
@@ -99,7 +95,6 @@ const TestPacks = () => {
     }
   };
   
-  // Mostrar mensaje de error si hay un problema o si tarda demasiado
   if ((error || isTimedOut) && !loading) {
     return (
       <div className="space-y-6">
@@ -201,7 +196,7 @@ const TestPacks = () => {
                 disabled={isExporting || loading || testPacks.length === 0}
                 className="gap-2"
               >
-                <FilePdf className="h-4 w-4" />
+                <FileText className="h-4 w-4" />
                 PDF
               </Button>
             </div>
@@ -236,7 +231,7 @@ const TestPacks = () => {
                 disabled={isExporting || loading || testPacks.length === 0}
                 className="gap-2"
               >
-                <FilePdf className="h-4 w-4" />
+                <FileText className="h-4 w-4" />
                 PDF
               </Button>
             </div>
