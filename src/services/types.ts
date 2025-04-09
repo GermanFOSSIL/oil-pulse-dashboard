@@ -95,3 +95,53 @@ export type PasswordChangeData = {
   userId: string;
   newPassword: string;
 };
+
+// New types for Test Pack module
+export type TestPack = {
+  id: string;
+  created_at: string;
+  updated_at: string;
+  nombre_paquete: string;
+  itr_asociado: string;
+  sistema: string;
+  subsistema: string;
+  estado: 'pendiente' | 'listo';
+};
+
+export type Tag = {
+  id: string;
+  created_at: string;
+  updated_at: string;
+  test_pack_id: string;
+  tag_name: string;
+  estado: 'pendiente' | 'liberado';
+  fecha_liberacion: string | null;
+};
+
+export type AccionesLog = {
+  id: string;
+  usuario_id: string;
+  tag_id: string;
+  accion: string;
+  fecha: string;
+};
+
+export type TestPackStats = {
+  total: number;
+  completed: number;
+  progress: number;
+};
+
+export type TagStats = {
+  total: number;
+  released: number;
+  progress: number;
+};
+
+export type StatsData = {
+  testPacks: TestPackStats;
+  tags: TagStats;
+  systems: { name: string; value: number; }[];
+  subsystems: { name: string; value: number; }[];
+  itrs: { name: string; value: number; }[];
+};

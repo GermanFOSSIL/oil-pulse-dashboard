@@ -18,6 +18,8 @@ import NotFound from "./pages/NotFound";
 import Auth from "./pages/Auth";
 import { AuthProvider } from "./contexts/AuthContext";
 import { ProtectedRoute } from "./components/ProtectedRoute";
+import TestPacks from "./pages/TestPacks";
+import TestPackDetail from "./pages/TestPackDetail";
 
 const queryClient = new QueryClient();
 
@@ -44,6 +46,8 @@ const App = () => (
               <Route path="systems" element={<Systems />} />
               <Route path="subsystems" element={<Subsystems />} />
               <Route path="itrs" element={<ITRs />} />
+              <Route path="test-packs" element={<TestPacks />} />
+              <Route path="test-packs/:id" element={<TestPackDetail />} />
               <Route path="configuration" element={<Configuration />} />
               <Route path="users" element={<Users />} />
               <Route path="reports" element={<Reports />} />

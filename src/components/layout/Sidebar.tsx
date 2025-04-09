@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { Link, useLocation } from "react-router-dom";
 import {
@@ -82,6 +81,12 @@ const navItems: NavItem[] = [
     href: "/database",
     icon: Database,
     permission: "database"
+  },
+  {
+    label: "Test Packs",
+    href: "/test-packs",
+    icon: FileText,
+    permission: "test-packs"
   },
 ];
 
