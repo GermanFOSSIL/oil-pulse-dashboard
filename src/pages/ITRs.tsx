@@ -30,8 +30,9 @@ const ITRs = () => {
         const systemsData = await getSystemsByProjectId(selectedProjectId);
         setSystems(systemsData);
         
-        const subsystemIds = systemsData.map(system => system.id);
-        const subsystemsData = await getSubsystems(subsystemIds);
+        // Obtener todos los IDs de sistemas para filtrar subsistemas
+        const systemIds = systemsData.map(system => system.id);
+        const subsystemsData = await getSubsystems(systemIds);
         setSubsystems(subsystemsData);
         
         const enrichedITRs = await fetchITRsWithDetails(selectedProjectId);
@@ -82,7 +83,7 @@ const ITRs = () => {
         });
         fetchData();
       } else {
-        const result = await addSampleITRs(selectedProjectId);
+        const result = await addSampleITRs();
         if (result.success) {
           toast({
             title: "Datos de muestra añadidos",

@@ -1,12 +1,16 @@
+
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { DataTable } from "@/components/ui/data-table";
 import { Plus, Filter } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { getSubsystems, Subsystem, getSystems, System, deleteSubsystem, getITRsBySubsystemId } from "@/services/supabaseService";
+import { getSystemsByProjectId } from "@/services/systemService";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { SubsystemFormModal } from "@/components/modals/SubsystemFormModal";
 import { DatabaseActivityTimeline } from "@/components/DatabaseActivityTimeline";
+import { ProjectSelector } from "@/components/ProjectSelector";
+import { Alert, AlertCircle, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import {
   Select,
   SelectContent,
@@ -30,39 +34,52 @@ const Subsystems = () => {
   const [selectedSubsystem, setSelectedSubsystem] = useState<Subsystem | undefined>(undefined);
   const [systemFilter, setSystemFilter] = useState<string>("all");
   const [completionFilter, setCompletionFilter] = useState<string>("all");
+  const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null);
   const { toast } = useToast();
 
   const fetchData = async () => {
     setLoading(true);
     try {
-      const [subsystemsData, systemsData] = await Promise.all([
-        getSubsystems(),
-        getSystems()
-      ]);
-      
-      const systemsMap = new Map<string, System>();
-      systemsData.forEach(system => systemsMap.set(system.id, system));
-      
-      const enrichedSubsystems = await Promise.all(
-        subsystemsData.map(async (subsystem) => {
-          const itrs = await getITRsBySubsystemId(subsystem.id);
-          const system = systemsMap.get(subsystem.system_id);
-          
-          const totalQuantity = itrs.reduce((sum, itr) => {
-            return sum + ((itr as any).quantity || 1);
-          }, 0);
-          
-          return {
-            ...subsystem,
-            systemName: system?.name || 'Sistema Desconocido',
-            itrsCount: itrs.length,
-            itrsQuantity: totalQuantity
-          };
-        })
-      );
-      
-      setSubsystems(enrichedSubsystems);
-      setSystems(systemsData);
+      if (selectedProjectId) {
+        // Obtener sistemas del proyecto seleccionado
+        const systemsData = await getSystemsByProjectId(selectedProjectId);
+        setSystems(systemsData);
+        
+        if (systemsData.length === 0) {
+          setSubsystems([]);
+          setLoading(false);
+          return;
+        }
+        
+        const systemIds = systemsData.map(system => system.id);
+        const subsystemsData = await getSubsystems(systemIds);
+        
+        const systemsMap = new Map<string, System>();
+        systemsData.forEach(system => systemsMap.set(system.id, system));
+        
+        const enrichedSubsystems = await Promise.all(
+          subsystemsData.map(async (subsystem) => {
+            const itrs = await getITRsBySubsystemId(subsystem.id);
+            const system = systemsMap.get(subsystem.system_id);
+            
+            const totalQuantity = itrs.reduce((sum, itr) => {
+              return sum + ((itr as any).quantity || 1);
+            }, 0);
+            
+            return {
+              ...subsystem,
+              systemName: system?.name || 'Sistema Desconocido',
+              itrsCount: itrs.length,
+              itrsQuantity: totalQuantity
+            };
+          })
+        );
+        
+        setSubsystems(enrichedSubsystems);
+      } else {
+        setSystems([]);
+        setSubsystems([]);
+      }
     } catch (error) {
       console.error("Error fetching data:", error);
       toast({
@@ -77,7 +94,7 @@ const Subsystems = () => {
 
   useEffect(() => {
     fetchData();
-  }, []);
+  }, [selectedProjectId]);
 
   const filteredSubsystems = subsystems.filter(subsystem => {
     if (systemFilter !== "all" && subsystem.systemName !== systemFilter) {
@@ -160,6 +177,24 @@ const Subsystems = () => {
   };
 
   const handleNewSubsystem = () => {
+    if (!selectedProjectId) {
+      toast({
+        title: "Seleccione un proyecto",
+        description: "Debe seleccionar un proyecto antes de crear un subsistema",
+        variant: "destructive"
+      });
+      return;
+    }
+    
+    if (systems.length === 0) {
+      toast({
+        title: "No hay sistemas",
+        description: "Debe crear al menos un sistema para el proyecto seleccionado antes de crear subsistemas",
+        variant: "destructive"
+      });
+      return;
+    }
+    
     setSelectedSubsystem(undefined);
     setShowModal(true);
   };
@@ -175,6 +210,11 @@ const Subsystems = () => {
     setSelectedSubsystem(undefined);
   };
 
+  const handleSelectProject = (projectId: string | null) => {
+    setSelectedProjectId(projectId);
+    setSystemFilter("all");
+  };
+
   const uniqueSystems = Array.from(new Set(subsystems.map(s => s.systemName))).filter(Boolean);
 
   return (
@@ -186,69 +226,99 @@ const Subsystems = () => {
             Gestiona los subsistemas dentro de tus sistemas
           </p>
         </div>
-        <Button onClick={handleNewSubsystem}>
-          <Plus className="h-4 w-4 mr-2" />
-          Nuevo Subsistema
-        </Button>
-      </div>
-
-      <div className="flex justify-start items-center mb-4 space-x-2">
-        <div className="w-[180px]">
-          <Select
-            value={systemFilter}
-            onValueChange={setSystemFilter}
-          >
-            <SelectTrigger>
-              <SelectValue placeholder="Filtrar por sistema" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">Todos los sistemas</SelectItem>
-              {uniqueSystems.map((system, index) => (
-                <SelectItem key={index} value={system as string}>
-                  {system}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-        
-        <div className="w-[180px]">
-          <Select
-            value={completionFilter}
-            onValueChange={setCompletionFilter}
-          >
-            <SelectTrigger>
-              <SelectValue placeholder="Filtrar por completado" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">Todos</SelectItem>
-              <SelectItem value="completed">Completados</SelectItem>
-              <SelectItem value="inprogress">En progreso</SelectItem>
-            </SelectContent>
-          </Select>
+        <div className="flex items-center space-x-4">
+          <ProjectSelector 
+            onSelectProject={handleSelectProject}
+            selectedProjectId={selectedProjectId}
+          />
+          <Button onClick={handleNewSubsystem}>
+            <Plus className="h-4 w-4 mr-2" />
+            Nuevo Subsistema
+          </Button>
         </div>
       </div>
 
-      {subsystems.length === 0 && !loading ? (
+      {!selectedProjectId && (
+        <Alert variant="warning">
+          <AlertCircle className="h-4 w-4" />
+          <AlertTitle>Selección requerida</AlertTitle>
+          <AlertDescription>
+            Seleccione un proyecto para ver y gestionar los subsistemas.
+          </AlertDescription>
+        </Alert>
+      )}
+
+      {selectedProjectId && systems.length === 0 && !loading ? (
+        <Card>
+          <CardHeader>
+            <CardTitle>No hay sistemas</CardTitle>
+            <CardDescription>
+              No se encontraron sistemas para el proyecto seleccionado
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <p>Primero debe crear sistemas para poder añadir subsistemas.</p>
+          </CardContent>
+        </Card>
+      ) : selectedProjectId && subsystems.length === 0 && !loading ? (
         <Card>
           <CardHeader>
             <CardTitle>No hay subsistemas</CardTitle>
             <CardDescription>
-              No se encontraron subsistemas en la base de datos
+              No se encontraron subsistemas para los sistemas del proyecto seleccionado
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <p>Puede importar datos utilizando la función de importación en la página de configuración.</p>
+            <p>Utilice el botón "Nuevo Subsistema" para crear uno.</p>
           </CardContent>
         </Card>
-      ) : (
-        <DataTable
-          data={filteredSubsystems}
-          columns={columns}
-          onEdit={handleEditSubsystem}
-          onDelete={handleDeleteSubsystem}
-          loading={loading}
-        />
+      ) : selectedProjectId && (
+        <>
+          <div className="flex justify-start items-center mb-4 space-x-2">
+            <div className="w-[180px]">
+              <Select
+                value={systemFilter}
+                onValueChange={setSystemFilter}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Filtrar por sistema" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Todos los sistemas</SelectItem>
+                  {uniqueSystems.map((system, index) => (
+                    <SelectItem key={index} value={system as string}>
+                      {system}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            
+            <div className="w-[180px]">
+              <Select
+                value={completionFilter}
+                onValueChange={setCompletionFilter}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Filtrar por completado" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Todos</SelectItem>
+                  <SelectItem value="completed">Completados</SelectItem>
+                  <SelectItem value="inprogress">En progreso</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+
+          <DataTable
+            data={filteredSubsystems}
+            columns={columns}
+            onEdit={handleEditSubsystem}
+            onDelete={handleDeleteSubsystem}
+            loading={loading}
+          />
+        </>
       )}
 
       <DatabaseActivityTimeline />

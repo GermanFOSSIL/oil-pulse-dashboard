@@ -1,3 +1,4 @@
+
 import { useState } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
@@ -5,7 +6,8 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
-import { System, Project, createSystem, updateSystem } from "@/services/supabaseService";
+import { System, Project } from "@/services/types";
+import { createSystem, updateSystem } from "@/services/systemService";
 
 interface SystemFormModalProps {
   open: boolean;
@@ -13,6 +15,7 @@ interface SystemFormModalProps {
   onSuccess: () => void;
   system?: System;
   projects: Project[];
+  defaultProjectId?: string;
 }
 
 export const SystemFormModal = ({ 
@@ -20,14 +23,15 @@ export const SystemFormModal = ({
   onClose, 
   onSuccess, 
   system, 
-  projects 
+  projects,
+  defaultProjectId
 }: SystemFormModalProps) => {
   const isEditMode = !!system;
   const { toast } = useToast();
   
   const [formData, setFormData] = useState({
     name: system?.name || "",
-    project_id: system?.project_id || "",
+    project_id: system?.project_id || defaultProjectId || "",
     completion_rate: system?.completion_rate || 0,
     start_date: system?.start_date ? new Date(system.start_date).toISOString().split('T')[0] : "",
     end_date: system?.end_date ? new Date(system.end_date).toISOString().split('T')[0] : ""
@@ -85,6 +89,13 @@ export const SystemFormModal = ({
       setLoading(false);
     }
   };
+
+  // Filter projects for select
+  const availableProjects = isEditMode 
+    ? projects 
+    : defaultProjectId 
+      ? projects.filter(p => p.id === defaultProjectId)
+      : projects;
   
   return (
     <Dialog open={open} onOpenChange={onClose}>
@@ -113,12 +124,13 @@ export const SystemFormModal = ({
             <Select
               value={formData.project_id}
               onValueChange={(value) => handleSelectChange("project_id", value)}
+              disabled={isEditMode || (defaultProjectId !== undefined)}
             >
               <SelectTrigger id="project_id">
                 <SelectValue placeholder="Seleccionar proyecto" />
               </SelectTrigger>
               <SelectContent>
-                {projects.map(project => (
+                {availableProjects.map(project => (
                   <SelectItem key={project.id} value={project.id}>
                     {project.name}
                   </SelectItem>
