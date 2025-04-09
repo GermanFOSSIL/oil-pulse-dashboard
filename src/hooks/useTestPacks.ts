@@ -1,4 +1,3 @@
-
 import { useState, useEffect, useCallback } from "react";
 import { useToast } from "@/hooks/use-toast";
 import {
@@ -90,14 +89,13 @@ export const useTestPacks = () => {
     fetchTestPacks();
     fetchStats();
     
-    // Set up polling for real-time updates
     const pollingInterval = setInterval(() => {
       console.log("Polling for test pack updates...");
       fetchTestPacks();
       if (selectedTab === "dashboard") {
         fetchStats();
       }
-    }, 30000); // Poll every 30 seconds
+    }, 30000);
     
     return () => clearInterval(pollingInterval);
   }, [fetchTestPacks, fetchStats, selectedTab]);
@@ -147,7 +145,6 @@ export const useTestPacks = () => {
     try {
       console.log(`Toggling release status for tag: ${tagId}`);
       
-      // Find the tag in the current data to get its current status
       const tag = testPacks?.flatMap(tp => tp.tags || []).find(t => t.id === tagId);
       if (!tag) {
         throw new Error("TAG no encontrado");
@@ -192,7 +189,6 @@ export const useTestPacks = () => {
       console.log(`Starting deletion process for test pack ID: ${id}`);
       setIsDeletingTestPack(true);
       
-      // Find the test pack in current data to get its name for user feedback
       const testPackToDelete = testPacks?.find(tp => tp.id === id);
       const testPackName = testPackToDelete?.nombre_paquete || 'Test Pack';
       
@@ -202,7 +198,6 @@ export const useTestPacks = () => {
       if (result.success) {
         console.log(`Test pack ${id} deleted successfully`);
         
-        // Optimistically update the UI by removing the deleted test pack
         setTestPacks(prevTestPacks => 
           prevTestPacks ? prevTestPacks.filter(tp => tp.id !== id) : null
         );
@@ -212,7 +207,6 @@ export const useTestPacks = () => {
           description: `${testPackName} ha sido eliminado correctamente.`,
         });
         
-        // Refresh data to ensure UI is in sync with the database
         console.log("Refreshing data after successful deletion");
         fetchTestPacks();
         fetchStats();
@@ -226,7 +220,6 @@ export const useTestPacks = () => {
           variant: "destructive",
         });
         
-        // Refresh data anyway to ensure UI consistency
         fetchTestPacks();
         return false;
       }
@@ -239,7 +232,6 @@ export const useTestPacks = () => {
         variant: "destructive",
       });
       
-      // Try to refresh data to ensure UI consistency
       fetchTestPacks();
       return false;
     } finally {

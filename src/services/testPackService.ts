@@ -1,4 +1,3 @@
-
 import { supabase } from "@/integrations/supabase/client";
 import * as XLSX from 'xlsx';
 
@@ -505,114 +504,32 @@ export const deleteTestPack = async (testPackId: string): Promise<{ success: boo
   try {
     console.log(`Starting deletion process for test pack ${testPackId}`);
     
-    // Verify the test pack exists before attempting to delete
-    const { data: testPackExists, error: existsError } = await supabase
-      .from('test_packs')
-      .select('id')
-      .eq('id', testPackId)
-      .maybeSingle();
-    
-    if (existsError) {
-      console.error(`Error checking if test pack ${testPackId} exists:`, existsError);
-      return { 
-        success: false, 
-        message: "Error al verificar si el test pack existe. Por favor, inténtelo de nuevo." 
-      };
-    }
-    
-    if (!testPackExists) {
-      console.error(`Test pack ${testPackId} not found, cannot delete.`);
-      return { 
-        success: false, 
-        message: "El test pack solicitado no existe o ya ha sido eliminado." 
-      };
-    }
-
-    // First try to use the new RPC method
-    console.log(`Attempting to delete test pack ${testPackId} using RPC function`);
-    
     // Call the RPC function to delete test pack and its tags in a transaction
-    const { data: rpcResult, error: rpcError } = await (supabase.rpc as any)(
+    const { data, error } = await supabase.rpc(
       'delete_test_pack_with_tags',
       { test_pack_id: testPackId }
     );
     
-    if (rpcError) {
-      console.error(`Error in RPC call to delete test pack ${testPackId}:`, rpcError);
-      
-      // If RPC fails, fall back to manual deletion
-      console.log(`Falling back to manual deletion for test pack ${testPackId}`);
-      
-      // First delete associated tags
-      const { data: tagsData, error: tagsQueryError } = await supabase
-        .from('tags')
-        .select('id')
-        .eq('test_pack_id', testPackId);
-        
-      if (tagsQueryError) {
-        console.error(`Error querying tags for test pack ${testPackId}:`, tagsQueryError);
-        return { 
-          success: false, 
-          message: "Error al buscar TAGs asociados. Por favor, inténtelo de nuevo." 
-        };
-      }
-      
-      if (tagsData && tagsData.length > 0) {
-        console.log(`Deleting ${tagsData.length} tags associated with test pack ${testPackId}`);
-        
-        const { error: tagsDeleteError } = await supabase
-          .from('tags')
-          .delete()
-          .eq('test_pack_id', testPackId);
-        
-        if (tagsDeleteError) {
-          console.error(`Error deleting tags for test pack ${testPackId}:`, tagsDeleteError);
-          return { 
-            success: false, 
-            message: "Error al eliminar los TAGs asociados. Por favor, inténtelo de nuevo." 
-          };
-        }
-      }
-      
-      // Now delete the test pack
-      const { error: deleteError } = await supabase
-        .from('test_packs')
-        .delete()
-        .eq('id', testPackId);
-      
-      if (deleteError) {
-        console.error(`Error deleting test pack ${testPackId}:`, deleteError);
-        return { 
-          success: false, 
-          message: "Error al eliminar el test pack. Por favor, inténtelo de nuevo." 
-        };
-      }
-    }
-    
-    // Verify deletion was successful by checking if the test pack still exists
-    const { data: verifyData, error: verifyError } = await supabase
-      .from('test_packs')
-      .select('id')
-      .eq('id', testPackId)
-      .maybeSingle();
-    
-    if (verifyError) {
-      console.error(`Error verifying deletion of test pack ${testPackId}:`, verifyError);
+    if (error) {
+      console.error(`Error in RPC call to delete test pack ${testPackId}:`, error);
       return { 
         success: false, 
-        message: "No se pudo verificar si el test pack fue eliminado. Por favor, verifique." 
+        message: error.message || "Error al eliminar el test pack. Por favor, inténtelo de nuevo." 
       };
     }
     
-    if (verifyData) {
-      console.error(`Test pack ${testPackId} still exists after deletion attempt.`);
+    // The function returns a boolean indicating success
+    const success = data === true;
+    
+    if (!success) {
+      console.error(`Test pack ${testPackId} deletion failed.`);
       return { 
         success: false, 
-        message: "El test pack no se eliminó correctamente. Contacte al administrador." 
+        message: "El test pack no se eliminó correctamente. Puede que no exista o que ya haya sido eliminado." 
       };
     }
     
-    console.log(`Test pack ${testPackId} successfully deleted and verified.`);
+    console.log(`Test pack ${testPackId} successfully deleted.`);
     return { 
       success: true, 
       message: "Test pack eliminado correctamente." 
@@ -626,7 +543,7 @@ export const deleteTestPack = async (testPackId: string): Promise<{ success: boo
   }
 };
 
-// Update the importFromExcel function to handle existing test packs
+// Import from Excel
 export const importFromExcel = async (excelBuffer: ArrayBuffer): Promise<{ success: boolean; count: number; message?: string }> => {
   try {
     console.log("Importing test packs from Excel");
