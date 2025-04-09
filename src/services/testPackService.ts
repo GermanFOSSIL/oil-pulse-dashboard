@@ -114,35 +114,38 @@ export const updateTestPack = async (id: string, updates: Partial<TestPack>): Pr
 
 export const deleteTestPack = async (id: string): Promise<boolean> => {
   try {
-    console.log(`Deleting Test Pack with id ${id}`);
+    console.log(`Eliminando Test Pack con id ${id}`);
     
     // First, get the test pack details before deletion for logging
-    const { data: testPackData } = await supabase
+    const { data: testPackData, error: getError } = await supabase
       .from('test_packs')
       .select('*')
       .eq('id', id)
       .single();
       
-    if (!testPackData) {
-      console.error(`Test Pack with id ${id} not found`);
+    if (getError) {
+      console.error(`Error al obtener Test Pack con id ${id}:`, getError);
       return false;
     }
     
-    // With the ON DELETE CASCADE constraint now in place, we can simply delete
-    // the tags and the related acciones_log entries will be automatically deleted
+    if (!testPackData) {
+      console.error(`Test Pack con id ${id} no encontrado`);
+      return false;
+    }
     
+    console.log("Eliminando todos los tags asociados al Test Pack");
     // Delete all tags associated with this test pack
-    // The foreign key cascade will automatically delete related acciones_log entries
     const { error: tagsError } = await supabase
       .from('tags')
       .delete()
       .eq('test_pack_id', id);
         
     if (tagsError) {
-      console.error(`Error deleting related tags:`, tagsError);
+      console.error(`Error al eliminar tags relacionados:`, tagsError);
       throw tagsError;
     }
     
+    console.log("Tags eliminados correctamente, eliminando el Test Pack");
     // Now delete the test pack itself
     const { error } = await supabase
       .from('test_packs')
@@ -150,11 +153,11 @@ export const deleteTestPack = async (id: string): Promise<boolean> => {
       .eq('id', id);
 
     if (error) {
-      console.error(`Error deleting Test Pack:`, error);
+      console.error(`Error al eliminar Test Pack:`, error);
       throw error;
     }
 
-    console.log("Test Pack and associated data deleted successfully");
+    console.log("Test Pack y datos asociados eliminados correctamente");
     
     // Log the activity
     await supabase.from('db_activity_log').insert({
@@ -166,8 +169,8 @@ export const deleteTestPack = async (id: string): Promise<boolean> => {
     
     return true;
   } catch (error) {
-    console.error("Error in deleteTestPack:", error);
-    throw error;
+    console.error("Error en deleteTestPack:", error);
+    return false;
   }
 };
 

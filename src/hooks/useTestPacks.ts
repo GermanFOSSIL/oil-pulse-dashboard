@@ -1,4 +1,3 @@
-
 import { useState, useCallback, useEffect } from 'react';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts/AuthContext';
@@ -182,6 +181,7 @@ export const useTestPacks = () => {
   const removeTestPack = useCallback(async (id: string) => {
     setLoading(true);
     try {
+      console.log(`Iniciando eliminación de Test Pack en el hook: ${id}`);
       const result = await deleteTestPack(id);
       
       if (result) {
@@ -202,15 +202,16 @@ export const useTestPacks = () => {
         
         return true;
       } else {
+        console.error("Error: el servicio reportó un fallo al eliminar el Test Pack");
         toast({
-          title: "Advertencia",
-          description: "No se encontró el Test Pack para eliminar",
+          title: "Error",
+          description: "No se pudo eliminar el Test Pack",
           variant: "destructive",
         });
         return false;
       }
     } catch (error) {
-      console.error(`Error deleting Test Pack with id ${id}:`, error);
+      console.error(`Error eliminando Test Pack con id ${id}:`, error);
       toast({
         title: "Error",
         description: "No se pudo eliminar el Test Pack",
