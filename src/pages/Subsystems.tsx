@@ -52,7 +52,7 @@ const Subsystems = () => {
         }
         
         const systemIds = systemsData.map(system => system.id);
-        const subsystemsData = await getSubsystems(systemIds);
+        const subsystemsData = await getSubsystems();
         
         const systemsMap = new Map<string, System>();
         systemsData.forEach(system => systemsMap.set(system.id, system));

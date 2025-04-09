@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { ProjectSelector } from "@/components/ProjectSelector";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -32,7 +31,7 @@ const ITRs = () => {
         
         // Obtener todos los IDs de sistemas para filtrar subsistemas
         const systemIds = systemsData.map(system => system.id);
-        const subsystemsData = await getSubsystems(systemIds);
+        const subsystemsData = await getSubsystems();
         setSubsystems(subsystemsData);
         
         const enrichedITRs = await fetchITRsWithDetails(selectedProjectId);
