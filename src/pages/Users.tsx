@@ -13,6 +13,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
 import { PasswordChangeData, UserCreateData } from "@/services/types";
+import { useTimeout } from "@/hooks/useTimeout";
 
 interface UserFormModalProps {
   open: boolean;
@@ -144,6 +145,7 @@ const UserFormModal = ({ open, onClose, onSuccess, user }: UserFormModalProps) =
   const isEditMode = !!user;
   const { toast } = useToast();
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   
   const [formData, setFormData] = useState({
     full_name: user?.full_name || "",
@@ -154,6 +156,32 @@ const UserFormModal = ({ open, onClose, onSuccess, user }: UserFormModalProps) =
     password: "",
     confirmPassword: ""
   });
+  
+  // Reset form data when user changes or modal opens/closes
+  useEffect(() => {
+    if (user) {
+      setFormData({
+        full_name: user.full_name || "",
+        role: user.role || "user",
+        avatar_url: user.avatar_url || "",
+        permissions: user.permissions || [],
+        email: "",
+        password: "",
+        confirmPassword: ""
+      });
+    } else {
+      setFormData({
+        full_name: "",
+        role: "user",
+        avatar_url: "",
+        permissions: ['dashboard', 'reports'],
+        email: "",
+        password: "",
+        confirmPassword: ""
+      });
+    }
+    setError(null);
+  }, [user, open]);
   
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
@@ -197,6 +225,7 @@ const UserFormModal = ({ open, onClose, onSuccess, user }: UserFormModalProps) =
   
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setError(null);
     
     if (!formData.full_name) {
       toast({
@@ -241,12 +270,22 @@ const UserFormModal = ({ open, onClose, onSuccess, user }: UserFormModalProps) =
     
     try {
       if (isEditMode && user) {
-        await updateUserProfile(user.id, {
+        console.log("Updating user profile:", user.id, {
           full_name: formData.full_name,
           avatar_url: formData.avatar_url,
           role: formData.role,
           permissions: formData.permissions
         });
+        
+        const updatedProfile = await updateUserProfile(user.id, {
+          full_name: formData.full_name,
+          avatar_url: formData.avatar_url,
+          role: formData.role,
+          permissions: formData.permissions
+        });
+        
+        console.log("Profile updated:", updatedProfile);
+        
         toast({
           title: "Usuario actualizado",
           description: "El usuario ha sido actualizado correctamente"
@@ -262,6 +301,7 @@ const UserFormModal = ({ open, onClose, onSuccess, user }: UserFormModalProps) =
           permissions: formData.permissions
         };
 
+        console.log("Creating new user:", {...userData, password: '******'});
         const result = await createUser(userData);
         
         if (result.success) {
@@ -271,6 +311,7 @@ const UserFormModal = ({ open, onClose, onSuccess, user }: UserFormModalProps) =
           });
           onSuccess();
         } else {
+          setError(result.message);
           toast({
             title: "Error",
             description: result.message,
@@ -280,6 +321,7 @@ const UserFormModal = ({ open, onClose, onSuccess, user }: UserFormModalProps) =
       }
     } catch (error: any) {
       console.error("Error al guardar usuario:", error);
+      setError(error.message || "Error desconocido");
       toast({
         title: "Error",
         description: `No se pudo guardar el usuario: ${error.message || "Error desconocido"}`,
@@ -298,6 +340,12 @@ const UserFormModal = ({ open, onClose, onSuccess, user }: UserFormModalProps) =
             {isEditMode ? "Editar Usuario" : "Nuevo Usuario"}
           </DialogTitle>
         </DialogHeader>
+        
+        {error && (
+          <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-md mb-4">
+            <p>{error}</p>
+          </div>
+        )}
         
         <form onSubmit={handleSubmit} className="space-y-4 pt-4">
           <div className="space-y-2">
@@ -426,20 +474,26 @@ const UserFormModal = ({ open, onClose, onSuccess, user }: UserFormModalProps) =
 const Users = () => {
   const [users, setUsers] = useState<UserProfile[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [showModal, setShowModal] = useState(false);
   const [showPasswordModal, setShowPasswordModal] = useState(false);
   const [selectedUser, setSelectedUser] = useState<UserProfile | undefined>(undefined);
   const { toast } = useToast();
+  const { isTimedOut, startTimeout, cancelTimeout } = useTimeout(30000);
 
   const fetchUsers = async () => {
     setLoading(true);
+    setError(null);
+    startTimeout();
     
     try {
       const profiles = await getUserProfiles();
       console.log("Perfiles obtenidos:", profiles);
       setUsers(profiles);
+      cancelTimeout();
     } catch (error: any) {
       console.error("Error fetching users:", error);
+      setError(`No se pudieron cargar los usuarios: ${error.message || "Error desconocido"}`);
       toast({
         title: "Error",
         description: `No se pudieron cargar los usuarios: ${error.message || "Error desconocido"}`,
@@ -452,6 +506,10 @@ const Users = () => {
 
   useEffect(() => {
     fetchUsers();
+    
+    return () => {
+      cancelTimeout();
+    };
   }, []);
 
   const columns = [
@@ -575,6 +633,39 @@ const Users = () => {
       description: "La contraseña ha sido cambiada exitosamente"
     });
   };
+
+  const handleRetry = () => {
+    fetchUsers();
+  };
+
+  if (error || isTimedOut) {
+    return (
+      <div className="space-y-6">
+        <div className="flex justify-between items-center">
+          <div>
+            <h1 className="text-3xl font-bold tracking-tight">Usuarios</h1>
+            <p className="text-muted-foreground">
+              Gestiona los usuarios y permisos del sistema
+            </p>
+          </div>
+        </div>
+
+        <Card>
+          <CardContent className="flex flex-col items-center justify-center pt-6 pb-6">
+            <AlertTriangle className="h-12 w-12 text-amber-500 mb-4" />
+            <h3 className="font-medium text-lg mb-2">Error de carga</h3>
+            <p className="text-muted-foreground mb-4 text-center">
+              {error || "No se pudieron cargar los usuarios. La operación ha tomado demasiado tiempo."}
+            </p>
+            <Button variant="default" onClick={handleRetry} className="gap-2">
+              <RefreshCw className="h-4 w-4" />
+              Reintentar
+            </Button>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">

@@ -55,19 +55,29 @@ export const getUserProfiles = async (): Promise<UserProfile[]> => {
 };
 
 export const updateUserProfile = async (userId: string, updates: Partial<UserProfile>): Promise<UserProfile> => {
-  const { data, error } = await supabase
-    .from('profiles')
-    .update(updates)
-    .eq('id', userId)
-    .select()
-    .single();
+  console.log(`Updating profile for user ${userId} with:`, updates);
+  
+  try {
+    const { data, error } = await supabase
+      .from('profiles')
+      .update(updates)
+      .eq('id', userId)
+      .select();
 
-  if (error) {
-    console.error(`Error updating profile for user ${userId}:`, error);
+    if (error) {
+      console.error(`Error updating profile for user ${userId}:`, error);
+      throw error;
+    }
+
+    if (!data || data.length === 0) {
+      throw new Error('No data returned after update');
+    }
+
+    return data[0] as unknown as UserProfile;
+  } catch (error) {
+    console.error(`Error in updateUserProfile for user ${userId}:`, error);
     throw error;
   }
-
-  return data as unknown as UserProfile;
 };
 
 export const getUserPermissions = async (userId: string): Promise<string[]> => {
@@ -134,6 +144,8 @@ export const bulkCreateUsers = async (users: BulkUserData[]): Promise<number> =>
 
 export const createUser = async (userData: UserCreateData): Promise<{ success: boolean; message: string; userId?: string }> => {
   try {
+    console.log("Creating user with data:", {...userData, password: '******'});
+    
     // First, create the user in auth
     const { data: authData, error: authError } = await supabase.auth.admin.createUser({
       email: userData.email,
@@ -154,6 +166,7 @@ export const createUser = async (userData: UserCreateData): Promise<{ success: b
     }
 
     const userId = authData.user.id;
+    console.log("User created with ID:", userId);
 
     // Then, update the profile with additional information
     const profileData: UserUpdateData = {
@@ -174,10 +187,17 @@ export const createUser = async (userData: UserCreateData): Promise<{ success: b
       }
     }
 
+    console.log("Updating profile with data:", profileData);
+    
+    // Use upsert instead of update to ensure the profile is created if it doesn't exist
     const { error: profileError } = await supabase
       .from('profiles')
-      .update(profileData)
-      .eq('id', userId);
+      .upsert({
+        id: userId,
+        ...profileData,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      });
 
     if (profileError) {
       console.error("Error updating user profile:", profileError);

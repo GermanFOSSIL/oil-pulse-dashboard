@@ -130,6 +130,8 @@ export const importDataFromExcel = async (data: ArrayBuffer) => {
     
     // Process Systems
     let systemsCount = 0;
+    let systemNameMap = new Map(); // Map to keep track of system names and their IDs
+    
     if (wb.SheetNames.includes('Sistemas') && latestProjects?.length) {
       const systemsSheet = wb.Sheets['Sistemas'];
       const systemsData = XLSX.utils.sheet_to_json(systemsSheet);
@@ -142,37 +144,51 @@ export const importDataFromExcel = async (data: ArrayBuffer) => {
           const projectId = system.project_id && system.project_id !== 'ID_PROYECTO' 
             ? system.project_id 
             : latestProjects[0].id;
-            
-          const { error } = await supabase
-            .from('systems')
-            .insert({
-              name: system.name,
-              project_id: projectId,
-              completion_rate: system.completion_rate || 0,
-              start_date: system.start_date || null,
-              end_date: system.end_date || null
-            });
-            
-          if (!error) {
-            systemsCount++;
-            console.log(`Sistema ${system.name} insertado correctamente`);
+          
+          // Check if this system name already exists for this project
+          const systemKey = `${system.name}-${projectId}`;
+          if (!systemNameMap.has(systemKey)) {
+            const { data: systemData, error } = await supabase
+              .from('systems')
+              .insert({
+                name: system.name,
+                project_id: projectId,
+                completion_rate: system.completion_rate || 0,
+                start_date: system.start_date || null,
+                end_date: system.end_date || null
+              })
+              .select();
+              
+            if (!error && systemData && systemData.length > 0) {
+              systemsCount++;
+              systemNameMap.set(systemKey, systemData[0].id); // Store the ID for this system name
+              console.log(`Sistema ${system.name} insertado correctamente`);
+            } else {
+              console.error(`Error al insertar sistema ${system.name}:`, error);
+            }
           } else {
-            console.error(`Error al insertar sistema ${system.name}:`, error);
+            console.log(`Sistema ${system.name} ya existe, no se duplicará`);
           }
         }
       }
     }
     
-    // Get the latest systems to use their IDs
-    const { data: latestSystems } = await supabase
+    // Get all systems to use their IDs
+    const { data: allSystems } = await supabase
       .from('systems')
-      .select('*')
-      .order('created_at', { ascending: false })
-      .limit(systemsCount || 1);
+      .select('*');
+    
+    // Create a map of system names to IDs
+    const systemsMap = new Map();
+    allSystems?.forEach(system => {
+      systemsMap.set(system.name, system.id);
+    });
     
     // Process Subsystems
     let subsystemsCount = 0;
-    if (wb.SheetNames.includes('Subsistemas') && latestSystems?.length) {
+    let subsystemNameMap = new Map(); // Map to keep track of subsystem names and their IDs
+    
+    if (wb.SheetNames.includes('Subsistemas') && allSystems?.length) {
       const subsystemsSheet = wb.Sheets['Subsistemas'];
       const subsystemsData = XLSX.utils.sheet_to_json(subsystemsSheet);
       console.log(`Datos de subsistemas encontrados: ${subsystemsData.length}`);
@@ -180,41 +196,63 @@ export const importDataFromExcel = async (data: ArrayBuffer) => {
       for (const row of subsystemsData) {
         const subsystem = row as any;
         if (subsystem.name) {
-          // Use the first system's ID if system_id is not specified
-          const systemId = subsystem.system_id && subsystem.system_id !== 'ID_SISTEMA' 
-            ? subsystem.system_id 
-            : latestSystems[0].id;
-            
-          const { error } = await supabase
-            .from('subsystems')
-            .insert({
-              name: subsystem.name,
-              system_id: systemId,
-              completion_rate: subsystem.completion_rate || 0,
-              start_date: subsystem.start_date || null,
-              end_date: subsystem.end_date || null
-            });
-            
-          if (!error) {
-            subsystemsCount++;
-            console.log(`Subsistema ${subsystem.name} insertado correctamente`);
+          // Find the system ID
+          let systemId;
+          
+          if (subsystem.system_id && subsystem.system_id !== 'ID_SISTEMA' && !subsystem.system_name) {
+            // Direct system ID provided
+            systemId = subsystem.system_id;
+          } else if (subsystem.system_name && systemsMap.has(subsystem.system_name)) {
+            // System name provided
+            systemId = systemsMap.get(subsystem.system_name);
           } else {
-            console.error(`Error al insertar subsistema ${subsystem.name}:`, error);
+            // Use first system as fallback
+            systemId = allSystems[0].id;
+          }
+          
+          // Check if this subsystem name already exists for this system
+          const subsystemKey = `${subsystem.name}-${systemId}`;
+          if (!subsystemNameMap.has(subsystemKey)) {
+            const { data: subsystemData, error } = await supabase
+              .from('subsystems')
+              .insert({
+                name: subsystem.name,
+                system_id: systemId,
+                completion_rate: subsystem.completion_rate || 0,
+                start_date: subsystem.start_date || null,
+                end_date: subsystem.end_date || null
+              })
+              .select();
+              
+            if (!error && subsystemData && subsystemData.length > 0) {
+              subsystemsCount++;
+              subsystemNameMap.set(subsystemKey, subsystemData[0].id); // Store the ID for this subsystem
+              console.log(`Subsistema ${subsystem.name} insertado correctamente`);
+            } else {
+              console.error(`Error al insertar subsistema ${subsystem.name}:`, error);
+            }
+          } else {
+            console.log(`Subsistema ${subsystem.name} ya existe para el sistema especificado, no se duplicará`);
           }
         }
       }
     }
     
-    // Get the latest subsystems to use their IDs
-    const { data: latestSubsystems } = await supabase
+    // Get all subsystems to use their IDs
+    const { data: allSubsystems } = await supabase
       .from('subsystems')
-      .select('*')
-      .order('created_at', { ascending: false })
-      .limit(subsystemsCount || 1);
+      .select('*');
+    
+    // Create a map of subsystem names to IDs
+    const subsystemsMap = new Map();
+    allSubsystems?.forEach(subsystem => {
+      subsystemsMap.set(subsystem.name, subsystem.id);
+    });
     
     // Process ITRs
     let itrsCount = 0;
-    if (wb.SheetNames.includes('ITRs') && latestSubsystems?.length) {
+    
+    if (wb.SheetNames.includes('ITRs') && allSubsystems?.length) {
       const itrsSheet = wb.Sheets['ITRs'];
       const itrsData = XLSX.utils.sheet_to_json(itrsSheet);
       console.log(`Datos de ITRs encontrados: ${itrsData.length}`);
@@ -222,10 +260,19 @@ export const importDataFromExcel = async (data: ArrayBuffer) => {
       for (const row of itrsData) {
         const itr = row as any;
         if (itr.name) {
-          // Use the first subsystem's ID if subsystem_id is not specified
-          const subsystemId = itr.subsystem_id && itr.subsystem_id !== 'ID_SUBSISTEMA' 
-            ? itr.subsystem_id 
-            : latestSubsystems[0].id;
+          // Find the subsystem ID
+          let subsystemId;
+          
+          if (itr.subsystem_id && itr.subsystem_id !== 'ID_SUBSISTEMA' && !itr.subsystem_name) {
+            // Direct subsystem ID provided
+            subsystemId = itr.subsystem_id;
+          } else if (itr.subsystem_name && subsystemsMap.has(itr.subsystem_name)) {
+            // Subsystem name provided
+            subsystemId = subsystemsMap.get(itr.subsystem_name);
+          } else {
+            // Use first subsystem as fallback
+            subsystemId = allSubsystems[0].id;
+          }
             
           const { error } = await supabase
             .from('itrs')
