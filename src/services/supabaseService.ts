@@ -1,3 +1,4 @@
+
 import { supabase } from "@/integrations/supabase/client";
 import { getUserProfile } from "./userService";
 import { getUserPermissions } from "./userPermissionService";
@@ -67,9 +68,19 @@ export const createProject = async (project: Partial<Project>): Promise<Project>
     throw new Error("Project name is required");
   }
 
+  // Create a new object with only the properties that are allowed in the database
+  const projectData = {
+    name: project.name,
+    location: project.location,
+    status: project.status || "inprogress",
+    progress: project.progress,
+    start_date: project.start_date,
+    end_date: project.end_date
+  };
+
   const { data, error } = await supabase
     .from("projects")
-    .insert(project)
+    .insert(projectData)
     .select()
     .single();
 
@@ -150,9 +161,18 @@ export const createSystem = async (system: Partial<System>): Promise<System> => 
     throw new Error("System name and project_id are required");
   }
 
+  // Create a new object with only the properties that are allowed in the database
+  const systemData = {
+    name: system.name,
+    project_id: system.project_id,
+    completion_rate: system.completion_rate,
+    start_date: system.start_date,
+    end_date: system.end_date
+  };
+
   const { data, error } = await supabase
     .from("systems")
-    .insert(system)
+    .insert(systemData)
     .select()
     .single();
 
@@ -227,9 +247,18 @@ export const createSubsystem = async (subsystem: Partial<Subsystem>): Promise<Su
     throw new Error("Subsystem name and system_id are required");
   }
 
+  // Create a new object with only the properties that are allowed in the database
+  const subsystemData = {
+    name: subsystem.name,
+    system_id: subsystem.system_id,
+    completion_rate: subsystem.completion_rate,
+    start_date: subsystem.start_date,
+    end_date: subsystem.end_date
+  };
+
   const { data, error } = await supabase
     .from("subsystems")
-    .insert(subsystem)
+    .insert(subsystemData)
     .select()
     .single();
 
@@ -292,9 +321,21 @@ export const createITR = async (itr: Partial<ITR>): Promise<ITR> => {
     throw new Error("ITR name and subsystem_id are required");
   }
 
+  // Create a new object with only the properties that are allowed in the database
+  const itrData = {
+    name: itr.name,
+    subsystem_id: itr.subsystem_id,
+    status: itr.status || "inprogress",
+    progress: itr.progress,
+    assigned_to: itr.assigned_to,
+    start_date: itr.start_date,
+    end_date: itr.end_date,
+    quantity: itr.quantity || 1
+  };
+
   const { data, error } = await supabase
     .from("itrs")
-    .insert(itr)
+    .insert(itrData)
     .select()
     .single();
 
