@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -131,9 +132,9 @@ const Subsystems = () => {
       </Card>
       <SubsystemFormModal
         open={open}
-        setOpen={setOpen}
+        onClose={() => setOpen(false)}
         systems={systems}
-        onSubmit={() => {
+        onSuccess={() => {
           fetchData();
           setOpen(false);
           setSelectedSubsystem(null);
