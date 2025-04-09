@@ -10,7 +10,7 @@ import TestPackToolbar from "@/components/testpacks/TestPackToolbar";
 import { useTestPacks } from "@/hooks/useTestPacks";
 import { ErrorBoundary } from "react-error-boundary";
 import { Button } from "@/components/ui/button";
-import { AlertTriangle } from "lucide-react";
+import { AlertTriangle, RefreshCw } from "lucide-react";
 import { useEffect } from "react";
 import { useToast } from "@/hooks/use-toast";
 
@@ -41,6 +41,7 @@ const TestPacks = () => {
     stats,
     isLoadingTestPacks,
     isLoadingStats,
+    isDeletingTestPack,
     setSelectedTab,
     setShowImportDialog,
     setShowFormDialog,
@@ -58,23 +59,14 @@ const TestPacks = () => {
     fetchStats
   } = useTestPacks();
 
-  // Add a more robust initialization and refresh strategy
+  // Initial data fetch
   useEffect(() => {
     console.log("Initial data fetch for Test Packs page");
     fetchTestPacks();
     fetchStats();
-    
-    // Set up a refresh interval for real-time updates
-    const refreshInterval = setInterval(() => {
-      console.log("Refreshing test packs data (interval)");
-      fetchTestPacks();
-      fetchStats();
-    }, 30000); // Refresh every 30 seconds
-    
-    return () => clearInterval(refreshInterval);
   }, [fetchTestPacks, fetchStats]);
 
-  // Ensure stats are updated when the tab changes
+  // Handle tab changes
   useEffect(() => {
     if (selectedTab === "dashboard") {
       console.log("Dashboard tab selected, fetching latest stats");
@@ -82,7 +74,7 @@ const TestPacks = () => {
     }
   }, [selectedTab, fetchStats]);
 
-  // Add data logging to help debug
+  // Log data changes for debugging
   useEffect(() => {
     if (stats) {
       console.log("Current stats data:", stats);
@@ -91,33 +83,31 @@ const TestPacks = () => {
       console.log(`Loaded ${testPacks.length} test packs`);
     }
   }, [stats, testPacks]);
-  
-  // Enhanced delete handler with better error handling
-  const enhancedDeleteHandler = useCallback(async (id: string) => {
-    try {
-      console.log("Starting deletion process for test pack:", id);
-      await handleDeleteTestPack(id);
-      
-      // Force refresh after successful deletion
-      await fetchTestPacks();
-      await fetchStats();
-      
-      toast({
-        title: "Éxito",
-        description: "Test pack eliminado correctamente.",
+
+  // Handle manual refresh
+  const handleManualRefresh = useCallback(() => {
+    console.log("Manual refresh requested by user");
+    toast({
+      title: "Actualizando",
+      description: "Actualizando datos...",
+    });
+    
+    Promise.all([fetchTestPacks(), fetchStats()])
+      .then(() => {
+        toast({
+          title: "Actualizado",
+          description: "Datos actualizados correctamente.",
+        });
+      })
+      .catch((error) => {
+        console.error("Error during manual refresh:", error);
+        toast({
+          title: "Error",
+          description: "No se pudieron actualizar los datos. Por favor, inténtelo de nuevo.",
+          variant: "destructive",
+        });
       });
-    } catch (error) {
-      console.error("Error during deletion process:", error);
-      toast({
-        title: "Error",
-        description: "Ocurrió un error al eliminar el test pack. Por favor, inténtelo de nuevo.",
-        variant: "destructive",
-      });
-      
-      // Try to refresh data anyway to ensure UI consistency
-      fetchTestPacks();
-    }
-  }, [handleDeleteTestPack, fetchTestPacks, fetchStats, toast]);
+  }, [fetchTestPacks, fetchStats, toast]);
 
   return (
     <div className="container mx-auto py-6 space-y-6">
@@ -128,11 +118,7 @@ const TestPacks = () => {
           onImport={openImportDialog}
           onDownloadTemplate={handleDownloadTemplate}
           onExport={handleExportData}
-          onRefresh={() => {
-            console.log("Manual refresh requested");
-            fetchTestPacks();
-            fetchStats();
-          }}
+          onRefresh={handleManualRefresh}
           userRole={userRole}
         />
       </div>
@@ -150,6 +136,13 @@ const TestPacks = () => {
           </TabsList>
           
           <TabsContent value="list" className="space-y-4">
+            {(isLoadingTestPacks || isDeletingTestPack) && (
+              <div className="flex items-center space-x-2 justify-end text-sm text-muted-foreground">
+                <RefreshCw className="h-3 w-3 animate-spin" />
+                <span>{isDeletingTestPack ? "Eliminando test pack..." : "Cargando datos..."}</span>
+              </div>
+            )}
+            
             <TestPackList 
               testPacks={testPacks || []}
               isLoading={isLoadingTestPacks}
@@ -160,7 +153,7 @@ const TestPacks = () => {
                 fetchTestPacks();
               }}
               onEdit={openEditTestPackForm}
-              onDelete={enhancedDeleteHandler}
+              onDelete={handleDeleteTestPack}
             />
           </TabsContent>
           

@@ -7,7 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { SearchIcon, FilterIcon, X, Edit, Trash } from "lucide-react";
+import { SearchIcon, FilterIcon, X, Edit, Trash2, AlertTriangle } from "lucide-react";
 import TestPackTags from "./TestPackTags";
 import { 
   AlertDialog,
@@ -28,7 +28,7 @@ interface TestPackListProps {
   userRole: string;
   onClearFilters: () => void;
   onEdit: (testPack: TestPack) => void;
-  onDelete: (id: string) => void;
+  onDelete: (id: string) => Promise<boolean>;
 }
 
 const TestPackList = ({ 
@@ -49,8 +49,9 @@ const TestPackList = ({
     estado: ""
   });
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
-  const [testPackToDelete, setTestPackToDelete] = useState<string | null>(null);
+  const [testPackToDelete, setTestPackToDelete] = useState<TestPack | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
 
   // Get unique list of systems
   const systems = testPacks 
@@ -94,37 +95,44 @@ const TestPackList = ({
     setExpandedTestPack(expandedTestPack === id ? null : id);
   };
 
-  const handleDeleteClick = (id: string) => {
-    setTestPackToDelete(id);
+  const handleDeleteClick = (testPack: TestPack) => {
+    console.log("Opening delete confirmation for test pack:", testPack.nombre_paquete);
+    setTestPackToDelete(testPack);
+    setDeleteError(null);
     setDeleteDialogOpen(true);
   };
 
   const confirmDelete = async () => {
-    if (testPackToDelete) {
-      try {
-        console.log("Deleting test pack with ID:", testPackToDelete);
-        setIsDeleting(true);
-        
-        await onDelete(testPackToDelete);
-        
+    if (!testPackToDelete) {
+      console.error("No test pack selected for deletion");
+      return;
+    }
+    
+    try {
+      console.log(`Confirming deletion of test pack: ${testPackToDelete.nombre_paquete} (${testPackToDelete.id})`);
+      setIsDeleting(true);
+      setDeleteError(null);
+      
+      const success = await onDelete(testPackToDelete.id);
+      
+      if (success) {
+        console.log("Delete operation completed successfully");
         setDeleteDialogOpen(false);
         setTestPackToDelete(null);
-        setIsDeleting(false);
         
         toast({
           title: "Test Pack eliminado",
-          description: "El Test Pack ha sido eliminado correctamente",
+          description: `${testPackToDelete.nombre_paquete} ha sido eliminado correctamente.`,
         });
-      } catch (error) {
-        console.error('Error al eliminar el Test Pack:', error);
-        setIsDeleting(false);
-        
-        toast({
-          title: "Error",
-          description: "No se pudo eliminar el Test Pack. Inténtelo de nuevo.",
-          variant: "destructive"
-        });
+      } else {
+        console.error("Delete operation failed");
+        setDeleteError("No se pudo eliminar el Test Pack. Por favor, inténtelo de nuevo.");
       }
+    } catch (error) {
+      console.error('Error al eliminar el Test Pack:', error);
+      setDeleteError("Ha ocurrido un error inesperado. Por favor, inténtelo de nuevo más tarde.");
+    } finally {
+      setIsDeleting(false);
     }
   };
 
@@ -249,9 +257,9 @@ const TestPackList = ({
                           variant="outline" 
                           size="icon" 
                           className="h-8 w-8 text-destructive hover:bg-destructive hover:text-white"
-                          onClick={() => handleDeleteClick(testPack.id)}
+                          onClick={() => handleDeleteClick(testPack)}
                         >
-                          <Trash className="h-4 w-4" />
+                          <Trash2 className="h-4 w-4" />
                         </Button>
                       </div>
                     )}
@@ -296,10 +304,19 @@ const TestPackList = ({
           <AlertDialogHeader>
             <AlertDialogTitle>¿Está seguro?</AlertDialogTitle>
             <AlertDialogDescription>
-              Esta acción eliminará permanentemente el Test Pack y todos sus TAGs asociados.
+              Esta acción eliminará permanentemente el Test Pack "{testPackToDelete?.nombre_paquete}" y todos sus TAGs asociados.
+              <br /><br />
               Esta acción no se puede deshacer.
             </AlertDialogDescription>
           </AlertDialogHeader>
+          
+          {deleteError && (
+            <div className="bg-destructive/10 p-3 rounded-md flex items-start space-x-2">
+              <AlertTriangle className="h-5 w-5 text-destructive flex-shrink-0 mt-0.5" />
+              <span className="text-destructive text-sm">{deleteError}</span>
+            </div>
+          )}
+          
           <AlertDialogFooter>
             <AlertDialogCancel disabled={isDeleting}>Cancelar</AlertDialogCancel>
             <AlertDialogAction 
