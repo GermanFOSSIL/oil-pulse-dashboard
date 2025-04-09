@@ -1,49 +1,26 @@
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { useTestPacks } from "@/hooks/useTestPacks";
-import { PlusCircle, Search, FileSpreadsheet, Filter, RefreshCw } from "lucide-react";
+import { PlusCircle, Search, FileSpreadsheet, Filter } from "lucide-react";
 import TestPackList from "@/components/testpack/TestPackList";
 import TestPackStats from "@/components/testpack/TestPackStats";
 import TestPackFormModal from "@/components/testpack/TestPackFormModal";
 import BatchUploadModal from "@/components/testpack/BatchUploadModal";
 import { DatabaseActivityTimeline } from "@/components/DatabaseActivityTimeline";
-import { useToast } from "@/hooks/use-toast";
 
 const TestPacks = () => {
   const { testPacks, loading, statsData, fetchTestPacks } = useTestPacks();
   const [searchTerm, setSearchTerm] = useState("");
   const [isFormModalOpen, setIsFormModalOpen] = useState(false);
   const [isBatchUploadModalOpen, setIsBatchUploadModalOpen] = useState(false);
-  const [isRefreshing, setIsRefreshing] = useState(false);
-  const { toast } = useToast();
   
   const filteredTestPacks = testPacks.filter(
     (testPack) => testPack.nombre_paquete.toLowerCase().includes(searchTerm.toLowerCase())
   );
-
-  const handleRefresh = async () => {
-    setIsRefreshing(true);
-    try {
-      await fetchTestPacks();
-      toast({
-        title: "Actualizado",
-        description: "Los datos se han actualizado correctamente",
-      });
-    } catch (error) {
-      console.error("Error al actualizar datos:", error);
-      toast({
-        title: "Error",
-        description: "No se pudieron actualizar los datos",
-        variant: "destructive",
-      });
-    } finally {
-      setIsRefreshing(false);
-    }
-  };
 
   return (
     <div className="space-y-6">
@@ -69,15 +46,6 @@ const TestPacks = () => {
           >
             <PlusCircle className="h-4 w-4 mr-2" />
             Nuevo Test Pack
-          </Button>
-          <Button 
-            variant="outline" 
-            className="h-10"
-            onClick={handleRefresh}
-            disabled={isRefreshing || loading}
-          >
-            <RefreshCw className={`h-4 w-4 mr-2 ${isRefreshing ? "animate-spin" : ""}`} />
-            {isRefreshing ? "Actualizando..." : "Actualizar"}
           </Button>
         </div>
       </div>

@@ -1,9 +1,19 @@
 
 import { supabase } from "@/integrations/supabase/client";
-import { UserCreateData, UserUpdateData } from "@/services/types";
-import { AVAILABLE_PERMISSIONS, getDefaultPermissionsForRole } from "@/services/userPermissionService";
-import { changeUserPassword, generateRandomPassword } from "@/services/userPasswordService";
-import { bulkCreateUsers } from "@/services/userBulkService";
+import { BulkUserData, UserCreateData, UserUpdateData, PasswordChangeData } from "@/services/types";
+
+// Define available permissions for sidebar menu items
+export const AVAILABLE_PERMISSIONS = [
+  "dashboard",
+  "projects", 
+  "systems",
+  "subsystems",
+  "itrs",
+  "configuration",
+  "users",
+  "reports",
+  "database"
+];
 
 // Use a different name to avoid conflict with the Profile in types.ts
 export interface UserProfile {
@@ -16,95 +26,114 @@ export interface UserProfile {
   updated_at?: string;
 }
 
-// Re-export functions from other modules
-export { 
-  AVAILABLE_PERMISSIONS,
-  changeUserPassword,
-  generateRandomPassword,
-  bulkCreateUsers
-};
-
-/**
- * Get a single user profile
- */
 export const getUserProfile = async (userId: string): Promise<UserProfile | null> => {
-  try {
-    const { data, error } = await supabase
-      .from('profiles')
-      .select('*')
-      .eq('id', userId)
-      .single();
+  const { data, error } = await supabase
+    .from('profiles')
+    .select('*')
+    .eq('id', userId)
+    .single();
 
-    if (error) {
-      console.error(`Error fetching profile for user ${userId}:`, error);
-      throw error;
-    }
-
-    return data as unknown as UserProfile;
-  } catch (error) {
-    console.error(`Error in getUserProfile for ${userId}:`, error);
+  if (error) {
+    console.error(`Error fetching profile for user ${userId}:`, error);
     throw error;
   }
+
+  return data as unknown as UserProfile;
 };
 
-/**
- * Get all user profiles
- */
 export const getUserProfiles = async (): Promise<UserProfile[]> => {
-  try {
-    const { data, error } = await supabase
-      .from('profiles')
-      .select('*');
+  const { data, error } = await supabase
+    .from('profiles')
+    .select('*');
 
-    if (error) {
-      console.error('Error fetching user profiles:', error);
-      throw error;
-    }
-
-    return data as unknown as UserProfile[];
-  } catch (error) {
-    console.error('Error in getUserProfiles:', error);
+  if (error) {
+    console.error('Error fetching user profiles:', error);
     throw error;
   }
+
+  return data as unknown as UserProfile[];
 };
 
-/**
- * Update a user profile
- */
 export const updateUserProfile = async (userId: string, updates: Partial<UserProfile>): Promise<UserProfile> => {
+  const { data, error } = await supabase
+    .from('profiles')
+    .update(updates)
+    .eq('id', userId)
+    .select()
+    .single();
+
+  if (error) {
+    console.error(`Error updating profile for user ${userId}:`, error);
+    throw error;
+  }
+
+  return data as unknown as UserProfile;
+};
+
+export const getUserPermissions = async (userId: string): Promise<string[]> => {
   try {
-    console.log(`Updating profile for user ${userId}:`, updates);
+    const profile = await getUserProfile(userId);
     
-    const { data, error } = await supabase
-      .from('profiles')
-      .update(updates)
-      .eq('id', userId)
-      .select()
-      .single();
-
-    if (error) {
-      console.error(`Error updating profile for user ${userId}:`, error);
-      throw error;
+    if (!profile) {
+      return [];
     }
-
-    return data as unknown as UserProfile;
+    
+    // Default permissions based on role
+    let permissions: string[] = ['dashboard'];
+    
+    if (profile.role === 'admin') {
+      // Admins have access to everything
+      permissions = [...AVAILABLE_PERMISSIONS];
+    } else if (profile.role === 'tecnico') {
+      // Technicians have access to dashboards, reports, and ITRs
+      permissions = ['dashboard', 'reports', 'itrs'];
+    } else {
+      // Regular users have access to dashboards and reports only
+      permissions = ['dashboard', 'reports'];
+    }
+    
+    // If custom permissions exist, use those instead
+    if (profile.permissions && Array.isArray(profile.permissions)) {
+      permissions = profile.permissions;
+    }
+    
+    return permissions;
   } catch (error) {
-    console.error(`Error in updateUserProfile for ${userId}:`, error);
+    console.error("Error fetching user permissions:", error);
+    return ['dashboard']; // Fallback to dashboard only
+  }
+};
+
+export const bulkCreateUsers = async (users: BulkUserData[]): Promise<number> => {
+  try {
+    let successCount = 0;
+    
+    for (const user of users) {
+      try {
+        const result = await createUser({
+          email: user.email,
+          password: user.password || generateRandomPassword(),
+          full_name: user.full_name,
+          role: user.role || 'user'
+        });
+        
+        if (result.success) {
+          successCount++;
+        }
+      } catch (err) {
+        console.error(`Error processing user ${user.email}:`, err);
+      }
+    }
+    
+    return successCount;
+  } catch (error) {
+    console.error("Error in bulk user creation:", error);
     throw error;
   }
 };
 
-/**
- * Create a new user
- */
 export const createUser = async (userData: UserCreateData): Promise<{ success: boolean; message: string; userId?: string }> => {
   try {
-    console.log("Creating user with data:", { 
-      email: userData.email, 
-      full_name: userData.full_name, 
-      role: userData.role 
-    });
-    
     // First, create the user in auth
     const { data: authData, error: authError } = await supabase.auth.admin.createUser({
       email: userData.email,
@@ -125,7 +154,6 @@ export const createUser = async (userData: UserCreateData): Promise<{ success: b
     }
 
     const userId = authData.user.id;
-    console.log("User created successfully with ID:", userId);
 
     // Then, update the profile with additional information
     const profileData: UserUpdateData = {
@@ -137,11 +165,15 @@ export const createUser = async (userData: UserCreateData): Promise<{ success: b
       profileData.permissions = userData.permissions;
     } else {
       // Set default permissions based on role
-      profileData.permissions = getDefaultPermissionsForRole(userData.role || 'user');
+      if (userData.role === 'admin') {
+        profileData.permissions = [...AVAILABLE_PERMISSIONS];
+      } else if (userData.role === 'tecnico') {
+        profileData.permissions = ['dashboard', 'reports', 'itrs'];
+      } else {
+        profileData.permissions = ['dashboard', 'reports'];
+      }
     }
 
-    console.log("Updating profile for new user with data:", profileData);
-    
     const { error: profileError } = await supabase
       .from('profiles')
       .update(profileData)
@@ -168,4 +200,44 @@ export const createUser = async (userData: UserCreateData): Promise<{ success: b
       message: `Error al crear usuario: ${error.message || "Error desconocido"}` 
     };
   }
+};
+
+export const changeUserPassword = async (data: PasswordChangeData): Promise<{ success: boolean; message: string }> => {
+  try {
+    const { error } = await supabase.auth.admin.updateUserById(
+      data.userId,
+      { password: data.newPassword }
+    );
+
+    if (error) {
+      console.error("Error changing password:", error);
+      return { 
+        success: false, 
+        message: `Error al cambiar la contraseña: ${error.message}` 
+      };
+    }
+
+    return { 
+      success: true, 
+      message: "Contraseña cambiada exitosamente" 
+    };
+  } catch (error: any) {
+    console.error("Error changing password:", error);
+    return { 
+      success: false, 
+      message: `Error al cambiar la contraseña: ${error.message || "Error desconocido"}` 
+    };
+  }
+};
+
+const generateRandomPassword = () => {
+  const characters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789!@#$%^&*';
+  let password = '';
+  
+  for (let i = 0; i < 12; i++) {
+    const randomIndex = Math.floor(Math.random() * characters.length);
+    password += characters.charAt(randomIndex);
+  }
+  
+  return password;
 };

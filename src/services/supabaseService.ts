@@ -1,554 +1,273 @@
 
+// This file re-exports all service functions from their respective modules
+// to maintain backward compatibility with existing code
+
+export * from './types';
+// Import and re-export from userService without the Profile interface
+import { AVAILABLE_PERMISSIONS, getUserPermissions, getUserProfiles as getUserProfilesList, updateUserProfile, bulkCreateUsers } from './userService';
+export { AVAILABLE_PERMISSIONS, getUserPermissions, updateUserProfile, bulkCreateUsers };
+export type { UserProfile } from './userService';
+
+// Rename the function to avoid naming collision
+export const getUserProfiles = getUserProfilesList;
+
+export * from './projectService';
+export * from './systemService';
+export * from './subsystemService';
+export * from './itrDataService';
+export * from './taskService';
+export * from './reportService';
+export * from './dashboardService';
+
+// Import necessary Supabase client
 import { supabase } from "@/integrations/supabase/client";
-import { getUserProfile } from "./userService";
-import { getUserPermissions } from "./userPermissionService";
-import {
-  Project,
-  System,
-  Subsystem,
-  ITR,
-  TestPack,
-  Tag,
-  Profile,
-  UserUpdateData,
-  UserCreateData,
-  BulkUserData,
-  PasswordChangeData,
-  Task,
-  ReportType,
-  TestPackStats,
-  TagStats,
-  StatsData,
-  AccionesLog,
-  DbActivityLog
-} from "./types";
+import * as XLSX from 'xlsx';
 
-// Re-export types
-export type {
-  Project,
-  System,
-  Subsystem,
-  ITR,
-  TestPack,
-  Tag,
-  Profile,
-  UserUpdateData,
-  UserCreateData,
-  BulkUserData,
-  PasswordChangeData,
-  Task,
-  ReportType,
-  TestPackStats,
-  TagStats,
-  StatsData,
-  AccionesLog,
-  DbActivityLog
-};
-
-// Project functions
-export const getProjects = async (): Promise<Project[]> => {
-  const { data, error } = await supabase
-    .from("projects")
-    .select("*")
-    .order("name", { ascending: true });
-
-  if (error) {
-    console.error("Error fetching projects:", error);
-    throw error;
-  }
-
-  return (data || []).map(item => ({
-    ...item,
-    status: item.status as "complete" | "inprogress" | "delayed"
-  })) as Project[];
-};
-
-export const createProject = async (project: Partial<Project>): Promise<Project> => {
-  if (!project.name) {
-    throw new Error("Project name is required");
-  }
-
-  // Create a new object with only the properties that are allowed in the database
-  const projectData = {
-    name: project.name,
-    location: project.location,
-    status: project.status || "inprogress",
-    progress: project.progress,
-    start_date: project.start_date,
-    end_date: project.end_date
-  };
-
-  const { data, error } = await supabase
-    .from("projects")
-    .insert(projectData)
-    .select()
-    .single();
-
-  if (error) {
-    console.error("Error creating project:", error);
-    throw error;
-  }
-
-  return {
-    ...data,
-    status: data.status as "complete" | "inprogress" | "delayed"
-  } as Project;
-};
-
-export const updateProject = async (id: string, project: Partial<Project>): Promise<Project> => {
-  const { data, error } = await supabase
-    .from("projects")
-    .update({ ...project, updated_at: new Date().toISOString() })
-    .eq("id", id)
-    .select()
-    .single();
-
-  if (error) {
-    console.error("Error updating project:", error);
-    throw error;
-  }
-
-  return {
-    ...data,
-    status: data.status as "complete" | "inprogress" | "delayed"
-  } as Project;
-};
-
-export const deleteProject = async (id: string): Promise<void> => {
-  const { error } = await supabase
-    .from("projects")
-    .delete()
-    .eq("id", id);
-
-  if (error) {
-    console.error("Error deleting project:", error);
-    throw error;
-  }
-};
-
-// System functions
-export const getSystems = async (): Promise<System[]> => {
-  const { data, error } = await supabase
-    .from("systems")
-    .select("*")
-    .order("name", { ascending: true });
-
-  if (error) {
-    console.error("Error fetching systems:", error);
-    throw error;
-  }
-
-  return data || [];
-};
-
-export const getSystemsByProjectId = async (projectId: string): Promise<System[]> => {
-  const { data, error } = await supabase
-    .from("systems")
-    .select("*")
-    .eq("project_id", projectId)
-    .order("name", { ascending: true });
-
-  if (error) {
-    console.error("Error fetching systems by project:", error);
-    throw error;
-  }
-
-  return data || [];
-};
-
-export const createSystem = async (system: Partial<System>): Promise<System> => {
-  if (!system.name || !system.project_id) {
-    throw new Error("System name and project_id are required");
-  }
-
-  // Create a new object with only the properties that are allowed in the database
-  const systemData = {
-    name: system.name,
-    project_id: system.project_id,
-    completion_rate: system.completion_rate,
-    start_date: system.start_date,
-    end_date: system.end_date
-  };
-
-  const { data, error } = await supabase
-    .from("systems")
-    .insert(systemData)
-    .select()
-    .single();
-
-  if (error) {
-    console.error("Error creating system:", error);
-    throw error;
-  }
-
-  return data;
-};
-
-export const updateSystem = async (id: string, system: Partial<System>): Promise<System> => {
-  const { data, error } = await supabase
-    .from("systems")
-    .update({ ...system, updated_at: new Date().toISOString() })
-    .eq("id", id)
-    .select()
-    .single();
-
-  if (error) {
-    console.error("Error updating system:", error);
-    throw error;
-  }
-
-  return data;
-};
-
-export const deleteSystem = async (id: string): Promise<void> => {
-  const { error } = await supabase
-    .from("systems")
-    .delete()
-    .eq("id", id);
-
-  if (error) {
-    console.error("Error deleting system:", error);
-    throw error;
-  }
-};
-
-// Subsystem functions
-export const getSubsystems = async (): Promise<Subsystem[]> => {
-  const { data, error } = await supabase
-    .from("subsystems")
-    .select("*")
-    .order("name", { ascending: true });
-
-  if (error) {
-    console.error("Error fetching subsystems:", error);
-    throw error;
-  }
-
-  return data || [];
-};
-
-export const getSubsystemsBySystemId = async (systemId: string): Promise<Subsystem[]> => {
-  const { data, error } = await supabase
-    .from("subsystems")
-    .select("*")
-    .eq("system_id", systemId)
-    .order("name", { ascending: true });
-
-  if (error) {
-    console.error("Error fetching subsystems by system:", error);
-    throw error;
-  }
-
-  return data || [];
-};
-
-export const createSubsystem = async (subsystem: Partial<Subsystem>): Promise<Subsystem> => {
-  if (!subsystem.name || !subsystem.system_id) {
-    throw new Error("Subsystem name and system_id are required");
-  }
-
-  // Create a new object with only the properties that are allowed in the database
-  const subsystemData = {
-    name: subsystem.name,
-    system_id: subsystem.system_id,
-    completion_rate: subsystem.completion_rate,
-    start_date: subsystem.start_date,
-    end_date: subsystem.end_date
-  };
-
-  const { data, error } = await supabase
-    .from("subsystems")
-    .insert(subsystemData)
-    .select()
-    .single();
-
-  if (error) {
-    console.error("Error creating subsystem:", error);
-    throw error;
-  }
-
-  return data;
-};
-
-export const updateSubsystem = async (id: string, subsystem: Partial<Subsystem>): Promise<Subsystem> => {
-  const { data, error } = await supabase
-    .from("subsystems")
-    .update({ ...subsystem, updated_at: new Date().toISOString() })
-    .eq("id", id)
-    .select()
-    .single();
-
-  if (error) {
-    console.error("Error updating subsystem:", error);
-    throw error;
-  }
-
-  return data;
-};
-
-export const deleteSubsystem = async (id: string): Promise<void> => {
-  const { error } = await supabase
-    .from("subsystems")
-    .delete()
-    .eq("id", id);
-
-  if (error) {
-    console.error("Error deleting subsystem:", error);
-    throw error;
-  }
-};
-
-// ITR functions
-export const getITRs = async (): Promise<ITR[]> => {
-  const { data, error } = await supabase
-    .from("itrs")
-    .select("*")
-    .order("name", { ascending: true });
-
-  if (error) {
-    console.error("Error fetching ITRs:", error);
-    throw error;
-  }
-
-  return (data || []).map(item => ({
-    ...item,
-    status: item.status as "complete" | "inprogress" | "delayed"
-  })) as ITR[];
-};
-
-export const createITR = async (itr: Partial<ITR>): Promise<ITR> => {
-  if (!itr.name || !itr.subsystem_id) {
-    throw new Error("ITR name and subsystem_id are required");
-  }
-
-  // Create a new object with only the properties that are allowed in the database
-  const itrData = {
-    name: itr.name,
-    subsystem_id: itr.subsystem_id,
-    status: itr.status || "inprogress",
-    progress: itr.progress,
-    assigned_to: itr.assigned_to,
-    start_date: itr.start_date,
-    end_date: itr.end_date,
-    quantity: itr.quantity || 1
-  };
-
-  const { data, error } = await supabase
-    .from("itrs")
-    .insert(itrData)
-    .select()
-    .single();
-
-  if (error) {
-    console.error("Error creating ITR:", error);
-    throw error;
-  }
-
-  return {
-    ...data,
-    status: data.status as "complete" | "inprogress" | "delayed"
-  } as ITR;
-};
-
-export const updateITR = async (id: string, itr: Partial<ITR>): Promise<ITR> => {
-  const { data, error } = await supabase
-    .from("itrs")
-    .update({ ...itr, updated_at: new Date().toISOString() })
-    .eq("id", id)
-    .select()
-    .single();
-
-  if (error) {
-    console.error("Error updating ITR:", error);
-    throw error;
-  }
-
-  return {
-    ...data,
-    status: data.status as "complete" | "inprogress" | "delayed"
-  } as ITR;
-};
-
-export const deleteITR = async (id: string): Promise<void> => {
-  const { error } = await supabase
-    .from("itrs")
-    .delete()
-    .eq("id", id);
-
-  if (error) {
-    console.error("Error deleting ITR:", error);
-    throw error;
-  }
-};
-
-// Tasks functions
-export const getTasks = async (): Promise<Task[]> => {
-  const { data, error } = await supabase
-    .from("tasks")
-    .select("*")
-    .order("name", { ascending: true });
-
-  if (error) {
-    console.error("Error fetching tasks:", error);
-    throw error;
-  }
-
-  return data || [];
-};
-
-// Dashboard and Reports functions
-export const getDashboardStats = async (projectId: string | null): Promise<any> => {
+// Functions required by other parts of the app but not included in refactored files
+export const generateImportTemplate = async () => {
   try {
-    // Get projects data
-    const projectsData = await getProjects();
+    console.log("Iniciando la generación de la plantilla de importación");
+    // Create workbook with sheets for projects, systems, subsystems, and ITRs
+    const wb = XLSX.utils.book_new();
     
-    // Basic stats calculation
-    const stats = {
-      totalProjects: projectsData.length,
-      completedProjects: projectsData.filter(p => p.status === "complete").length,
-      inProgressProjects: projectsData.filter(p => p.status === "inprogress").length,
-      delayedProjects: projectsData.filter(p => p.status === "delayed").length,
-      totalSystems: 0,
-      totalITRs: 0,
-      completedITRs: 0,
-      inProgressITRs: 0,
-      delayedITRs: 0,
-      completionRate: 0,
-      chartData: [],
-      areaChartData: [],
-      projectsData: []
-    };
-    
-    // Mock chart data
-    stats.chartData = [
-      { name: "Sistema A", value: 70, completedITRs: 7, totalITRs: 10 },
-      { name: "Sistema B", value: 45, completedITRs: 5, totalITRs: 11 },
-      { name: "Sistema C", value: 90, completedITRs: 9, totalITRs: 10 },
-      { name: "Sistema D", value: 30, completedITRs: 3, totalITRs: 10 }
+    // Projects sheet
+    const projectsData = [
+      ["name", "location", "status", "progress", "start_date", "end_date"],
+      ["Proyecto Ejemplo", "Ubicación ejemplo", "inprogress", 50, "2023-01-01", "2023-12-31"]
     ];
+    const projectsWs = XLSX.utils.aoa_to_sheet(projectsData);
+    XLSX.utils.book_append_sheet(wb, projectsWs, "Proyectos");
     
-    // Mock area chart data
-    stats.areaChartData = [
-      { name: "Ene", inspections: 20, completions: 10, issues: 5 },
-      { name: "Feb", inspections: 25, completions: 15, issues: 3 },
-      { name: "Mar", inspections: 30, completions: 20, issues: 4 },
-      { name: "Abr", inspections: 35, completions: 25, issues: 2 },
-      { name: "May", inspections: 40, completions: 30, issues: 1 }
+    // Systems sheet
+    const systemsData = [
+      ["name", "project_id", "completion_rate", "start_date", "end_date"],
+      ["Sistema Ejemplo", "ID_PROYECTO", 40, "2023-01-15", "2023-11-30"]
     ];
+    const systemsWs = XLSX.utils.aoa_to_sheet(systemsData);
+    XLSX.utils.book_append_sheet(wb, systemsWs, "Sistemas");
     
-    // Mock projects data for cards
-    stats.projectsData = projectsData.map(project => ({
-      title: project.name,
-      value: project.progress || 0,
-      description: `Estado: ${project.status}, Ubicación: ${project.location || "N/A"}`
-    }));
+    // Subsystems sheet
+    const subsystemsData = [
+      ["name", "system_id", "completion_rate", "start_date", "end_date"],
+      ["Subsistema Ejemplo", "ID_SISTEMA", 30, "2023-02-01", "2023-10-31"]
+    ];
+    const subsystemsWs = XLSX.utils.aoa_to_sheet(subsystemsData);
+    XLSX.utils.book_append_sheet(wb, subsystemsWs, "Subsistemas");
     
-    // Calculate completion rate
-    stats.completionRate = 75; // Mocked value
+    // ITRs sheet
+    const itrsData = [
+      ["name", "subsystem_id", "status", "progress", "assigned_to", "start_date", "end_date"],
+      ["ITR Ejemplo", "ID_SUBSISTEMA", "inprogress", 25, "Técnico ejemplo", "2023-03-01", "2023-09-30"]
+    ];
+    const itrsWs = XLSX.utils.aoa_to_sheet(itrsData);
+    XLSX.utils.book_append_sheet(wb, itrsWs, "ITRs");
     
-    // Set totals
-    stats.totalSystems = 15; // Mocked value
-    stats.totalITRs = 45; // Mocked value
-    stats.completedITRs = 30; // Mocked value
-    stats.inProgressITRs = 10; // Mocked value
-    stats.delayedITRs = 5; // Mocked value
-    
-    return stats;
-  } catch (error) {
-    console.error("Error getting dashboard stats:", error);
-    throw error;
-  }
-};
-
-export const generateReport = async (reportType: string, projectId: string): Promise<string> => {
-  try {
-    // For demonstration purposes, return a mock URL
-    // In a real application, this would generate a report and return a URL to download it
-    console.log(`Generating report: ${reportType} for project: ${projectId}`);
-    
-    // Simulate API delay
-    await new Promise(resolve => setTimeout(resolve, 1000));
-    
-    // Mock report data URL
-    return 'data:application/json;base64,' + btoa(JSON.stringify({
-      reportType,
-      projectId,
-      date: new Date().toISOString(),
-      systems: [
-        { id: "1", name: "Sistema A", completion_rate: 75 },
-        { id: "2", name: "Sistema B", completion_rate: 45 },
-        { id: "3", name: "Sistema C", completion_rate: 90 }
-      ],
-      subsystems: [
-        { id: "1", name: "Subsistema A1", system_id: "1" },
-        { id: "2", name: "Subsistema A2", system_id: "1" },
-        { id: "3", name: "Subsistema B1", system_id: "2" }
-      ],
-      itrs: [
-        { id: "1", name: "ITR-001", status: "complete", progress: 100, subsystem_id: "1", due_date: "2025-05-15" },
-        { id: "2", name: "ITR-002", status: "inprogress", progress: 50, subsystem_id: "1", due_date: "2025-05-20" },
-        { id: "3", name: "ITR-003", status: "delayed", progress: 30, subsystem_id: "2", due_date: "2025-05-10" }
-      ]
-    }));
-  } catch (error) {
-    console.error("Error generating report:", error);
-    throw error;
-  }
-};
-
-// Data import/export functions
-export const generateImportTemplate = async (): Promise<ArrayBuffer> => {
-  try {
-    // In a real application, this would generate an Excel template
-    // For now, just return a mock ArrayBuffer
-    console.log("Generating import template");
-    
-    // Create a mock ArrayBuffer
-    const buffer = new ArrayBuffer(1024);
-    return buffer;
+    // Generate buffer
+    const wbout = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
+    console.log("Plantilla generada correctamente");
+    return wbout;
   } catch (error) {
     console.error("Error generating import template:", error);
-    throw error;
+    throw error; // Lanzar el error para manejarlo en el componente
   }
 };
 
-export const importDataFromExcel = async (data: ArrayBuffer): Promise<any> => {
+export const importDataFromExcel = async (data: ArrayBuffer) => {
   try {
-    // In a real application, this would process the Excel file
-    // For now, just return mock stats
-    console.log("Importing data from Excel");
+    console.log("Iniciando importación de datos desde Excel");
+    if (!data) {
+      console.log("No data provided for import");
+      return {
+        projects: 0,
+        systems: 0,
+        subsystems: 0,
+        tasks: 0,
+        itrs: 0,
+        users: 0
+      };
+    }
     
-    return {
-      projects: 3,
-      systems: 5,
-      subsystems: 10,
-      itrs: 20,
-      users: 5,
-      tasks: 15
+    const wb = XLSX.read(data, { type: 'array' });
+    console.log("Hojas disponibles:", wb.SheetNames);
+    
+    // Process Projects
+    let projectsCount = 0;
+    if (wb.SheetNames.includes('Proyectos')) {
+      const projectsSheet = wb.Sheets['Proyectos'];
+      const projectsData = XLSX.utils.sheet_to_json(projectsSheet);
+      console.log(`Datos de proyectos encontrados: ${projectsData.length}`);
+      
+      for (const row of projectsData) {
+        const project = row as any;
+        if (project.name) {
+          const { error } = await supabase
+            .from('projects')
+            .insert({
+              name: project.name,
+              location: project.location || null,
+              status: project.status || 'inprogress',
+              progress: project.progress || 0,
+              start_date: project.start_date || null,
+              end_date: project.end_date || null
+            });
+            
+          if (!error) {
+            projectsCount++;
+            console.log(`Proyecto ${project.name} insertado correctamente`);
+          } else {
+            console.error(`Error al insertar proyecto ${project.name}:`, error);
+          }
+        }
+      }
+    }
+    
+    // Get the latest projects to use their IDs
+    const { data: latestProjects } = await supabase
+      .from('projects')
+      .select('*')
+      .order('created_at', { ascending: false })
+      .limit(projectsCount || 1);
+    
+    // Process Systems
+    let systemsCount = 0;
+    if (wb.SheetNames.includes('Sistemas') && latestProjects?.length) {
+      const systemsSheet = wb.Sheets['Sistemas'];
+      const systemsData = XLSX.utils.sheet_to_json(systemsSheet);
+      console.log(`Datos de sistemas encontrados: ${systemsData.length}`);
+      
+      for (const row of systemsData) {
+        const system = row as any;
+        if (system.name) {
+          // Use the first project's ID if project_id is not specified
+          const projectId = system.project_id && system.project_id !== 'ID_PROYECTO' 
+            ? system.project_id 
+            : latestProjects[0].id;
+            
+          const { error } = await supabase
+            .from('systems')
+            .insert({
+              name: system.name,
+              project_id: projectId,
+              completion_rate: system.completion_rate || 0,
+              start_date: system.start_date || null,
+              end_date: system.end_date || null
+            });
+            
+          if (!error) {
+            systemsCount++;
+            console.log(`Sistema ${system.name} insertado correctamente`);
+          } else {
+            console.error(`Error al insertar sistema ${system.name}:`, error);
+          }
+        }
+      }
+    }
+    
+    // Get the latest systems to use their IDs
+    const { data: latestSystems } = await supabase
+      .from('systems')
+      .select('*')
+      .order('created_at', { ascending: false })
+      .limit(systemsCount || 1);
+    
+    // Process Subsystems
+    let subsystemsCount = 0;
+    if (wb.SheetNames.includes('Subsistemas') && latestSystems?.length) {
+      const subsystemsSheet = wb.Sheets['Subsistemas'];
+      const subsystemsData = XLSX.utils.sheet_to_json(subsystemsSheet);
+      console.log(`Datos de subsistemas encontrados: ${subsystemsData.length}`);
+      
+      for (const row of subsystemsData) {
+        const subsystem = row as any;
+        if (subsystem.name) {
+          // Use the first system's ID if system_id is not specified
+          const systemId = subsystem.system_id && subsystem.system_id !== 'ID_SISTEMA' 
+            ? subsystem.system_id 
+            : latestSystems[0].id;
+            
+          const { error } = await supabase
+            .from('subsystems')
+            .insert({
+              name: subsystem.name,
+              system_id: systemId,
+              completion_rate: subsystem.completion_rate || 0,
+              start_date: subsystem.start_date || null,
+              end_date: subsystem.end_date || null
+            });
+            
+          if (!error) {
+            subsystemsCount++;
+            console.log(`Subsistema ${subsystem.name} insertado correctamente`);
+          } else {
+            console.error(`Error al insertar subsistema ${subsystem.name}:`, error);
+          }
+        }
+      }
+    }
+    
+    // Get the latest subsystems to use their IDs
+    const { data: latestSubsystems } = await supabase
+      .from('subsystems')
+      .select('*')
+      .order('created_at', { ascending: false })
+      .limit(subsystemsCount || 1);
+    
+    // Process ITRs
+    let itrsCount = 0;
+    if (wb.SheetNames.includes('ITRs') && latestSubsystems?.length) {
+      const itrsSheet = wb.Sheets['ITRs'];
+      const itrsData = XLSX.utils.sheet_to_json(itrsSheet);
+      console.log(`Datos de ITRs encontrados: ${itrsData.length}`);
+      
+      for (const row of itrsData) {
+        const itr = row as any;
+        if (itr.name) {
+          // Use the first subsystem's ID if subsystem_id is not specified
+          const subsystemId = itr.subsystem_id && itr.subsystem_id !== 'ID_SUBSISTEMA' 
+            ? itr.subsystem_id 
+            : latestSubsystems[0].id;
+            
+          const { error } = await supabase
+            .from('itrs')
+            .insert({
+              name: itr.name,
+              subsystem_id: subsystemId,
+              status: itr.status || 'inprogress',
+              progress: itr.progress || 0,
+              assigned_to: itr.assigned_to || null,
+              start_date: itr.start_date || null,
+              end_date: itr.end_date || null
+            });
+            
+          if (!error) {
+            itrsCount++;
+            console.log(`ITR ${itr.name} insertado correctamente`);
+          } else {
+            console.error(`Error al insertar ITR ${itr.name}:`, error);
+          }
+        }
+      }
+    }
+    
+    const result = {
+      projects: projectsCount,
+      systems: systemsCount,
+      subsystems: subsystemsCount,
+      tasks: 0, // Tasks are not imported in this version
+      itrs: itrsCount,
+      users: 0  // Users are not imported in this version
     };
+    
+    console.log("Importación completada:", result);
+    return result;
   } catch (error) {
     console.error("Error importing data from Excel:", error);
-    throw error;
+    throw error; // Lanzar error para manejo en componente
   }
 };
 
-// Test Pack and Tags functions
-export const getTestPacks = async (): Promise<TestPack[]> => {
-  const { data, error } = await supabase
-    .from("test_packs")
-    .select("*")
-    .order("created_at", { ascending: false });
-
-  if (error) {
-    console.error("Error fetching test packs:", error);
-    throw error;
-  }
-
-  return (data || []).map(item => ({
-    ...item,
-    estado: item.estado as "pendiente" | "listo"
-  })) as TestPack[];
+// Temporary function for creating user profile
+export const createUserProfile = async () => {
+  console.log("Function not implemented: createUserProfile");
+  return { id: 'temp-id', full_name: 'Nuevo Usuario', role: 'user' };
 };
-
-// Re-export functions from other services
-export { getUserProfile, getUserPermissions };

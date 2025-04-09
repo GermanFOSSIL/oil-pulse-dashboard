@@ -48,55 +48,28 @@ const TagList = ({ tags, testPackId, onRefresh }: TagListProps) => {
   const [tagToEdit, setTagToEdit] = useState<Tag | null>(null);
   const [isFormModalOpen, setIsFormModalOpen] = useState(false);
   const [tagToDelete, setTagToDelete] = useState<string | null>(null);
-  const [isDeleting, setIsDeleting] = useState(false);
-  const [isUpdating, setIsUpdating] = useState(false);
   
-  const handleEdit = (tag: Tag, e?: React.MouseEvent) => {
-    if (e) e.stopPropagation();
+  const handleEdit = (tag: Tag) => {
     setTagToEdit(tag);
     setIsFormModalOpen(true);
   };
   
-  const handleDelete = async (e?: React.MouseEvent) => {
-    if (e) e.stopPropagation();
+  const handleDelete = async () => {
     if (tagToDelete) {
-      setIsDeleting(true);
-      try {
-        await removeTag(tagToDelete);
-        setTagToDelete(null);
-        onRefresh();
-      } catch (error) {
-        console.error("Error deleting tag:", error);
-      } finally {
-        setIsDeleting(false);
-      }
+      await removeTag(tagToDelete);
+      setTagToDelete(null);
+      onRefresh();
     }
   };
   
-  const handleReleaseTag = async (tagId: string, e?: React.MouseEvent) => {
-    if (e) e.stopPropagation();
-    setIsUpdating(true);
-    try {
-      await releaseTag(tagId);
-      onRefresh();
-    } catch (error) {
-      console.error("Error releasing tag:", error);
-    } finally {
-      setIsUpdating(false);
-    }
+  const handleReleaseTag = async (tagId: string) => {
+    await releaseTag(tagId);
+    onRefresh();
   };
   
-  const handleChangeStatus = async (tagId: string, newStatus: 'pendiente' | 'liberado', e?: React.MouseEvent) => {
-    if (e) e.stopPropagation();
-    setIsUpdating(true);
-    try {
-      await changeTagStatus(tagId, newStatus);
-      onRefresh();
-    } catch (error) {
-      console.error("Error changing tag status:", error);
-    } finally {
-      setIsUpdating(false);
-    }
+  const handleChangeStatus = async (tagId: string, newStatus: 'pendiente' | 'liberado') => {
+    await changeTagStatus(tagId, newStatus);
+    onRefresh();
   };
   
   const getStatusBadge = (status: string) => {
@@ -157,32 +130,26 @@ const TagList = ({ tags, testPackId, onRefresh }: TagListProps) => {
                   </TableCell>
                   <TableCell className="text-right">
                     <div className="flex justify-end gap-2">
-                      {tag.estado === 'pendiente' && !isUpdating && (
+                      {tag.estado === 'pendiente' && (
                         <Button 
                           variant="outline" 
                           size="icon" 
                           className="h-8 w-8 text-green-600"
                           title="Marcar como liberado"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleReleaseTag(tag.id, e);
-                          }}
+                          onClick={() => handleReleaseTag(tag.id)}
                         >
                           <Check className="h-4 w-4" />
                         </Button>
                       )}
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>
-                          <Button variant="ghost" size="icon" className="h-8 w-8" disabled={isUpdating} onClick={(e) => e.stopPropagation()}>
+                          <Button variant="ghost" size="icon" className="h-8 w-8">
                             <MoreHorizontal className="h-4 w-4" />
                             <span className="sr-only">Acciones</span>
                           </Button>
                         </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end" onClick={(e) => e.stopPropagation()}>
-                          <DropdownMenuItem onClick={(e) => {
-                            e.stopPropagation();
-                            handleEdit(tag, e);
-                          }}>
+                        <DropdownMenuContent align="end">
+                          <DropdownMenuItem onClick={() => handleEdit(tag)}>
                             <Edit className="h-4 w-4 mr-2" />
                             Editar
                           </DropdownMenuItem>
@@ -190,18 +157,12 @@ const TagList = ({ tags, testPackId, onRefresh }: TagListProps) => {
                           <DropdownMenuSeparator />
                           
                           {tag.estado === 'pendiente' ? (
-                            <DropdownMenuItem onClick={(e) => {
-                              e.stopPropagation();
-                              handleChangeStatus(tag.id, 'liberado', e);
-                            }}>
+                            <DropdownMenuItem onClick={() => handleChangeStatus(tag.id, 'liberado')}>
                               <Check className="h-4 w-4 mr-2 text-green-600" />
                               Marcar como liberado
                             </DropdownMenuItem>
                           ) : (
-                            <DropdownMenuItem onClick={(e) => {
-                              e.stopPropagation();
-                              handleChangeStatus(tag.id, 'pendiente', e);
-                            }}>
+                            <DropdownMenuItem onClick={() => handleChangeStatus(tag.id, 'pendiente')}>
                               <X className="h-4 w-4 mr-2 text-amber-600" />
                               Marcar como pendiente
                             </DropdownMenuItem>
@@ -211,10 +172,7 @@ const TagList = ({ tags, testPackId, onRefresh }: TagListProps) => {
                           
                           <DropdownMenuItem 
                             className="text-destructive focus:text-destructive"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setTagToDelete(tag.id);
-                            }}
+                            onClick={() => setTagToDelete(tag.id)}
                           >
                             <Trash2 className="h-4 w-4 mr-2" />
                             Eliminar
@@ -248,7 +206,7 @@ const TagList = ({ tags, testPackId, onRefresh }: TagListProps) => {
       )}
       
       <AlertDialog open={!!tagToDelete} onOpenChange={(open) => !open && setTagToDelete(null)}>
-        <AlertDialogContent onClick={(e) => e.stopPropagation()}>
+        <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>¿Está seguro?</AlertDialogTitle>
             <AlertDialogDescription>
@@ -256,16 +214,12 @@ const TagList = ({ tags, testPackId, onRefresh }: TagListProps) => {
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel disabled={isDeleting}>Cancelar</AlertDialogCancel>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
             <AlertDialogAction 
-              onClick={(e) => {
-                e.stopPropagation();
-                handleDelete(e);
-              }}
+              onClick={handleDelete}
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-              disabled={isDeleting}
             >
-              {isDeleting ? "Eliminando..." : "Eliminar"}
+              Eliminar
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

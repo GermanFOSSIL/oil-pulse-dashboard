@@ -34,7 +34,6 @@ import { Edit, MoreHorizontal, RefreshCw, Tags, Trash2 } from "lucide-react";
 import TestPackFormModal from "./TestPackFormModal";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
-import { useToast } from "@/hooks/use-toast";
 
 interface TestPackListProps {
   testPacks: TestPack[];
@@ -45,63 +44,25 @@ interface TestPackListProps {
 const TestPackList = ({ testPacks, loading, onRefresh }: TestPackListProps) => {
   const navigate = useNavigate();
   const { removeTestPack } = useTestPacks();
-  const { toast } = useToast();
   
   const [testPackToEdit, setTestPackToEdit] = useState<TestPack | null>(null);
   const [isFormModalOpen, setIsFormModalOpen] = useState(false);
   const [testPackToDelete, setTestPackToDelete] = useState<string | null>(null);
-  const [isDeleting, setIsDeleting] = useState(false);
   
-  const handleEdit = (testPack: TestPack, e: React.MouseEvent) => {
-    e.stopPropagation();
+  const handleEdit = (testPack: TestPack) => {
     setTestPackToEdit(testPack);
     setIsFormModalOpen(true);
   };
   
-  const handleDelete = async (e?: React.MouseEvent) => {
-    if (e) e.stopPropagation();
-    
-    if (!testPackToDelete) return;
-    
-    setIsDeleting(true);
-    try {
-      console.log("Iniciando eliminación del Test Pack:", testPackToDelete);
-      const success = await removeTestPack(testPackToDelete);
-      console.log("Resultado de la eliminación:", success);
-      
-      if (success) {
-        toast({
-          title: "Éxito",
-          description: "Test Pack eliminado correctamente",
-        });
-        setTestPackToDelete(null);
-        onRefresh();
-      } else {
-        toast({
-          title: "Error",
-          description: "No se pudo eliminar el Test Pack",
-          variant: "destructive",
-        });
-      }
-    } catch (error) {
-      console.error("Error en handleDelete:", error);
-      toast({
-        title: "Error",
-        description: "Ocurrió un error al eliminar el Test Pack",
-        variant: "destructive",
-      });
-    } finally {
-      setIsDeleting(false);
+  const handleDelete = async () => {
+    if (testPackToDelete) {
+      await removeTestPack(testPackToDelete);
+      setTestPackToDelete(null);
     }
   };
   
-  const handleViewDetails = (testPackId: string, e?: React.MouseEvent) => {
-    if (e) e.stopPropagation();
-    try {
-      navigate(`/test-packs/${testPackId}`);
-    } catch (error) {
-      console.error("Navigation error:", error);
-    }
+  const handleViewDetails = (testPackId: string) => {
+    navigate(`/test-packs/${testPackId}`);
   };
   
   const getStatusBadge = (status: string) => {
@@ -165,54 +126,45 @@ const TestPackList = ({ testPacks, loading, onRefresh }: TestPackListProps) => {
                       <TableRow key={testPack.id} className="cursor-pointer hover:bg-muted/50">
                         <TableCell 
                           className="font-medium"
-                          onClick={(e) => handleViewDetails(testPack.id, e)}
+                          onClick={() => handleViewDetails(testPack.id)}
                         >
                           {testPack.nombre_paquete}
                         </TableCell>
-                        <TableCell onClick={(e) => handleViewDetails(testPack.id, e)}>
+                        <TableCell onClick={() => handleViewDetails(testPack.id)}>
                           {testPack.itr_asociado}
                         </TableCell>
-                        <TableCell onClick={(e) => handleViewDetails(testPack.id, e)}>
+                        <TableCell onClick={() => handleViewDetails(testPack.id)}>
                           {testPack.sistema}
                         </TableCell>
-                        <TableCell onClick={(e) => handleViewDetails(testPack.id, e)}>
+                        <TableCell onClick={() => handleViewDetails(testPack.id)}>
                           {testPack.subsistema}
                         </TableCell>
-                        <TableCell onClick={(e) => handleViewDetails(testPack.id, e)}>
+                        <TableCell onClick={() => handleViewDetails(testPack.id)}>
                           {getStatusBadge(testPack.estado)}
                         </TableCell>
-                        <TableCell onClick={(e) => handleViewDetails(testPack.id, e)}>
+                        <TableCell onClick={() => handleViewDetails(testPack.id)}>
                           {formatDate(testPack.created_at)}
                         </TableCell>
                         <TableCell className="text-right">
                           <DropdownMenu>
                             <DropdownMenuTrigger asChild>
-                              <Button variant="ghost" size="icon" onClick={(e) => e.stopPropagation()}>
+                              <Button variant="ghost" size="icon">
                                 <MoreHorizontal className="h-4 w-4" />
                                 <span className="sr-only">Acciones</span>
                               </Button>
                             </DropdownMenuTrigger>
-                            <DropdownMenuContent align="end" onClick={(e) => e.stopPropagation()}>
-                              <DropdownMenuItem onClick={(e) => {
-                                e.stopPropagation();
-                                handleViewDetails(testPack.id, e);
-                              }}>
+                            <DropdownMenuContent align="end">
+                              <DropdownMenuItem onClick={() => handleViewDetails(testPack.id)}>
                                 <Tags className="h-4 w-4 mr-2" />
                                 Ver TAGs
                               </DropdownMenuItem>
-                              <DropdownMenuItem onClick={(e) => {
-                                e.stopPropagation();
-                                handleEdit(testPack, e);
-                              }}>
+                              <DropdownMenuItem onClick={() => handleEdit(testPack)}>
                                 <Edit className="h-4 w-4 mr-2" />
                                 Editar
                               </DropdownMenuItem>
                               <DropdownMenuItem 
                                 className="text-destructive focus:text-destructive"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  setTestPackToDelete(testPack.id);
-                                }}
+                                onClick={() => setTestPackToDelete(testPack.id)}
                               >
                                 <Trash2 className="h-4 w-4 mr-2" />
                                 Eliminar
@@ -246,13 +198,8 @@ const TestPackList = ({ testPacks, loading, onRefresh }: TestPackListProps) => {
         />
       )}
       
-      <AlertDialog 
-        open={!!testPackToDelete} 
-        onOpenChange={(open) => {
-          if (!open && !isDeleting) setTestPackToDelete(null);
-        }}
-      >
-        <AlertDialogContent onClick={(e) => e.stopPropagation()}>
+      <AlertDialog open={!!testPackToDelete} onOpenChange={(open) => !open && setTestPackToDelete(null)}>
+        <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>¿Está seguro?</AlertDialogTitle>
             <AlertDialogDescription>
@@ -260,17 +207,12 @@ const TestPackList = ({ testPacks, loading, onRefresh }: TestPackListProps) => {
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel disabled={isDeleting}>Cancelar</AlertDialogCancel>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
             <AlertDialogAction 
-              onClick={(e) => {
-                e.preventDefault();
-                e.stopPropagation();
-                handleDelete();
-              }}
+              onClick={handleDelete}
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-              disabled={isDeleting}
             >
-              {isDeleting ? "Eliminando..." : "Eliminar"}
+              Eliminar
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

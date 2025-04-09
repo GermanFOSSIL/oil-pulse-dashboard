@@ -11,7 +11,7 @@ import {
 } from "@/components/ui/dialog";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { useTestPacks } from "@/hooks/useTestPacks";
-import { FileSpreadsheet, Upload, AlertCircle, CheckCircle2, X, Download } from "lucide-react";
+import { FileSpreadsheet, Upload, AlertCircle, CheckCircle2, X } from "lucide-react";
 import * as XLSX from 'xlsx';
 import { TestPack, Tag } from "@/services/types";
 
@@ -190,71 +190,6 @@ const BatchUploadModal = ({ isOpen, onClose, onSuccess }: BatchUploadModalProps)
     onClose();
   };
 
-  const generateTemplateExcel = () => {
-    // Create a new workbook
-    const wb = XLSX.utils.book_new();
-    
-    // Create Test Packs sheet with headers
-    const testPacksHeaders = ['nombre_paquete', 'itr_asociado', 'sistema', 'subsistema'];
-    const testPacksData = [
-      ['Test Pack 1', 'ITR-001', 'Sistema A', 'Subsistema 1'],
-      ['Test Pack 2', 'ITR-002', 'Sistema B', 'Subsistema 2']
-    ];
-    const testPacksWs = XLSX.utils.aoa_to_sheet([testPacksHeaders, ...testPacksData]);
-    
-    // Add column comments/notes
-    testPacksWs['!cols'] = [
-      { wch: 20 }, { wch: 15 }, { wch: 15 }, { wch: 15 }
-    ];
-    
-    // Create TAGs sheet with headers
-    const tagsHeaders = ['test_pack_id', 'tag_name'];
-    const tagsData = [
-      [1, 'TAG-001'],  // This references Test Pack 1 (by index)
-      [1, 'TAG-002'],  // Also for Test Pack 1
-      [2, 'TAG-003'],  // This references Test Pack 2 (by index)
-      ['Test Pack 1', 'TAG-004']  // Also reference by name example
-    ];
-    const tagsWs = XLSX.utils.aoa_to_sheet([tagsHeaders, ...tagsData]);
-    
-    tagsWs['!cols'] = [
-      { wch: 20 }, { wch: 20 }
-    ];
-    
-    // Add the sheets to the workbook
-    XLSX.utils.book_append_sheet(wb, testPacksWs, 'Test Packs');
-    XLSX.utils.book_append_sheet(wb, tagsWs, 'TAGs');
-    
-    // Add instruction sheet
-    const instructionsData = [
-      ['Instrucciones para completar el archivo de carga masiva'],
-      [''],
-      ['Hoja: Test Packs'],
-      ['- nombre_paquete: Nombre del Test Pack (obligatorio)'],
-      ['- itr_asociado: Código o nombre del ITR asociado (obligatorio)'],
-      ['- sistema: Nombre del sistema (obligatorio)'],
-      ['- subsistema: Nombre del subsistema (obligatorio)'],
-      [''],
-      ['Hoja: TAGs'],
-      ['- test_pack_id: Referencia al Test Pack. Puede ser:'],
-      ['  * Un número que hace referencia al índice del Test Pack (1 para el primer Test Pack, 2 para el segundo, etc.)'],
-      ['  * El nombre exacto del Test Pack definido en la hoja "Test Packs"'],
-      ['- tag_name: Nombre del TAG (obligatorio)'],
-      [''],
-      ['Notas:'],
-      ['- Todos los Test Packs se crearán con estado "pendiente"'],
-      ['- Todos los TAGs se crearán con estado "pendiente"'],
-      ['- Asegúrese de que las referencias a Test Packs sean correctas'],
-    ];
-    const instructionsWs = XLSX.utils.aoa_to_sheet(instructionsData);
-    instructionsWs['!cols'] = [{ wch: 80 }];
-    
-    XLSX.utils.book_append_sheet(wb, instructionsWs, 'Instrucciones');
-    
-    // Write the file and trigger download
-    XLSX.writeFile(wb, 'Plantilla_TestPacks_TAGs.xlsx');
-  };
-
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && handleClose()}>
       <DialogContent className="sm:max-w-[500px]">
@@ -263,20 +198,10 @@ const BatchUploadModal = ({ isOpen, onClose, onSuccess }: BatchUploadModalProps)
           <DialogDescription>
             Seleccione un archivo Excel que contenga los datos a importar.
             El archivo debe tener hojas llamadas "Test Packs" y "TAGs".
-            Puede descargar una plantilla con el formato requerido.
           </DialogDescription>
         </DialogHeader>
         
         <div className="space-y-4">
-          <Button 
-            variant="outline" 
-            onClick={generateTemplateExcel} 
-            className="w-full gap-2"
-          >
-            <Download className="h-4 w-4" />
-            Descargar Plantilla Excel
-          </Button>
-          
           <div className="border-2 border-dashed rounded-lg p-6 text-center">
             <FileSpreadsheet className="h-10 w-10 mx-auto mb-4 text-muted-foreground" />
             <h3 className="font-medium text-lg mb-2">Seleccione un archivo Excel</h3>

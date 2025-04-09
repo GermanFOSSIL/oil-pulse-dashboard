@@ -12,54 +12,37 @@ import { DatabaseActivityTimeline } from "@/components/DatabaseActivityTimeline"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { AlertCircle } from "lucide-react";
-import { useLoadingTimeout } from "@/hooks/use-loading-timeout";
-import { LoadingFallback } from "@/components/ui/loading-fallback";
-import { Skeleton } from "@/components/ui/skeleton";
 
 const ITRs = () => {
   const [itrs, setITRs] = useState<ITRWithDetails[]>([]);
   const [subsystems, setSubsystems] = useState<Subsystem[]>([]);
   const [systems, setSystems] = useState<System[]>([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<Error | null>(null);
   const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null);
   const [addingSampleData, setAddingSampleData] = useState(false);
   const [activeTab, setActiveTab] = useState("itrs");
   const { toast } = useToast();
-  const { hasTimedOut } = useLoadingTimeout({ loading, timeoutMs: 10000 });
 
   const fetchData = async () => {
-    console.log("Iniciando fetchData en ITRs.tsx");
     setLoading(true);
-    setError(null);
-    
     try {
       if (selectedProjectId) {
-        console.log(`Obteniendo datos para el proyecto: ${selectedProjectId}`);
-        
-        // Recolectar sistemas primero
         const systemsData = await getSystemsByProjectId(selectedProjectId);
-        console.log(`Sistemas obtenidos: ${systemsData.length}`);
         setSystems(systemsData);
         
-        // Obtener subsistemas
+        // Get subsystems
         const subsystemsData = await getSubsystems();
-        console.log(`Subsistemas obtenidos: ${subsystemsData.length}`);
         setSubsystems(subsystemsData);
         
-        // Obtener ITRs con detalles
         const enrichedITRs = await fetchITRsWithDetails(selectedProjectId);
-        console.log(`ITRs enriquecidos obtenidos: ${enrichedITRs.length}`);
         setITRs(enrichedITRs);
       } else {
-        console.log("No hay proyecto seleccionado, limpiando datos");
         setSystems([]);
         setSubsystems([]);
         setITRs([]);
       }
-    } catch (err) {
-      console.error("Error al obtener datos:", err);
-      setError(err instanceof Error ? err : new Error("Error desconocido al cargar datos"));
+    } catch (error) {
+      console.error("Error fetching data:", error);
       toast({
         title: "Error",
         description: "No se pudieron cargar los datos de ITRs",
@@ -126,37 +109,6 @@ const ITRs = () => {
     }
   };
 
-  // Renderizado para mostrar error o timeout
-  if ((error || hasTimedOut) && !loading) {
-    return (
-      <div className="space-y-6">
-        <div className="flex justify-between items-center">
-          <div>
-            <h1 className="text-3xl font-bold tracking-tight">ITRs</h1>
-            <p className="text-muted-foreground">
-              Gestión de Registros de Inspección (ITRs)
-            </p>
-          </div>
-          <div className="flex items-center space-x-4">
-            <ProjectSelector 
-              onSelectProject={handleSelectProject}
-              selectedProjectId={selectedProjectId}
-            />
-          </div>
-        </div>
-
-        <LoadingFallback 
-          title={hasTimedOut ? "Tiempo de carga excedido" : "Error de carga"}
-          description={hasTimedOut 
-            ? "La operación ha tardado demasiado tiempo. Por favor, inténtalo de nuevo."
-            : `Error: ${error?.message || "Error desconocido"}`
-          }
-          onRetry={fetchData}
-        />
-      </div>
-    );
-  }
-
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center">
@@ -191,16 +143,7 @@ const ITRs = () => {
         </TabsList>
         
         <TabsContent value="itrs" className="mt-6">
-          {loading ? (
-            <div className="space-y-3">
-              <Skeleton className="h-[200px] w-full rounded-md" />
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <Skeleton className="h-[100px] rounded-md" />
-                <Skeleton className="h-[100px] rounded-md" />
-                <Skeleton className="h-[100px] rounded-md" />
-              </div>
-            </div>
-          ) : selectedProjectId ? (
+          {selectedProjectId ? (
             <ITRList 
               itrs={itrs}
               subsystems={subsystems}
