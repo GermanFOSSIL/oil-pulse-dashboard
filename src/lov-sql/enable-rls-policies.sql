@@ -46,27 +46,3 @@ ALTER TABLE public.profiles ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "Allow all operations on profiles" ON public.profiles
   USING (true)
   WITH CHECK (true);
-
--- Enable RLS for test_packs table
-ALTER TABLE public.test_packs ENABLE ROW LEVEL SECURITY;
-
--- Create policy to allow all operations on test_packs table for authenticated users
-CREATE POLICY "Allow all operations on test_packs" ON public.test_packs
-  USING (true)
-  WITH CHECK (true);
-
--- Enable RLS for tags table
-ALTER TABLE public.tags ENABLE ROW LEVEL SECURITY;
-
--- Create policy to allow all operations on tags table for authenticated users
-CREATE POLICY "Allow all operations on tags" ON public.tags
-  USING (true)
-  WITH CHECK (true);
-
--- Enable RLS for acciones_log table
-ALTER TABLE public.acciones_log ENABLE ROW LEVEL SECURITY;
-
--- Create policy to allow all operations on acciones_log table for authenticated users
-CREATE POLICY "Allow all operations on acciones_log" ON public.acciones_log
-  USING (true)
-  WITH CHECK (true);

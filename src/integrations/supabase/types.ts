@@ -9,38 +9,6 @@ export type Json =
 export type Database = {
   public: {
     Tables: {
-      acciones_log: {
-        Row: {
-          accion: string
-          fecha: string
-          id: string
-          tag_id: string
-          usuario_id: string
-        }
-        Insert: {
-          accion: string
-          fecha?: string
-          id?: string
-          tag_id: string
-          usuario_id: string
-        }
-        Update: {
-          accion?: string
-          fecha?: string
-          id?: string
-          tag_id?: string
-          usuario_id?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "acciones_log_tag_id_fkey"
-            columns: ["tag_id"]
-            isOneToOne: false
-            referencedRelation: "tags"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       db_activity_log: {
         Row: {
           action: string
@@ -269,44 +237,6 @@ export type Database = {
           },
         ]
       }
-      tags: {
-        Row: {
-          created_at: string
-          estado: string
-          fecha_liberacion: string | null
-          id: string
-          tag_name: string
-          test_pack_id: string
-          updated_at: string
-        }
-        Insert: {
-          created_at?: string
-          estado?: string
-          fecha_liberacion?: string | null
-          id?: string
-          tag_name: string
-          test_pack_id: string
-          updated_at?: string
-        }
-        Update: {
-          created_at?: string
-          estado?: string
-          fecha_liberacion?: string | null
-          id?: string
-          tag_name?: string
-          test_pack_id?: string
-          updated_at?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "tags_test_pack_id_fkey"
-            columns: ["test_pack_id"]
-            isOneToOne: false
-            referencedRelation: "test_packs"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       tasks: {
         Row: {
           created_at: string
@@ -345,48 +275,12 @@ export type Database = {
           },
         ]
       }
-      test_packs: {
-        Row: {
-          created_at: string
-          estado: string
-          id: string
-          itr_asociado: string
-          nombre_paquete: string
-          sistema: string
-          subsistema: string
-          updated_at: string
-        }
-        Insert: {
-          created_at?: string
-          estado?: string
-          id?: string
-          itr_asociado: string
-          nombre_paquete: string
-          sistema: string
-          subsistema: string
-          updated_at?: string
-        }
-        Update: {
-          created_at?: string
-          estado?: string
-          id?: string
-          itr_asociado?: string
-          nombre_paquete?: string
-          sistema?: string
-          subsistema?: string
-          updated_at?: string
-        }
-        Relationships: []
-      }
     }
     Views: {
       [_ in never]: never
     }
     Functions: {
-      delete_test_pack_with_tags: {
-        Args: { test_pack_id: string }
-        Returns: boolean
-      }
+      [_ in never]: never
     }
     Enums: {
       [_ in never]: never

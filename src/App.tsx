@@ -14,7 +14,6 @@ import Configuration from "./pages/Configuration";
 import Users from "./pages/Users";
 import Reports from "./pages/Reports";
 import Database from "./pages/Database";
-import TestPacks from "./pages/TestPacks";
 import NotFound from "./pages/NotFound";
 import Auth from "./pages/Auth";
 import { AuthProvider } from "./contexts/AuthContext";
@@ -45,7 +44,6 @@ const App = () => (
               <Route path="systems" element={<Systems />} />
               <Route path="subsystems" element={<Subsystems />} />
               <Route path="itrs" element={<ITRs />} />
-              <Route path="testpacks" element={<TestPacks />} />
               <Route path="configuration" element={<Configuration />} />
               <Route path="users" element={<Users />} />
               <Route path="reports" element={<Reports />} />

@@ -140,30 +140,7 @@ export const getProjectsHierarchy = async (): Promise<any[]> => {
     return data || [];
   } catch (error) {
     console.error("Error en getProjectsHierarchy:", error);
-    return []; // Return empty array on error instead of throwing
-  }
-};
-
-// Get available ITRs for a specific subsystem
-export const getAvailableITRs = async (subsystemId: string) => {
-  try {
-    console.log(`Fetching ITRs for subsystem ${subsystemId}`);
-    const { data, error } = await supabase
-      .from('itrs')
-      .select('id, name, quantity, status, progress')
-      .eq('subsystem_id', subsystemId)
-      .order('name');
-      
-    if (error) {
-      console.error("Error fetching ITRs:", error);
-      throw error;
-    }
-    
-    console.log(`Found ${data?.length || 0} ITRs for subsystem ${subsystemId}`);
-    return data || [];
-  } catch (error) {
-    console.error("Error in getAvailableITRs:", error);
-    return []; // Return empty array instead of throwing
+    throw error;
   }
 };
 
