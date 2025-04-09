@@ -170,10 +170,10 @@ const TestPackList = ({
       />
       
       <div>
-        <p className="mb-2 text-muted-foreground text-sm">{filteredTestPacks.length} Test Packs encontrados</p>
+        <p className="text-sm text-muted-foreground mb-4">{filteredTestPacks.length} Test Packs encontrados</p>
         
         <div className="space-y-4">
-          {filteredTestPacks.map(testPack => (
+          {filteredTestPacks.map((testPack) => (
             <TestPackItemCard
               key={testPack.id}
               testPack={testPack}

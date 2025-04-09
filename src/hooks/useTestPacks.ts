@@ -12,7 +12,7 @@ import {
 } from "@/services/testPackService";
 import { useAuth } from "@/contexts/AuthContext";
 
-// Split useTestPacks hook into several smaller hooks
+// Split useTestPacks hook into smaller modules
 export const useTestPacks = () => {
   const { toast } = useToast();
   const { userProfile } = useAuth();
@@ -96,7 +96,10 @@ export const useTestPacks = () => {
     try {
       console.log(`Toggling release status for tag: ${tagId}`);
       
-      const tag = testPacks?.flatMap(tp => tp.tags || []).find(t => t.id === tagId);
+      const tag = testPacks
+        ?.flatMap(tp => tp.tags || [])
+        .find(t => t.id === tagId);
+      
       if (!tag) {
         throw new Error("TAG no encontrado");
       }
@@ -130,7 +133,7 @@ export const useTestPacks = () => {
     }
   };
 
-  // Handle test pack deletion
+  // Handle test pack deletion with improved error handling
   const handleDeleteTestPack = async (id: string): Promise<boolean> => {
     if (isDeletingTestPack) {
       console.log("Delete operation already in progress, ignoring request");
@@ -150,6 +153,7 @@ export const useTestPacks = () => {
       if (result.success) {
         console.log(`Test pack ${id} deleted successfully`);
         
+        // Update local state to remove the deleted test pack
         setTestPacks(prevTestPacks => 
           prevTestPacks ? prevTestPacks.filter(tp => tp.id !== id) : null
         );
@@ -160,8 +164,8 @@ export const useTestPacks = () => {
         });
         
         console.log("Refreshing data after successful deletion");
-        fetchTestPacks();
-        fetchStats();
+        await fetchTestPacks();
+        await fetchStats();
         
         return true;
       } else {
@@ -172,7 +176,7 @@ export const useTestPacks = () => {
           variant: "destructive",
         });
         
-        fetchTestPacks();
+        await fetchTestPacks();
         return false;
       }
     } catch (error: any) {
@@ -184,7 +188,7 @@ export const useTestPacks = () => {
         variant: "destructive",
       });
       
-      fetchTestPacks();
+      await fetchTestPacks();
       return false;
     } finally {
       setIsDeletingTestPack(false);
@@ -357,7 +361,7 @@ interface TestPackStatsData {
     released: number;
     progress: number;
   };
-  systems: { name: string; value: number }[];
-  subsystems: { name: string; value: number }[];
-  itrs: { name: string; value: number }[];
+  systems: Array<{ name: string; count: number }>;
+  subsystems: Array<{ name: string; count: number }>;
+  itrs: Array<{ name: string; count: number }>;
 }
