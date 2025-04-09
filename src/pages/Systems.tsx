@@ -10,7 +10,7 @@ import { System, Project } from "@/services/types";
 import { SystemFormModal } from "@/components/modals/SystemFormModal";
 import { ProjectSelector } from "@/components/ProjectSelector";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Alert, AlertCircle, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Alert, AlertDescription, AlertTitle, AlertCircle } from "@/components/ui/alert";
 
 const Systems = () => {
   const [systems, setSystems] = useState<System[]>([]);
@@ -161,7 +161,7 @@ const Systems = () => {
       </div>
 
       {!selectedProjectId && (
-        <Alert variant="warning">
+        <Alert variant="destructive">
           <AlertCircle className="h-4 w-4" />
           <AlertTitle>Selección requerida</AlertTitle>
           <AlertDescription>

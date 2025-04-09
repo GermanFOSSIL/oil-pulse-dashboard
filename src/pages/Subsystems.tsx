@@ -10,7 +10,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { SubsystemFormModal } from "@/components/modals/SubsystemFormModal";
 import { DatabaseActivityTimeline } from "@/components/DatabaseActivityTimeline";
 import { ProjectSelector } from "@/components/ProjectSelector";
-import { Alert, AlertCircle, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Alert, AlertDescription, AlertTitle, AlertCircle } from "@/components/ui/alert";
 import {
   Select,
   SelectContent,
@@ -239,7 +239,7 @@ const Subsystems = () => {
       </div>
 
       {!selectedProjectId && (
-        <Alert variant="warning">
+        <Alert variant="destructive">
           <AlertCircle className="h-4 w-4" />
           <AlertTitle>Selección requerida</AlertTitle>
           <AlertDescription>

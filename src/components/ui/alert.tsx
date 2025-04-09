@@ -1,5 +1,7 @@
+
 import * as React from "react"
 import { cva, type VariantProps } from "class-variance-authority"
+import { AlertTriangle, Info, XCircle } from "lucide-react"
 
 import { cn } from "@/lib/utils"
 
@@ -11,6 +13,8 @@ const alertVariants = cva(
         default: "bg-background text-foreground",
         destructive:
           "border-destructive/50 text-destructive dark:border-destructive [&>svg]:text-destructive",
+        warning:
+          "border-orange-500/50 text-orange-500 dark:border-orange-500 [&>svg]:text-orange-500",
       },
     },
     defaultVariants: {
@@ -56,4 +60,7 @@ const AlertDescription = React.forwardRef<
 ))
 AlertDescription.displayName = "AlertDescription"
 
+// Export the AlertCircle from Lucide React directly
 export { Alert, AlertTitle, AlertDescription }
+// Export icons for use with Alert
+export { AlertTriangle, XCircle as AlertCircle, Info }
