@@ -1,5 +1,5 @@
 
-import { Suspense } from "react";
+import { Suspense, useCallback } from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import TestPackList from "@/components/testpacks/TestPackList";
 import TestPackActivity from "@/components/testpacks/TestPackActivity";
@@ -12,6 +12,7 @@ import { ErrorBoundary } from "react-error-boundary";
 import { Button } from "@/components/ui/button";
 import { AlertTriangle } from "lucide-react";
 import { useEffect } from "react";
+import { useToast } from "@/hooks/use-toast";
 
 // Error fallback component
 const ErrorFallback = ({ error, resetErrorBoundary }: { error: Error, resetErrorBoundary: () => void }) => (
@@ -28,6 +29,8 @@ const ErrorFallback = ({ error, resetErrorBoundary }: { error: Error, resetError
 );
 
 const TestPacks = () => {
+  const { toast } = useToast();
+  
   const {
     selectedTab,
     showImportDialog,
@@ -88,6 +91,33 @@ const TestPacks = () => {
       console.log(`Loaded ${testPacks.length} test packs`);
     }
   }, [stats, testPacks]);
+  
+  // Enhanced delete handler with better error handling
+  const enhancedDeleteHandler = useCallback(async (id: string) => {
+    try {
+      console.log("Starting deletion process for test pack:", id);
+      await handleDeleteTestPack(id);
+      
+      // Force refresh after successful deletion
+      await fetchTestPacks();
+      await fetchStats();
+      
+      toast({
+        title: "Éxito",
+        description: "Test pack eliminado correctamente.",
+      });
+    } catch (error) {
+      console.error("Error during deletion process:", error);
+      toast({
+        title: "Error",
+        description: "Ocurrió un error al eliminar el test pack. Por favor, inténtelo de nuevo.",
+        variant: "destructive",
+      });
+      
+      // Try to refresh data anyway to ensure UI consistency
+      fetchTestPacks();
+    }
+  }, [handleDeleteTestPack, fetchTestPacks, fetchStats, toast]);
 
   return (
     <div className="container mx-auto py-6 space-y-6">
@@ -130,10 +160,7 @@ const TestPacks = () => {
                 fetchTestPacks();
               }}
               onEdit={openEditTestPackForm}
-              onDelete={(id) => {
-                console.log("Delete request received for test pack ID:", id);
-                handleDeleteTestPack(id);
-              }}
+              onDelete={enhancedDeleteHandler}
             />
           </TabsContent>
           

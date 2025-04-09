@@ -50,6 +50,7 @@ const TestPackList = ({
   });
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [testPackToDelete, setTestPackToDelete] = useState<string | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   // Get unique list of systems
   const systems = testPacks 
@@ -98,23 +99,26 @@ const TestPackList = ({
     setDeleteDialogOpen(true);
   };
 
-  const confirmDelete = () => {
+  const confirmDelete = async () => {
     if (testPackToDelete) {
       try {
         console.log("Deleting test pack with ID:", testPackToDelete);
-        onDelete(testPackToDelete);
+        setIsDeleting(true);
+        
+        await onDelete(testPackToDelete);
+        
         setDeleteDialogOpen(false);
         setTestPackToDelete(null);
+        setIsDeleting(false);
         
-        // Wait for the state update to complete
-        setTimeout(() => {
-          toast({
-            title: "Test Pack eliminado",
-            description: "El Test Pack ha sido eliminado correctamente",
-          });
-        }, 300);
+        toast({
+          title: "Test Pack eliminado",
+          description: "El Test Pack ha sido eliminado correctamente",
+        });
       } catch (error) {
         console.error('Error al eliminar el Test Pack:', error);
+        setIsDeleting(false);
+        
         toast({
           title: "Error",
           description: "No se pudo eliminar el Test Pack. Inténtelo de nuevo.",
@@ -297,9 +301,21 @@ const TestPackList = ({
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Cancelar</AlertDialogCancel>
-            <AlertDialogAction onClick={confirmDelete} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
-              Eliminar
+            <AlertDialogCancel disabled={isDeleting}>Cancelar</AlertDialogCancel>
+            <AlertDialogAction 
+              onClick={(e) => {
+                e.preventDefault();
+                confirmDelete();
+              }} 
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              disabled={isDeleting}
+            >
+              {isDeleting ? (
+                <>
+                  <div className="mr-2 h-4 w-4 animate-spin rounded-full border-2 border-background border-t-transparent"></div>
+                  Eliminando...
+                </>
+              ) : "Eliminar"}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

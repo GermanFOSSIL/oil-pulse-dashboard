@@ -174,20 +174,23 @@ export const useTestPacks = () => {
       );
       
       toast({
-        title: "Éxito",
-        description: "Test pack eliminado correctamente.",
+        title: "Success",
+        description: "Test pack deleted successfully.",
       });
       
       fetchTestPacks();
       fetchStats();
+      
+      return true;
     } catch (error: any) {
       console.error("Error deleting test pack:", error);
       toast({
         title: "Error",
         description:
-          error.message || "No se pudo eliminar el test pack. Inténtelo de nuevo.",
+          error.message || "Failed to delete test pack. Please try again.",
         variant: "destructive",
       });
+      throw error;
     }
   };
 
