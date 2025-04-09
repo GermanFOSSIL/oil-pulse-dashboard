@@ -128,51 +128,22 @@ export const deleteTestPack = async (id: string): Promise<boolean> => {
       return false;
     }
     
-    // Step 1: Get all tags associated with this test pack
-    const { data: tagData } = await supabase
+    // With the ON DELETE CASCADE constraint now in place, we can simply delete
+    // the tags and the related acciones_log entries will be automatically deleted
+    
+    // Delete all tags associated with this test pack
+    // The foreign key cascade will automatically delete related acciones_log entries
+    const { error: tagsError } = await supabase
       .from('tags')
-      .select('id')
+      .delete()
       .eq('test_pack_id', id);
-    
-    const tagIds = tagData ? tagData.map(tag => tag.id) : [];
-    
-    // Step 2: Delete related entries in acciones_log if there are tags
-    if (tagIds.length > 0) {
-      // Check if there are any actions for these tags
-      const { data: actionsData } = await supabase
-        .from('acciones_log')
-        .select('id')
-        .in('tag_id', tagIds);
-      
-      if (actionsData && actionsData.length > 0) {
-        console.log(`Deleting ${actionsData.length} related action logs`);
-        const { error: accionesLogError } = await supabase
-          .from('acciones_log')
-          .delete()
-          .in('tag_id', tagIds);
-          
-        if (accionesLogError) {
-          console.error(`Error deleting related acciones_log entries:`, accionesLogError);
-          throw accionesLogError;
-        }
-      }
-    }
-    
-    // Step 3: Now delete the tags
-    if (tagIds.length > 0) {
-      console.log(`Deleting ${tagIds.length} related tags`);
-      const { error: tagsError } = await supabase
-        .from('tags')
-        .delete()
-        .eq('test_pack_id', id);
         
-      if (tagsError) {
-        console.error(`Error deleting related tags:`, tagsError);
-        throw tagsError;
-      }
+    if (tagsError) {
+      console.error(`Error deleting related tags:`, tagsError);
+      throw tagsError;
     }
     
-    // Step 4: Finally delete the test pack
+    // Now delete the test pack itself
     const { error } = await supabase
       .from('test_packs')
       .delete()
@@ -319,6 +290,7 @@ export const deleteTag = async (id: string): Promise<void> => {
       .eq('id', id)
       .single();
       
+    // The associated acciones_log entries will be automatically deleted via CASCADE
     const { error } = await supabase
       .from('tags')
       .delete()
