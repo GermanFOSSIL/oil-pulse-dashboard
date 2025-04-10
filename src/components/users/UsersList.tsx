@@ -109,8 +109,8 @@ const UsersList = memo(({ users, onEdit, onDelete, onResetPassword, isLoading = 
       </TableHeader>
       <TableBody>
         {users.map(user => {
-          // Try to get email from multiple sources, using fallbacks
-          const email = user.email || user.profile?.email || 'Email no disponible';
+          // Get email from profile first, then from user object as fallback
+          const email = user.profile?.email || user.email || 'Email no disponible';
           const name = user.profile?.full_name || '-';
           const avatarUrl = user.profile?.avatar_url;
           

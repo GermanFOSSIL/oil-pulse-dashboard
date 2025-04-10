@@ -81,6 +81,7 @@ export type UserUpdateData = {
   avatar_url?: string;
   role?: string;
   permissions?: string[];
+  email?: string; // Added email field to UserUpdateData
 };
 
 export type UserCreateData = {

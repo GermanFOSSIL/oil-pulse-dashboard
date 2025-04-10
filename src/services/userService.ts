@@ -1,4 +1,3 @@
-
 import { supabase } from "@/integrations/supabase/client";
 import { BulkUserData, UserCreateData, UserUpdateData, PasswordChangeData } from "@/services/types";
 
@@ -24,7 +23,7 @@ export interface UserProfile {
   permissions?: string[];
   created_at?: string;
   updated_at?: string;
-  email?: string; // Add email property to the interface
+  email?: string; // Added email to the UserProfile interface
 }
 
 export const getUserProfile = async (userId: string): Promise<UserProfile | null> => {
@@ -44,19 +43,29 @@ export const getUserProfile = async (userId: string): Promise<UserProfile | null
     }
 
     // Now get the user email from auth if possible
-    let userEmail = null;
+    let userEmail = profileData?.email; // First try to get email from profiles
     
-    try {
-      const { data: userData, error: userError } = await supabase.auth.admin.getUserById(userId);
-      
-      if (!userError && userData?.user) {
-        userEmail = userData.user.email;
-        console.log(`Got email ${userEmail} for user ${userId} from auth`);
-      } else if (userError) {
-        console.log(`Could not get email from auth for user ${userId}, error:`, userError);
+    if (!userEmail) {
+      try {
+        const { data: userData, error: userError } = await supabase.auth.admin.getUserById(userId);
+        
+        if (!userError && userData?.user) {
+          userEmail = userData.user.email;
+          console.log(`Got email ${userEmail} for user ${userId} from auth`);
+          
+          // Sync the email back to the profile if it doesn't exist there
+          if (userEmail && !profileData.email) {
+            await supabase
+              .from('profiles')
+              .update({ email: userEmail, updated_at: new Date().toISOString() })
+              .eq('id', userId);
+          }
+        } else if (userError) {
+          console.log(`Could not get email from auth for user ${userId}, error:`, userError);
+        }
+      } catch (authError) {
+        console.log(`Error accessing auth API for user ${userId}:`, authError);
       }
-    } catch (authError) {
-      console.log(`Error accessing auth API for user ${userId}:`, authError);
     }
 
     // Combine profile data with email
@@ -121,10 +130,22 @@ export const getUserProfiles = async (): Promise<UserProfile[]> => {
         });
       }
       
-      // For each profile, try to get the email
+      // For each profile, try to get the email if not already set
       const enhancedProfiles = profiles.map(profile => {
-        // Try to get email from auth users map
-        const email = userEmailMap[profile.id] || profile.email || null;
+        // First try to use the email from the profile itself (preferred)
+        // If not available, try to get it from auth users map
+        const email = profile.email || userEmailMap[profile.id] || null;
+        
+        // Sync back to profile if needed
+        if (email && !profile.email) {
+          // Don't await this to keep the function responsive
+          supabase
+            .from('profiles')
+            .update({ email, updated_at: new Date().toISOString() })
+            .eq('id', profile.id)
+            .then(() => console.log(`Synced email for user ${profile.id}`))
+            .catch(err => console.error(`Failed to sync email for user ${profile.id}:`, err));
+        }
         
         return {
           ...profile,
@@ -135,16 +156,13 @@ export const getUserProfiles = async (): Promise<UserProfile[]> => {
       return enhancedProfiles;
     } catch (authError) {
       console.error('Error accessing auth API:', authError);
-      // If auth API fails, return profiles without emails
-      return profiles.map(profile => ({
-        ...profile,
-        email: profile.email || null
-      })) as UserProfile[];
+      // If auth API fails, return profiles with their emails
+      return profiles as UserProfile[];
     }
   } catch (error) {
     console.error('Error in getUserProfiles:', error);
     
-    // Fallback: Just return profiles without emails
+    // Fallback: Just return profiles without trying to enhance them
     const { data, error: fallbackError } = await supabase
       .from('profiles')
       .select('*');
@@ -182,10 +200,25 @@ export const updateUserProfile = async (userId: string, updates: Partial<UserPro
       throw new Error('No data returned after update');
     }
 
-    return {
-      ...data[0],
-      email: updates.email || data[0].email
-    } as UserProfile;
+    // Try to update email in auth.users if email has changed
+    if (updates.email) {
+      try {
+        // Notice this requires admin privileges - may fail with public client
+        const { error: updateAuthError } = await supabase.auth.admin.updateUserById(
+          userId,
+          { email: updates.email }
+        );
+        
+        if (updateAuthError) {
+          console.error(`Could not update auth email for user ${userId}:`, updateAuthError);
+        }
+      } catch (authError) {
+        console.error(`Error updating auth email for user ${userId}:`, authError);
+        // Continue even if auth update fails - we've already updated the profile
+      }
+    }
+
+    return data[0] as UserProfile;
   } catch (error) {
     console.error(`Error in updateUserProfile for user ${userId}:`, error);
     throw error;

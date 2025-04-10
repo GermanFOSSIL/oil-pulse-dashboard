@@ -64,8 +64,8 @@ const UserForm = memo(({ user, onSubmit, isSubmitting = false }: UserFormProps) 
   // Initialize form values when user data is available
   useEffect(() => {
     if (user) {
-      // Try to get email from multiple sources with fallbacks
-      const email = user.email || user.profile?.email || "";
+      // Try to get email from profile first, then from user object
+      const email = user.profile?.email || user.email || "";
       
       const formValues = {
         email,
