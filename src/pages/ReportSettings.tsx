@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -87,9 +86,32 @@ const ReportSettings = () => {
           setRecipients(typedRecipients);
         }
 
-        // Set schedule
-        if (scheduleData) {
-          setSchedule(scheduleData.settings);
+        // Set schedule - Fix for the error in line 92
+        if (scheduleData && scheduleData.settings) {
+          // Make sure settings is properly typed
+          const settingsObj = typeof scheduleData.settings === 'string' 
+            ? JSON.parse(scheduleData.settings) 
+            : scheduleData.settings;
+            
+          // Ensure we have a valid schedule structure
+          const validatedSettings: ReportScheduleSettings = {
+            daily: {
+              enabled: settingsObj.daily?.enabled || false,
+              time: settingsObj.daily?.time || "07:00"
+            },
+            weekly: {
+              enabled: settingsObj.weekly?.enabled || false,
+              time: settingsObj.weekly?.time || "07:00",
+              day: settingsObj.weekly?.day || "monday"
+            },
+            monthly: {
+              enabled: settingsObj.monthly?.enabled || false,
+              time: settingsObj.monthly?.time || "07:00",
+              day: settingsObj.monthly?.day || "1"
+            }
+          };
+          
+          setSchedule(validatedSettings);
         }
       } catch (error) {
         console.error("Error fetching report settings:", error);
@@ -192,14 +214,15 @@ const ReportSettings = () => {
     }
   };
 
-  // Update schedule settings
+  // Update schedule settings - Fix for the error in line 202
   const updateSchedule = async () => {
     setSaving(true);
     try {
+      // Fix the upsert call structure
       const { error } = await supabase
         .from("report_schedule")
         .upsert({ 
-          id: 1, 
+          id: '1', // Use a string instead of a number
           settings: schedule,
           updated_at: new Date().toISOString()
         });

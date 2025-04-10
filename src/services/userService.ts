@@ -1,3 +1,4 @@
+
 import { supabase } from "@/integrations/supabase/client";
 import { BulkUserData, UserCreateData, UserUpdateData, PasswordChangeData } from "@/services/types";
 
@@ -414,20 +415,26 @@ export const changeUserPassword = async (data: PasswordChangeData): Promise<{ su
         message: "No se pudo encontrar el email del usuario"
       };
     }
-    
-    // Send a password reset link instead of directly changing the password
-    const { error } = await supabase.auth.resetPasswordForEmail(userEmail, {
-      redirectTo: window.location.origin + '/auth/reset-password',
-    });
-    
-    if (error) {
-      throw error;
+
+    // Fix the Promise.catch issue by using try/catch with await
+    try {
+      const { error } = await supabase.auth.resetPasswordForEmail(userEmail, {
+        redirectTo: window.location.origin + '/auth/reset-password',
+      });
+      
+      if (error) throw error;
+      
+      return { 
+        success: true, 
+        message: "Se ha enviado un correo electrónico con instrucciones para cambiar la contraseña." 
+      };
+    } catch (resetError: any) {
+      console.error("Error resetting password:", resetError);
+      return { 
+        success: false, 
+        message: `Error al enviar el correo de cambio de contraseña: ${resetError.message || "Error desconocido"}` 
+      };
     }
-    
-    return { 
-      success: true, 
-      message: "Se ha enviado un correo electrónico con instrucciones para cambiar la contraseña." 
-    };
   } catch (error: any) {
     console.error("Error sending password reset:", error);
     return { 
