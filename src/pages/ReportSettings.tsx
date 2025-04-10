@@ -155,7 +155,7 @@ const ReportSettings: React.FC<ReportSettingsProps> = () => {
         
         if (data) {
           // Convert the settings from JSON to our ReportScheduleSettings type
-          const typedSettings = data.settings as ReportScheduleSettings;
+          const typedSettings = data.settings as unknown as ReportScheduleSettings;
           setScheduleSettings(typedSettings);
         }
       } catch (error) {
@@ -183,7 +183,7 @@ const ReportSettings: React.FC<ReportSettingsProps> = () => {
         .from('report_schedule')
         .upsert({
           id: '1', // Using a fixed ID as there will be only one settings record
-          settings: scheduleSettings as any // Cast to any to satisfy Supabase's Json type
+          settings: scheduleSettings as unknown as any // Cast to any to satisfy Supabase's Json type
         })
         .select();
       

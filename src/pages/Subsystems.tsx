@@ -1,29 +1,26 @@
-
 import { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { DataTable } from "@/components/ui/data-table";
-import { Subsystem, System, getSubsystems, getSystemsByProjectId } from "@/services/supabaseService";
+import { getSubsystems, getSystemsByProjectId } from "@/services/supabaseService";
+import { Subsystem, System } from "@/services/types"; // Updated import
 import { ProjectSelector } from "@/components/ProjectSelector";
-import { useToast } from "@/hooks/use-toast";
-import { PlusCircle, Search, Filter } from "lucide-react";
+import { SubsystemList } from "@/components/subsystem/SubsystemList";
 import { SubsystemFormModal } from "@/components/modals/SubsystemFormModal";
-
-interface SubsystemsProps {
-  projectId: string | null;
-}
+import { useToast } from "@/hooks/use-toast";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { AlertCircle } from "lucide-react";
 
 const Subsystems = () => {
   const [subsystems, setSubsystems] = useState<Subsystem[]>([]);
   const [systems, setSystems] = useState<System[]>([]);
-  const [search, setSearch] = useState("");
-  const [open, setOpen] = useState(false);
-  const [selectedSubsystem, setSelectedSubsystem] = useState<Subsystem | null>(null);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null);
-  const navigate = useNavigate();
+  const [isModalOpen, setIsModalOpen] = useState(false);
   const { toast } = useToast();
 
   const fetchData = async () => {
@@ -32,10 +29,11 @@ const Subsystems = () => {
       if (selectedProjectId) {
         const systemsData = await getSystemsByProjectId(selectedProjectId);
         setSystems(systemsData);
-        const systemsIds = systemsData.map((system) => system.id);
+
+        const systemIds = systemsData.map(system => system.id);
         const subsystemsData = await getSubsystems();
-        const filteredSubsystems = subsystemsData.filter((subsystem) =>
-          systemsIds.includes(subsystem.system_id)
+        const filteredSubsystems = subsystemsData.filter(
+          subsystem => systemIds.includes(subsystem.system_id)
         );
         setSubsystems(filteredSubsystems);
       } else {
@@ -43,11 +41,11 @@ const Subsystems = () => {
         setSubsystems([]);
       }
     } catch (error) {
-      console.error("Error fetching data:", error);
+      console.error("Error fetching subsystems:", error);
       toast({
         title: "Error",
-        description: "Failed to load subsystems",
-        variant: "destructive",
+        description: "No se pudieron cargar los subsistemas",
+        variant: "destructive"
       });
     } finally {
       setLoading(false);
@@ -62,37 +60,13 @@ const Subsystems = () => {
     setSelectedProjectId(projectId);
   };
 
-  const handleEdit = (subsystem: Subsystem) => {
-    setSelectedSubsystem(subsystem);
-    setOpen(true);
-  };
-
-  const handleDelete = (subsystem: Subsystem) => {
-    console.log("Delete subsystem", subsystem);
-  };
-
-  const columns = [
-    {
-      header: "Name",
-      accessorKey: "name",
-    },
-    {
-      header: "System ID",
-      accessorKey: "system_id",
-    },
-  ];
-
-  const filteredSubsystems = subsystems.filter((subsystem) =>
-    subsystem.name.toLowerCase().includes(search.toLowerCase())
-  );
-
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">Subsystems</h1>
+          <h1 className="text-3xl font-bold tracking-tight">Subsistemas</h1>
           <p className="text-muted-foreground">
-            Manage and monitor subsystems within your projects.
+            Gestiona los subsistemas de tus proyectos.
           </p>
         </div>
         <div className="flex items-center space-x-4">
@@ -100,46 +74,44 @@ const Subsystems = () => {
             onSelectProject={handleSelectProject}
             selectedProjectId={selectedProjectId}
           />
-          <Button onClick={() => setOpen(true)}>
-            <PlusCircle className="h-4 w-4 mr-2" />
-            Add Subsystem
-          </Button>
         </div>
       </div>
-      <Card>
-        <CardHeader>
-          <CardTitle>Subsystems List</CardTitle>
-          <CardContent>
-            <div className="flex items-center space-x-2">
-              <Search className="h-4 w-4" />
-              <Input
-                placeholder="Search subsystems..."
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-              />
-            </div>
+
+      {!selectedProjectId && (
+        <Alert variant="destructive">
+          <AlertCircle className="h-4 w-4" />
+          <AlertTitle>Selección requerida</AlertTitle>
+          <AlertDescription>
+            Debe seleccionar un proyecto para ver y gestionar los subsistemas.
+          </AlertDescription>
+        </Alert>
+      )}
+
+      {selectedProjectId ? (
+        <SubsystemList
+          subsystems={subsystems}
+          systems={systems}
+          loading={loading}
+          onOpenModal={() => setIsModalOpen(true)}
+          onRefresh={fetchData}
+          selectedProjectId={selectedProjectId}
+        />
+      ) : (
+        <Card className="border-dashed border-muted">
+          <CardContent className="pt-6 pb-6 text-center">
+            <p className="text-muted-foreground">
+              Seleccione un proyecto para ver los subsistemas asociados.
+            </p>
           </CardContent>
-        </CardHeader>
-        <CardContent>
-          <DataTable
-            columns={columns}
-            data={filteredSubsystems}
-            onEdit={handleEdit}
-            onDelete={handleDelete}
-            loading={loading}
-          />
-        </CardContent>
-      </Card>
+        </Card>
+      )}
+
       <SubsystemFormModal
-        open={open}
-        onClose={() => setOpen(false)}
+        isOpen={isModalOpen}
+        onClose={() => setIsModalOpen(false)}
+        onSuccess={fetchData}
         systems={systems}
-        onSuccess={() => {
-          fetchData();
-          setOpen(false);
-          setSelectedSubsystem(null);
-        }}
-        subsystem={selectedSubsystem}
+        selectedProjectId={selectedProjectId}
       />
     </div>
   );

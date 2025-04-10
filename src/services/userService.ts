@@ -1,5 +1,5 @@
 import { supabase } from "@/integrations/supabase/client";
-import { BulkUserData, UserCreateData, UserUpdateData, PasswordChangeData } from "@/services/types";
+import { BulkUserData, UserCreateData, UserUpdateData, PasswordChangeData, UserProfile } from "@/services/types";
 
 // Define available permissions for sidebar menu items
 export const AVAILABLE_PERMISSIONS = [

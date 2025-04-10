@@ -1,5 +1,5 @@
 
-import type { ITR } from "@/services/supabaseService";
+import type { ITR } from "@/services/types";
 
 // Re-export the ITR type using 'export type' to avoid isolatedModules error
 export type { ITR };

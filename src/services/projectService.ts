@@ -1,4 +1,3 @@
-
 import { supabase } from "@/integrations/supabase/client";
 import { Project } from "@/services/types";
 
@@ -33,7 +32,14 @@ export const getProjectById = async (id: string): Promise<Project | null> => {
 export const createProject = async (project: Omit<Project, "id" | "created_at" | "updated_at">): Promise<Project> => {
   const { data, error } = await supabase
     .from('projects')
-    .insert(project)
+    .insert({
+      name: project.name,
+      location: project.location,
+      status: project.status,
+      progress: project.progress,
+      start_date: project.start_date,
+      end_date: project.end_date
+    })
     .select()
     .single();
 

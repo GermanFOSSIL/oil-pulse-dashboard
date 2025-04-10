@@ -3,7 +3,8 @@ import { useState, useEffect } from "react";
 import { ProjectSelector } from "@/components/ProjectSelector";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
-import { getSubsystems, Subsystem, getSystemsByProjectId, System } from "@/services/supabaseService";
+import { getSubsystems, getSystemsByProjectId } from "@/services/supabaseService";
+import { System, Subsystem } from "@/services/types"; // Updated import to use the types from types.ts
 import { ITRWithDetails } from "@/types/itr-types";
 import { ITRList } from "@/components/itr/ITRList";
 import { fetchITRsWithDetails, createTestITRs } from "@/services/itrService";

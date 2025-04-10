@@ -1,7 +1,8 @@
 
 import { useState, useEffect } from "react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { getProjects, Project } from "@/services/supabaseService";
+import { getProjects } from "@/services/supabaseService";
+import { Project } from "@/services/types"; // Updated import to use the types from types.ts
 import { useToast } from "@/hooks/use-toast";
 
 interface ProjectSelectorProps {
