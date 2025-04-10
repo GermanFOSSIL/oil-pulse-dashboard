@@ -113,13 +113,15 @@ export const getUserProfiles = async (): Promise<UserProfile[]> => {
 
     // Get all auth users to match with profiles - but limit response fields
     try {
-      const { data: { users: authUsers }, error: authError } = await supabase.auth.admin.listUsers({
+      const { data, error: authError } = await supabase.auth.admin.listUsers({
         perPage: 100, // Limit number of users per page
       });
       
       if (authError) {
         console.error('Error fetching auth users:', authError);
       }
+      
+      const authUsers = data?.users || [];
       
       // Create a map of user IDs to emails for faster lookup
       const userEmailMap: Record<string, string> = {};

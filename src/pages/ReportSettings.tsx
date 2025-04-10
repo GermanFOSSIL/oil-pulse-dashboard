@@ -127,7 +127,7 @@ const ReportSettings = () => {
       // Add to database
       const { data, error } = await supabase
         .from("report_recipients")
-        .insert([{ email: newEmail.trim() }])
+        .insert({ email: newEmail.trim() })
         .select();
 
       if (error) throw error;
