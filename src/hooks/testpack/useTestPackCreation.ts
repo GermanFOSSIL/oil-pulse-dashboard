@@ -1,68 +1,82 @@
 
-import { useState, useCallback } from 'react';
-import { useToast } from '@/hooks/use-toast';
-import { 
-  createTestPack,
-  bulkCreateTestPacksAndTags
-} from '@/services/testPackService';
-import { TestPack, Tag } from '@/services/types';
+import { useState } from "react";
+import { createTestPack, bulkCreateTestPacksAndTags } from "@/services/testPackService";
+import { TestPack, Tag } from "@/services/types";
+import { useToast } from "@/hooks/use-toast";
 
-export const useTestPackCreation = () => {
+export const useTestPackCreation = (onSuccess?: () => void) => {
+  const [creating, setCreating] = useState(false);
+  const [bulkCreating, setBulkCreating] = useState(false);
   const { toast } = useToast();
-  const [loading, setLoading] = useState<boolean>(false);
-  
-  const addTestPack = useCallback(async (testPackData: Omit<TestPack, "id" | "created_at" | "updated_at">) => {
-    setLoading(true);
+
+  const createSingleTestPack = async (testPackData: Omit<TestPack, "id" | "created_at" | "updated_at">) => {
+    if (creating) return;
+
     try {
-      const newTestPack = await createTestPack(testPackData);
+      setCreating(true);
+      const createdPack = await createTestPack(testPackData);
+      
       toast({
-        title: "Éxito",
-        description: "Test Pack creado correctamente",
+        title: "Test Pack Created",
+        description: "Test pack has been created successfully.",
       });
-      return newTestPack;
+      
+      if (onSuccess) {
+        onSuccess();
+      }
+      
+      return createdPack;
     } catch (error) {
-      console.error("Error creating Test Pack:", error);
+      console.error("Error creating test pack:", error);
       toast({
         title: "Error",
-        description: "No se pudo crear el Test Pack",
+        description: "Failed to create test pack. Please try again.",
         variant: "destructive",
       });
       return null;
     } finally {
-      setLoading(false);
+      setCreating(false);
     }
-  }, [toast]);
-  
-  const bulkCreateData = useCallback(async (
-    testPacksData: Array<Omit<TestPack, "id" | "created_at" | "updated_at">>,
-    tagsData: Array<{ testPackIndex: number; tagData: Omit<Tag, "id" | "created_at" | "updated_at" | "test_pack_id"> }>
+  };
+
+  const createMultipleTestPacks = async (
+    testPacks: Omit<TestPack, "id" | "created_at" | "updated_at">[],
+    tagsByPack: { [packIndex: number]: Omit<Tag, "id" | "created_at" | "updated_at" | "test_pack_id">[] }
   ) => {
-    setLoading(true);
+    if (bulkCreating) return;
+
     try {
-      const result = await bulkCreateTestPacksAndTags(testPacksData, tagsData);
+      setBulkCreating(true);
+      
+      const result = await bulkCreateTestPacksAndTags(testPacks, tagsByPack);
       
       toast({
-        title: "Éxito",
-        description: `Se crearon ${result.testPacks.length} Test Packs y ${result.tags.length} TAGs correctamente`,
+        title: "Bulk Creation Successful",
+        description: `Created ${result.testPacks.length} test packs and ${result.tags.length} tags.`,
       });
+      
+      if (onSuccess) {
+        onSuccess();
+      }
       
       return result;
     } catch (error) {
       console.error("Error in bulk creation:", error);
       toast({
         title: "Error",
-        description: "Ocurrió un error durante la creación masiva",
+        description: "Failed to create test packs. Please try again.",
         variant: "destructive",
       });
       return null;
     } finally {
-      setLoading(false);
+      setBulkCreating(false);
     }
-  }, [toast]);
-  
+  };
+
   return {
-    loading,
-    addTestPack,
-    bulkCreateData
+    creating,
+    bulkCreating,
+    createSingleTestPack,
+    createMultipleTestPacks
   };
 };

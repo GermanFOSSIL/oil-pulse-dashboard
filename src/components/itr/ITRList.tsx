@@ -1,360 +1,324 @@
 
 import { useState } from "react";
-import { Button } from "@/components/ui/button";
-import { DataTable } from "@/components/ui/data-table";
-import { StatusBadge } from "@/components/ui/status-badge";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { ITRWithDetails } from "@/types/itr-types";
-import { Plus, Database, CheckCircle2, Filter } from "lucide-react";
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import { ITRFormModal } from "@/components/modals/ITRFormModal";
-import { Subsystem, deleteITR, updateITR } from "@/services/supabaseService";
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import { Button } from "@/components/ui/button";
+import { Edit, Trash2, Search, Plus, ArrowUpDown } from "lucide-react";
+import { Skeleton } from "@/components/ui/skeleton";
+import { Input } from "@/components/ui/input";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { format } from "date-fns";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
+import { Badge } from "@/components/ui/badge";
+import { deleteITR } from "@/services/itrService";
 import { useToast } from "@/hooks/use-toast";
-import { System } from "@/services/types";
+import { ITRFormModal } from "@/components/modals/ITRFormModal";
+import { ITRWithActions, ITRWithDetails, Subsystem, System } from "@/services/types";
 
 interface ITRListProps {
-  itrs: ITRWithDetails[];
-  subsystems: Subsystem[];
-  systems: System[];
+  itrs: ITRWithActions[] | ITRWithDetails[];
   loading: boolean;
-  selectedProjectId: string | null;
+  systems?: System[];
+  subsystems?: Subsystem[];
+  onOpenModal?: () => void;
   onRefresh: () => void;
-  onAddSampleData: () => void;
-  addingSampleData: boolean;
+  selectedProjectId?: string | null;
+  filterBySubsystem?: boolean;
 }
 
-export const ITRList = ({ 
-  itrs, 
-  subsystems, 
-  systems, 
-  loading, 
-  selectedProjectId,
+export const ITRList = ({
+  itrs,
+  loading,
+  systems,
+  subsystems,
+  onOpenModal,
   onRefresh,
-  onAddSampleData,
-  addingSampleData
+  selectedProjectId,
+  filterBySubsystem = false,
 }: ITRListProps) => {
-  const [statusFilter, setStatusFilter] = useState<string>("all");
-  const [systemFilter, setSystemFilter] = useState<string>("all");
-  const [subsystemFilter, setSubsystemFilter] = useState<string>("all");
-  const [showModal, setShowModal] = useState(false);
-  const [selectedITR, setSelectedITR] = useState<ITRWithDetails | undefined>(undefined);
-  const [markingComplete, setMarkingComplete] = useState<string | null>(null);
+  const [searchTerm, setSearchTerm] = useState("");
+  const [sortField, setSortField] = useState<string>("name");
+  const [sortDirection, setSortDirection] = useState<"asc" | "desc">("asc");
+  const [selectedITR, setSelectedITR] = useState<ITRWithActions | null>(null);
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const { toast } = useToast();
 
-  // Modify the ITRWithDetails type to include actions dynamically
-  type ITRWithActions = ITRWithDetails & { actions?: string };
+  // Convert ITRWithDetails to ITRWithActions
+  const convertToITRWithActions = (itr: ITRWithDetails): ITRWithActions => {
+    return {
+      id: itr.id,
+      name: itr.name,
+      subsystem_id: itr.subsystem_id,
+      status: itr.status || "inprogress",
+      progress: itr.progress,
+      assigned_to: "",
+      start_date: "",
+      end_date: "",
+      created_at: itr.created_at,
+      updated_at: itr.updated_at,
+      quantity: itr.quantity,
+      subsystemName: itr.subsystemName,
+      systemName: itr.systemName,
+      projectName: itr.projectName,
+      actions: {
+        canEdit: true,
+        canDelete: true,
+      }
+    };
+  };
 
-  const columns = [
-    {
-      header: "Nombre ITR",
-      accessorKey: "name" as keyof ITRWithActions,
-    },
-    {
-      header: "Subsistema",
-      accessorKey: "subsystemName" as keyof ITRWithActions,
-    },
-    {
-      header: "Sistema",
-      accessorKey: "systemName" as keyof ITRWithActions,
-      cell: (item: ITRWithActions) => <span>{item.systemName || 'No disponible'}</span>,
-    },
-    {
-      header: "Asignado a",
-      accessorKey: "assigned_to" as keyof ITRWithActions,
-      cell: (item: ITRWithActions) => <span>{item.assigned_to || 'No Asignado'}</span>,
-    },
-    {
-      header: "Fecha Inicio",
-      accessorKey: "start_date" as keyof ITRWithActions,
-      cell: (item: ITRWithActions) => <span>{item.start_date ? new Date(item.start_date).toLocaleDateString('es-ES') : 'Sin Fecha'}</span>,
-    },
-    {
-      header: "Fecha Límite",
-      accessorKey: "end_date" as keyof ITRWithActions,
-      cell: (item: ITRWithActions) => <span>{item.end_date ? new Date(item.end_date).toLocaleDateString('es-ES') : 'Sin Fecha'}</span>,
-    },
-    {
-      header: "Estado",
-      accessorKey: "status" as keyof ITRWithActions,
-      cell: (item: ITRWithActions) => <StatusBadge status={item.status} />,
-    },
-    {
-      header: "Progreso",
-      accessorKey: "progress" as keyof ITRWithActions,
-      cell: (item: ITRWithActions) => (
-        <div className="w-full bg-secondary/10 rounded-full h-2.5">
-          <div
-            className={`h-2.5 rounded-full ${
-              item.status === "complete"
-                ? "bg-status-complete"
-                : item.status === "delayed"
-                ? "bg-status-delayed"
-                : "bg-status-inprogress"
-            }`}
-            style={{ width: `${item.progress || 0}%` }}
-          ></div>
-        </div>
-      ),
-    },
-    {
-      header: "Acciones",
-      accessorKey: "id" as keyof ITRWithActions, // Use id instead of actions
-      cell: (item: ITRWithActions) => (
-        <div className="flex items-center space-x-2">
-          <Button 
-            variant="outline" 
-            size="sm" 
-            className="h-8 px-2 text-xs"
-            onClick={(e) => {
-              e.stopPropagation();
-              handleMarkComplete(item);
-            }}
-            disabled={item.status === "complete" || markingComplete === item.id}
-          >
-            {markingComplete === item.id ? (
-              <div className="animate-spin h-4 w-4 border-2 border-current border-t-transparent rounded-full" />
-            ) : (
-              <>
-                <CheckCircle2 className="h-4 w-4 mr-1" />
-                <span>Completar</span>
-              </>
-            )}
-          </Button>
-        </div>
-      ),
+  const handleSort = (field: string) => {
+    if (sortField === field) {
+      setSortDirection(sortDirection === "asc" ? "desc" : "asc");
+    } else {
+      setSortField(field);
+      setSortDirection("asc");
     }
-  ];
+  };
 
-  // Apply all active filters
-  const filteredITRs = itrs.filter(itr => {
-    // Status filter
-    if (statusFilter !== "all" && itr.status !== statusFilter) {
-      return false;
-    }
-    
-    // System filter
-    if (systemFilter !== "all" && itr.systemName !== systemFilter) {
-      return false;
-    }
-    
-    // Subsystem filter
-    if (subsystemFilter !== "all" && itr.subsystemName !== subsystemFilter) {
-      return false;
-    }
-    
-    return true;
-  });
-
-  const handleMarkComplete = async (itr: ITRWithDetails) => {
-    setMarkingComplete(itr.id);
+  const handleDelete = async (id: string) => {
     try {
-      await updateITR(itr.id, {
-        status: "complete",
-        progress: 100
-      });
-      
+      await deleteITR(id);
       toast({
-        title: "ITR completado",
-        description: `${itr.name} ha sido marcado como completado`,
+        title: "Success",
+        description: "ITR deleted successfully",
       });
-      
       onRefresh();
     } catch (error) {
-      console.error("Error al marcar como completado:", error);
+      console.error("Error deleting ITR:", error);
       toast({
         title: "Error",
-        description: "No se pudo marcar el ITR como completado",
-        variant: "destructive"
+        description: "Failed to delete ITR",
+        variant: "destructive",
       });
-    } finally {
-      setMarkingComplete(null);
     }
   };
 
-  const handleEditITR = (itr: ITRWithDetails) => {
-    setSelectedITR(itr);
-    setShowModal(true);
-  };
-
-  const handleDeleteITR = async (itr: ITRWithDetails) => {
-    if (confirm(`¿Está seguro que desea eliminar ${itr.name}?`)) {
-      try {
-        await deleteITR(itr.id);
-        toast({
-          title: "ITR eliminado",
-          description: "El ITR ha sido eliminado correctamente",
-        });
-        onRefresh();
-      } catch (error) {
-        console.error("Error al eliminar ITR:", error);
-        toast({
-          title: "Error",
-          description: "No se pudo eliminar el ITR",
-          variant: "destructive"
-        });
-      }
+  const handleEdit = (itr: ITRWithActions | ITRWithDetails) => {
+    if ('actions' in itr) {
+      setSelectedITR(itr);
+    } else {
+      setSelectedITR(convertToITRWithActions(itr));
     }
+    setIsEditModalOpen(true);
   };
 
-  const handleNewITR = () => {
-    setSelectedITR(undefined);
-    setShowModal(true);
-  };
+  // Filter ITRs based on search term
+  const filteredITRs = itrs.filter((itr) => {
+    const searchLower = searchTerm.toLowerCase();
+    const name = 'name' in itr ? itr.name?.toLowerCase() : '';
+    const subsystemName = itr.subsystemName?.toLowerCase() || '';
+    const systemName = itr.systemName?.toLowerCase() || '';
+    const projectName = itr.projectName?.toLowerCase() || '';
+    const status = 'status' in itr ? itr.status?.toLowerCase() : '';
+    const assignedTo = 'assigned_to' in itr ? itr.assigned_to?.toLowerCase() : '';
 
-  const handleModalClose = () => {
-    setShowModal(false);
-    setSelectedITR(undefined);
-  };
+    return (
+      name?.includes(searchLower) ||
+      subsystemName?.includes(searchLower) ||
+      systemName?.includes(searchLower) ||
+      projectName?.includes(searchLower) ||
+      status?.includes(searchLower) ||
+      assignedTo?.includes(searchLower)
+    );
+  });
 
-  const handleModalSuccess = () => {
-    onRefresh();
-    setShowModal(false);
-    setSelectedITR(undefined);
-  };
+  // Sort ITRs
+  const sortedITRs = [...filteredITRs].sort((a, b) => {
+    let aValue: any = 'name' in a ? a[sortField as keyof ITRWithActions] : null;
+    let bValue: any = 'name' in b ? b[sortField as keyof ITRWithActions] : null;
 
-  // Get unique system and subsystem names for filters
-  const uniqueSystems = Array.from(new Set(itrs.map(itr => itr.systemName))).filter(Boolean);
-  const uniqueSubsystems = Array.from(new Set(itrs.map(itr => itr.subsystemName))).filter(Boolean);
+    // Handle special cases
+    if (sortField === "subsystemName") {
+      aValue = a.subsystemName || "";
+      bValue = b.subsystemName || "";
+    } else if (sortField === "systemName") {
+      aValue = a.systemName || "";
+      bValue = b.systemName || "";
+    } else if (sortField === "projectName") {
+      aValue = a.projectName || "";
+      bValue = b.projectName || "";
+    }
 
-  if (!selectedProjectId) {
+    // Handle undefined values
+    if (aValue === undefined) aValue = "";
+    if (bValue === undefined) bValue = "";
+
+    // Compare
+    if (aValue < bValue) return sortDirection === "asc" ? -1 : 1;
+    if (aValue > bValue) return sortDirection === "asc" ? 1 : -1;
+    return 0;
+  });
+
+  if (loading) {
     return (
       <Card>
-        <CardHeader>
-          <CardTitle>Seleccione un proyecto</CardTitle>
-          <CardDescription>
-            Por favor seleccione un proyecto para ver y gestionar sus ITRs
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <p>Para gestionar ITRs, primero seleccione un proyecto de la lista desplegable en la parte superior.</p>
+        <CardContent className="p-6">
+          <div className="space-y-4">
+            <Skeleton className="h-8 w-full" />
+            <Skeleton className="h-8 w-full" />
+            <Skeleton className="h-8 w-full" />
+          </div>
         </CardContent>
       </Card>
     );
   }
 
+  const renderStatusBadge = (status: string) => {
+    const statusMap: Record<string, { label: string; variant: "default" | "secondary" | "destructive" | "outline" }> = {
+      complete: { label: "Completado", variant: "default" },
+      inprogress: { label: "En progreso", variant: "secondary" },
+      delayed: { label: "Retrasado", variant: "destructive" },
+    };
+
+    const statusInfo = statusMap[status] || { label: status, variant: "outline" };
+
+    return (
+      <Badge variant={statusInfo.variant}>{statusInfo.label}</Badge>
+    );
+  };
+
   return (
-    <>
-      <div className="flex justify-between items-center mb-4">
+    <Card>
+      <CardHeader className="flex flex-row items-center justify-between">
+        <CardTitle>ITRs</CardTitle>
         <div className="flex space-x-2">
-          {/* Status Filter */}
-          <div className="w-[180px]">
-            <Select
-              value={statusFilter}
-              onValueChange={setStatusFilter}
-            >
-              <SelectTrigger>
-                <SelectValue placeholder="Filtrar por estado" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Todos los estados</SelectItem>
-                <SelectItem value="complete">Completado</SelectItem>
-                <SelectItem value="inprogress">En Progreso</SelectItem>
-                <SelectItem value="delayed">Retrasado</SelectItem>
-              </SelectContent>
-            </Select>
+          <div className="relative">
+            <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+            <Input
+              type="search"
+              placeholder="Search ITRs..."
+              className="w-[200px] pl-8"
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+            />
           </div>
-          
-          {/* System Filter */}
-          <div className="w-[180px]">
-            <Select
-              value={systemFilter}
-              onValueChange={setSystemFilter}
-            >
-              <SelectTrigger>
-                <SelectValue placeholder="Filtrar por sistema" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Todos los sistemas</SelectItem>
-                {uniqueSystems.map((system, index) => (
-                  <SelectItem key={index} value={system as string}>
-                    {system}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-          
-          {/* Subsystem Filter */}
-          <div className="w-[180px]">
-            <Select
-              value={subsystemFilter}
-              onValueChange={setSubsystemFilter}
-            >
-              <SelectTrigger>
-                <SelectValue placeholder="Filtrar por subsistema" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Todos los subsistemas</SelectItem>
-                {uniqueSubsystems.map((subsystem, index) => (
-                  <SelectItem key={index} value={subsystem as string}>
-                    {subsystem}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-        </div>
-        
-        <div className="flex space-x-2">
-          <Button onClick={handleNewITR}>
-            <Plus className="h-4 w-4 mr-2" />
-            Nuevo ITR
-          </Button>
-          <Button onClick={onAddSampleData} variant="outline" disabled={addingSampleData}>
-            <Database className="h-4 w-4 mr-2" />
-            {addingSampleData ? "Añadiendo datos..." : "Añadir datos de muestra"}
-          </Button>
-        </div>
-      </div>
-
-      {loading ? (
-        <Card>
-          <CardContent className="py-10">
-            <div className="flex justify-center items-center">
-              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
-            </div>
-          </CardContent>
-        </Card>
-      ) : filteredITRs.length === 0 ? (
-        <Card>
-          <CardHeader>
-            <CardTitle>No hay ITRs</CardTitle>
-            <CardDescription>
-              No se encontraron registros de inspección para el proyecto seleccionado
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <p>Puede crear un nuevo ITR usando el botón "Nuevo ITR" o importar datos desde la página de configuración.</p>
-            <p className="mt-4">También puede utilizar el botón "Añadir datos de muestra" para generar ITRs de ejemplo.</p>
-          </CardContent>
-        </Card>
-      ) : (
-        <DataTable
-          data={filteredITRs}
-          columns={columns}
-          onEdit={handleEditITR}
-          onDelete={handleDeleteITR}
-          loading={loading}
-        />
-      )}
-
-      {showModal && (
-        <ITRFormModal
-          open={showModal}
-          onClose={handleModalClose}
-          onSuccess={handleModalSuccess}
-          itr={selectedITR}
-          subsystems={subsystems.filter(subsystem => 
-            systems.some(system => system.id === subsystem.system_id)
+          {onOpenModal && (
+            <Button onClick={onOpenModal} disabled={!selectedProjectId}>
+              <Plus className="mr-2 h-4 w-4" /> Add ITR
+            </Button>
           )}
+        </div>
+      </CardHeader>
+      <CardContent className="p-0">
+        {sortedITRs.length === 0 ? (
+          <div className="flex flex-col items-center justify-center p-8 text-center">
+            <p className="text-muted-foreground">No ITRs found</p>
+            {selectedProjectId && onOpenModal && (
+              <Button variant="outline" className="mt-4" onClick={onOpenModal}>
+                <Plus className="mr-2 h-4 w-4" /> Add your first ITR
+              </Button>
+            )}
+          </div>
+        ) : (
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead 
+                  className="cursor-pointer"
+                  onClick={() => handleSort("name")}
+                >
+                  Name <ArrowUpDown className="ml-2 h-4 w-4 inline" />
+                </TableHead>
+                {!filterBySubsystem && (
+                  <>
+                    <TableHead 
+                      className="cursor-pointer"
+                      onClick={() => handleSort("subsystemName")}
+                    >
+                      Subsystem <ArrowUpDown className="ml-2 h-4 w-4 inline" />
+                    </TableHead>
+                    <TableHead 
+                      className="cursor-pointer"
+                      onClick={() => handleSort("systemName")}
+                    >
+                      System <ArrowUpDown className="ml-2 h-4 w-4 inline" />
+                    </TableHead>
+                  </>
+                )}
+                <TableHead className="text-right">Status</TableHead>
+                <TableHead className="text-right">Progress</TableHead>
+                <TableHead className="text-right">Actions</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {sortedITRs.map((itr) => (
+                <TableRow key={'id' in itr ? itr.id : ''}>
+                  <TableCell className="font-medium">{'name' in itr ? itr.name : ''}</TableCell>
+                  {!filterBySubsystem && (
+                    <>
+                      <TableCell>{itr.subsystemName || "—"}</TableCell>
+                      <TableCell>{itr.systemName || "—"}</TableCell>
+                    </>
+                  )}
+                  <TableCell className="text-right">
+                    {renderStatusBadge('status' in itr ? itr.status : 'inprogress')}
+                  </TableCell>
+                  <TableCell className="text-right">
+                    {'progress' in itr ? `${itr.progress || 0}%` : '0%'}
+                  </TableCell>
+                  <TableCell className="text-right">
+                    <div className="flex justify-end space-x-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => handleEdit(itr)}
+                      >
+                        <Edit className="h-4 w-4" />
+                      </Button>
+                      <AlertDialog>
+                        <AlertDialogTrigger asChild>
+                          <Button variant="outline" size="sm">
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </AlertDialogTrigger>
+                        <AlertDialogContent>
+                          <AlertDialogHeader>
+                            <AlertDialogTitle>Delete ITR</AlertDialogTitle>
+                            <AlertDialogDescription>
+                              Are you sure you want to delete this ITR? This action cannot be undone.
+                            </AlertDialogDescription>
+                          </AlertDialogHeader>
+                          <AlertDialogFooter>
+                            <AlertDialogCancel>Cancel</AlertDialogCancel>
+                            <AlertDialogAction
+                              onClick={() => handleDelete('id' in itr ? itr.id : '')}
+                              className="bg-red-600 hover:bg-red-700"
+                            >
+                              Delete
+                            </AlertDialogAction>
+                          </AlertDialogFooter>
+                        </AlertDialogContent>
+                      </AlertDialog>
+                    </div>
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        )}
+      </CardContent>
+      
+      {/* Edit Modal */}
+      {selectedITR && (
+        <ITRFormModal
+          open={isEditModalOpen}
+          onClose={() => setIsEditModalOpen(false)}
+          itr={selectedITR}
+          systems={systems || []}
+          subsystems={subsystems || []}
+          onSuccess={() => {
+            setIsEditModalOpen(false);
+            onRefresh();
+          }}
         />
       )}
-    </>
+    </Card>
   );
 };

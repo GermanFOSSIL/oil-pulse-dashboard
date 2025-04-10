@@ -1,6 +1,7 @@
+
 import { useState, useEffect } from "react";
 import { getSubsystems, getSystemsByProjectId } from "@/services/supabaseService";
-import { Subsystem, System } from "@/services/types"; // Updated import
+import { Subsystem, System } from "@/services/types";
 import { ProjectSelector } from "@/components/ProjectSelector";
 import { SubsystemList } from "@/components/subsystem/SubsystemList";
 import { SubsystemFormModal } from "@/components/modals/SubsystemFormModal";
@@ -107,11 +108,10 @@ const Subsystems = () => {
       )}
 
       <SubsystemFormModal
-        isOpen={isModalOpen}
+        open={isModalOpen}
         onClose={() => setIsModalOpen(false)}
         onSuccess={fetchData}
         systems={systems}
-        selectedProjectId={selectedProjectId}
       />
     </div>
   );

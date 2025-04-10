@@ -79,11 +79,13 @@ export interface Subsystem {
   updated_at: string;
 }
 
+export type StatusType = "complete" | "inprogress" | "delayed" | string;
+
 export interface ITR {
   id: string;
   name: string;
   subsystem_id: string;
-  status: string;
+  status: StatusType;
   progress?: number;
   assigned_to?: string;
   start_date?: string;

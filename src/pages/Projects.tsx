@@ -1,9 +1,10 @@
+
 import { useState, useEffect } from "react";
 import { ProjectList } from "@/components/project/ProjectList";
 import { ProjectFormModal } from "@/components/modals/ProjectFormModal";
 import { useToast } from "@/hooks/use-toast";
 import { getProjects } from "@/services/projectService";
-import { Project } from "@/services/types"; // Updated import
+import { Project } from "@/services/types";
 
 const Projects = () => {
   const [projects, setProjects] = useState<Project[]>([]);
@@ -86,11 +87,10 @@ const Projects = () => {
       />
       <ProjectFormModal
         open={isFormModalOpen}
-        onOpenChange={setIsFormModalOpen}
+        onClose={handleCloseModal}
         project={selectedProject}
         onProjectCreated={handleProjectCreated}
         onProjectUpdated={handleProjectUpdated}
-        onClose={handleCloseModal}
       />
     </div>
   );

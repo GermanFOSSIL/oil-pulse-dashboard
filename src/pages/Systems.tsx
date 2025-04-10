@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { ProjectSelector } from "@/components/ProjectSelector";
 import { SystemList } from "@/components/system/SystemList";
@@ -5,8 +6,7 @@ import { SystemFormModal } from "@/components/modals/SystemFormModal";
 import { useToast } from "@/hooks/use-toast";
 import { getSystems, getSystemsByProjectId } from "@/services/supabaseService";
 import { getProjects } from "@/services/projectService";
-import { Project, System } from "@/services/types"; // Updated import
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Project, System } from "@/services/types";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { AlertCircle } from "lucide-react";
 
@@ -107,7 +107,7 @@ const Systems = () => {
       />
 
       <SystemFormModal
-        isOpen={isSystemFormModalOpen}
+        open={isSystemFormModalOpen}
         onClose={() => setIsSystemFormModalOpen(false)}
         projects={projects}
         onSuccess={() => {
