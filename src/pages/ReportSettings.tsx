@@ -52,12 +52,10 @@ const ReportSettings = () => {
     monthly: { enabled: false, time: "07:00", day: "1" }
   });
 
-  // Fetch report settings
   useEffect(() => {
     const fetchSettings = async () => {
       setLoading(true);
       try {
-        // Fetch email recipients
         const { data: recipientsData, error: recipientsError } = await supabase
           .from("report_recipients")
           .select("*");
@@ -66,18 +64,15 @@ const ReportSettings = () => {
           throw recipientsError;
         }
 
-        // Fetch schedule settings
         const { data: scheduleData, error: scheduleError } = await supabase
           .from("report_schedule")
           .select("*")
           .single();
 
         if (scheduleError && scheduleError.code !== "PGRST116") {
-          // PGRST116 is "no rows returned" which is fine for default settings
           throw scheduleError;
         }
 
-        // Set recipients
         if (recipientsData) {
           const typedRecipients: EmailRecipient[] = recipientsData.map(recipient => ({
             id: recipient.id,
@@ -86,14 +81,11 @@ const ReportSettings = () => {
           setRecipients(typedRecipients);
         }
 
-        // Set schedule - Fix for the error in line 92
         if (scheduleData && scheduleData.settings) {
-          // Make sure settings is properly typed
           const settingsObj = typeof scheduleData.settings === 'string' 
             ? JSON.parse(scheduleData.settings) 
             : scheduleData.settings;
             
-          // Ensure we have a valid schedule structure
           const validatedSettings: ReportScheduleSettings = {
             daily: {
               enabled: settingsObj.daily?.enabled || false,
@@ -128,7 +120,6 @@ const ReportSettings = () => {
     fetchSettings();
   }, [toast]);
 
-  // Add a new email recipient
   const addRecipient = async () => {
     if (!newEmail.trim() || !isValidEmail(newEmail)) {
       toast({
@@ -141,7 +132,6 @@ const ReportSettings = () => {
 
     setSaving(true);
     try {
-      // Check if email already exists
       if (recipients.some(r => r.email === newEmail.trim())) {
         toast({
           title: "Error",
@@ -151,7 +141,6 @@ const ReportSettings = () => {
         return;
       }
 
-      // Add to database
       const { data, error } = await supabase
         .from("report_recipients")
         .insert({ email: newEmail.trim() })
@@ -159,7 +148,6 @@ const ReportSettings = () => {
 
       if (error) throw error;
 
-      // Update local state
       if (data && data.length > 0) {
         const newRecipient: EmailRecipient = {
           id: data[0].id,
@@ -185,7 +173,6 @@ const ReportSettings = () => {
     }
   };
 
-  // Remove an email recipient
   const removeRecipient = async (id: string) => {
     setSaving(true);
     try {
@@ -196,7 +183,6 @@ const ReportSettings = () => {
 
       if (error) throw error;
 
-      // Update local state
       setRecipients(recipients.filter(r => r.id !== id));
       toast({
         title: "Éxito",
@@ -214,16 +200,16 @@ const ReportSettings = () => {
     }
   };
 
-  // Update schedule settings - Fix for the error in line 202
   const updateSchedule = async () => {
     setSaving(true);
     try {
-      // Fix the upsert call structure
+      const settingsJson = JSON.stringify(schedule);
+      
       const { error } = await supabase
         .from("report_schedule")
         .upsert({ 
-          id: '1', // Use a string instead of a number
-          settings: schedule,
+          id: '1',
+          settings: settingsJson,
           updated_at: new Date().toISOString()
         });
 
@@ -245,12 +231,10 @@ const ReportSettings = () => {
     }
   };
 
-  // Validate email format
   const isValidEmail = (email: string) => {
     return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
   };
 
-  // Handle schedule changes
   const handleScheduleChange = (type: keyof ReportScheduleSettings, field: string, value: any) => {
     setSchedule(prev => ({
       ...prev,
@@ -301,7 +285,6 @@ const ReportSettings = () => {
           <TabsTrigger value="preview">Vista Previa</TabsTrigger>
         </TabsList>
 
-        {/* Email Recipients Tab */}
         <TabsContent value="recipients" className="space-y-4">
           <Card>
             <CardHeader>
@@ -364,10 +347,8 @@ const ReportSettings = () => {
           </Card>
         </TabsContent>
 
-        {/* Schedule Tab */}
         <TabsContent value="schedule" className="space-y-4">
           <div className="grid gap-4 md:grid-cols-3">
-            {/* Daily Report Schedule */}
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
@@ -401,7 +382,6 @@ const ReportSettings = () => {
               </CardContent>
             </Card>
 
-            {/* Weekly Report Schedule */}
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
@@ -454,7 +434,6 @@ const ReportSettings = () => {
               </CardContent>
             </Card>
 
-            {/* Monthly Report Schedule */}
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
@@ -523,7 +502,6 @@ const ReportSettings = () => {
           </div>
         </TabsContent>
 
-        {/* Preview Tab */}
         <TabsContent value="preview" className="space-y-4">
           <Card>
             <CardHeader>
