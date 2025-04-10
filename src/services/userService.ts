@@ -1,3 +1,4 @@
+
 import { supabase } from "@/integrations/supabase/client";
 import { BulkUserData, UserCreateData, UserUpdateData, PasswordChangeData } from "@/services/types";
 
@@ -144,7 +145,7 @@ export const getUserProfiles = async (): Promise<UserProfile[]> => {
             .update({ email, updated_at: new Date().toISOString() })
             .eq('id', profile.id)
             .then(() => console.log(`Synced email for user ${profile.id}`))
-            .catch(err => console.error(`Failed to sync email for user ${profile.id}:`, err));
+            .catch(error => console.error(`Failed to sync email for user ${profile.id}:`, error));
         }
         
         return {

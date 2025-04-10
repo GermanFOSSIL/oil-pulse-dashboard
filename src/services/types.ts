@@ -1,4 +1,3 @@
-
 export type Project = {
   id: string;
   created_at: string;
@@ -65,6 +64,7 @@ export type Profile = {
   avatar_url: string | null;
   role: string | null;
   permissions?: string[] | null;
+  email?: string | null; // Added email field to Profile type
 };
 
 export type BulkUserData = {
