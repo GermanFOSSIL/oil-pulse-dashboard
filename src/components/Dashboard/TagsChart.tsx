@@ -1,148 +1,108 @@
 
-import React, { useState } from 'react';
+import React from 'react';
 import { 
   ResponsiveContainer, 
   PieChart, 
   Pie, 
   Cell, 
-  Legend, 
-  Tooltip,
-  Sector
+  Tooltip, 
+  Legend 
 } from 'recharts';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { CalendarIcon, Download } from 'lucide-react';
-import { Button } from "@/components/ui/button";
-import { format, startOfMonth } from 'date-fns';
-import { es } from 'date-fns/locale';
+import { Tag } from 'lucide-react';
 
-type TagsChartProps = {
-  data: any[];
+interface TagsChartProps {
+  data: { name: string; value: number; }[];
   className?: string;
-  onExport?: () => void;
-};
+}
 
-const COLORS = ['#22c55e', '#F97316', '#ef4444', '#0EA5E9'];
+const COLORS = ['#10B981', '#F97316']; // Green for released, Orange for pending
+const RADIAN = Math.PI / 180;
 
-export const TagsChart = ({ data, className = "", onExport }: TagsChartProps) => {
-  const [activeIndex, setActiveIndex] = useState(0);
-
-  // Current month date range
-  const startDate = startOfMonth(new Date());
-  const endDate = new Date();
-  const dateRange = `${format(startDate, 'dd MMM', { locale: es })} - ${format(endDate, 'dd MMM yyyy', { locale: es })}`;
-
-  const onPieEnter = (_: any, index: number) => {
-    setActiveIndex(index);
-  };
-
-  const renderActiveShape = (props: any) => {
-    const RADIAN = Math.PI / 180;
-    const { 
-      cx, cy, midAngle, innerRadius, outerRadius, startAngle, endAngle, 
-      fill, payload, percent, value 
-    } = props;
-    
-    const sin = Math.sin(-RADIAN * midAngle);
-    const cos = Math.cos(-RADIAN * midAngle);
-    const sx = cx + (outerRadius + 10) * cos;
-    const sy = cy + (outerRadius + 10) * sin;
-    const mx = cx + (outerRadius + 30) * cos;
-    const my = cy + (outerRadius + 30) * sin;
-    const ex = mx + (cos >= 0 ? 1 : -1) * 22;
-    const ey = my;
-    const textAnchor = cos >= 0 ? 'start' : 'end';
+const TagsChart: React.FC<TagsChartProps> = ({ data, className = "" }) => {
+  // Custom label for the pie chart
+  const renderCustomizedLabel = ({ cx, cy, midAngle, innerRadius, outerRadius, percent, index }: any) => {
+    const radius = innerRadius + (outerRadius - innerRadius) * 0.5;
+    const x = cx + radius * Math.cos(-midAngle * RADIAN);
+    const y = cy + radius * Math.sin(-midAngle * RADIAN);
 
     return (
-      <g>
-        <text x={cx} y={cy} dy={8} textAnchor="middle" fill={fill} className="text-sm font-medium">
-          {payload.name}
-        </text>
-        <Sector
-          cx={cx}
-          cy={cy}
-          innerRadius={innerRadius}
-          outerRadius={outerRadius}
-          startAngle={startAngle}
-          endAngle={endAngle}
-          fill={fill}
-        />
-        <Sector
-          cx={cx}
-          cy={cy}
-          startAngle={startAngle}
-          endAngle={endAngle}
-          innerRadius={outerRadius + 6}
-          outerRadius={outerRadius + 10}
-          fill={fill}
-        />
-        <path d={`M${sx},${sy}L${mx},${my}L${ex},${ey}`} stroke={fill} fill="none" />
-        <circle cx={ex} cy={ey} r={2} fill={fill} stroke="none" />
-        <text x={ex + (cos >= 0 ? 1 : -1) * 12} y={ey} textAnchor={textAnchor} fill="#333" className="text-xs">
-          {`${value}`}
-        </text>
-        <text x={ex + (cos >= 0 ? 1 : -1) * 12} y={ey} dy={18} textAnchor={textAnchor} fill="#999" className="text-xs">
-          {`(${(percent * 100).toFixed(2)}%)`}
-        </text>
-      </g>
+      <text 
+        x={x} 
+        y={y} 
+        fill="white" 
+        textAnchor={x > cx ? 'start' : 'end'} 
+        dominantBaseline="central"
+        fontSize="12"
+        fontWeight="bold"
+      >
+        {`${(percent * 100).toFixed(0)}%`}
+      </text>
     );
   };
 
+  const CustomTooltip = ({ active, payload }: any) => {
+    if (active && payload && payload.length) {
+      return (
+        <div className="bg-white p-2 border shadow-sm rounded-md">
+          <p className="font-semibold">{payload[0].name}</p>
+          <p className="text-sm">Cantidad: {payload[0].value}</p>
+          <p className="text-sm">Porcentaje: {((payload[0].value / data.reduce((sum, item) => sum + item.value, 0)) * 100).toFixed(1)}%</p>
+        </div>
+      );
+    }
+    return null;
+  };
+
+  const total = data.reduce((sum, item) => sum + item.value, 0);
+
   return (
     <Card className={`overflow-hidden ${className}`}>
-      <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-        <div>
-          <CardTitle>Estado de Tags</CardTitle>
-          <CardDescription className="flex items-center mt-1 text-xs">
-            <CalendarIcon className="h-3 w-3 mr-1" />
-            {dateRange}
-          </CardDescription>
+      <CardHeader className="pb-2">
+        <div className="flex items-center justify-between">
+          <CardTitle className="flex items-center gap-2">
+            <Tag className="h-5 w-5" />
+            <span>Estado de Tags</span>
+          </CardTitle>
+          <span className="text-sm font-semibold bg-muted px-2 py-1 rounded-md">
+            Total: {total}
+          </span>
         </div>
-        {onExport && (
-          <Button variant="ghost" size="sm" onClick={onExport}>
-            <Download className="h-4 w-4" />
-          </Button>
-        )}
+        <CardDescription>
+          Distribución de tags liberados y pendientes
+        </CardDescription>
       </CardHeader>
-      <CardContent>
+      <CardContent className="pt-2">
         <div className="h-72 w-full">
           <ResponsiveContainer width="100%" height="100%">
             <PieChart>
               <Pie
-                activeIndex={activeIndex}
-                activeShape={renderActiveShape}
                 data={data}
                 cx="50%"
                 cy="50%"
-                innerRadius={60}
-                outerRadius={80}
-                fill="#8884d8"
+                labelLine={false}
+                label={renderCustomizedLabel}
+                outerRadius={90}
+                innerRadius={40}
+                paddingAngle={5}
                 dataKey="value"
-                onMouseEnter={onPieEnter}
               >
                 {data.map((entry, index) => (
-                  <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                  <Cell 
+                    key={`cell-${index}`} 
+                    fill={COLORS[index % COLORS.length]} 
+                    stroke="none"
+                  />
                 ))}
               </Pie>
+              <Tooltip content={<CustomTooltip />} />
               <Legend 
+                layout="horizontal" 
                 verticalAlign="bottom" 
-                height={36}
+                align="center"
                 iconType="circle"
                 iconSize={10}
-                formatter={(value, entry: any, index) => {
-                  const color = COLORS[index % COLORS.length];
-                  return (
-                    <span style={{ color, fontSize: '12px' }}>{value}</span>
-                  );
-                }}
-              />
-              <Tooltip 
-                formatter={(value: number) => [`${value} tags`, '']}
-                contentStyle={{ 
-                  backgroundColor: 'white', 
-                  border: '1px solid #E5E7EB',
-                  borderRadius: '4px',
-                  boxShadow: '0 2px 8px rgba(0,0,0,0.05)'
-                }}
+                wrapperStyle={{ paddingTop: 20 }}
               />
             </PieChart>
           </ResponsiveContainer>
@@ -151,3 +111,5 @@ export const TagsChart = ({ data, className = "", onExport }: TagsChartProps) =>
     </Card>
   );
 };
+
+export { TagsChart };

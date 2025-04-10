@@ -27,6 +27,7 @@ import { KPICard } from "@/components/DashboardWidgets/KPICard";
 import { TestPacksChart } from "@/components/Dashboard/TestPacksChart";
 import { MonthlyEfficiencyChart } from "@/components/Dashboard/MonthlyEfficiencyChart";
 import { TagsChart } from "@/components/Dashboard/TagsChart";
+import { StatsData } from "@/services/types";
 
 // Dashboard skeleton loader
 const DashboardSkeleton = () => (
@@ -94,19 +95,19 @@ const Dashboard = () => {
         { name: 'Retrasados', value: dashboardStats.delayedProjects || 0 }
       ];
       
-      const systemsData = dashboardStats.chartData || [];
+      const systemData = dashboardStats.chartData || [];
       
-      const tagsData = [
-        { name: 'Liberados', value: dashboardStats.tags?.released || 0 },
-        { name: 'Pendientes', value: dashboardStats.tags?.total - (dashboardStats.tags?.released || 0) || 0 }
-      ];
+      const tagsData = dashboardStats.tags ? [
+        { name: 'Liberados', value: dashboardStats.tags.released || 0 },
+        { name: 'Pendientes', value: dashboardStats.tags.total - (dashboardStats.tags.released || 0) || 0 }
+      ] : [];
       
       // Ensure we have monthly data, or generate mock data
       const monthlyData = dashboardStats.areaChartData || generateMonthlyMockData();
       
       setKpiChartData({
         testPacks: testPackData,
-        systems: systemsData,
+        systems: systemData,
         tags: tagsData,
         monthlyActivity: monthlyData
       });
@@ -477,7 +478,6 @@ const Dashboard = () => {
           <ProjectSelector
             onSelectProject={handleSelectProject}
             selectedProjectId={selectedProjectId}
-            className="w-full sm:w-auto"
           />
           <div className="flex gap-2">
             <Button 

@@ -64,7 +64,7 @@ export type Profile = {
   avatar_url: string | null;
   role: string | null;
   permissions?: string[] | null;
-  email?: string | null; // Added email field to Profile type
+  email?: string | null;
 };
 
 export type BulkUserData = {
@@ -81,7 +81,7 @@ export type UserUpdateData = {
   avatar_url?: string;
   role?: string;
   permissions?: string[];
-  email?: string; // Added email field to UserUpdateData
+  email?: string;
 };
 
 export type UserCreateData = {
@@ -97,7 +97,6 @@ export type PasswordChangeData = {
   newPassword: string;
 };
 
-// Test Pack module types
 export type TestPack = {
   id: string;
   created_at: string;
@@ -147,7 +146,6 @@ export type StatsData = {
   itrs: { name: string; value: number; }[];
 };
 
-// Database activity log
 export type DbActivityLog = {
   id: string;
   created_at: string;
