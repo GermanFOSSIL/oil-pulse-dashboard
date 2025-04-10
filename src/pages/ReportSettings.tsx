@@ -17,13 +17,14 @@ import {
 } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { supabase } from "@/integrations/supabase/client";
+import { ReportRecipient, ReportSchedule } from "@/services/types";
 
 interface EmailRecipient {
   id: string;
   email: string;
 }
 
-interface ReportSchedule {
+interface ReportScheduleSettings {
   daily: {
     enabled: boolean;
     time: string;
@@ -46,7 +47,7 @@ const ReportSettings = () => {
   const [saving, setSaving] = useState(false);
   const [recipients, setRecipients] = useState<EmailRecipient[]>([]);
   const [newEmail, setNewEmail] = useState("");
-  const [schedule, setSchedule] = useState<ReportSchedule>({
+  const [schedule, setSchedule] = useState<ReportScheduleSettings>({
     daily: { enabled: false, time: "07:00" },
     weekly: { enabled: false, time: "07:00", day: "monday" },
     monthly: { enabled: false, time: "07:00", day: "1" }
@@ -79,7 +80,11 @@ const ReportSettings = () => {
 
         // Set recipients
         if (recipientsData) {
-          setRecipients(recipientsData);
+          const typedRecipients: EmailRecipient[] = recipientsData.map(recipient => ({
+            id: recipient.id,
+            email: recipient.email
+          }));
+          setRecipients(typedRecipients);
         }
 
         // Set schedule
@@ -134,7 +139,12 @@ const ReportSettings = () => {
 
       // Update local state
       if (data && data.length > 0) {
-        setRecipients([...recipients, data[0]]);
+        const newRecipient: EmailRecipient = {
+          id: data[0].id,
+          email: data[0].email
+        };
+        
+        setRecipients([...recipients, newRecipient]);
         setNewEmail("");
         toast({
           title: "Éxito",
@@ -188,7 +198,11 @@ const ReportSettings = () => {
     try {
       const { error } = await supabase
         .from("report_schedule")
-        .upsert({ id: 1, settings: schedule });
+        .upsert({ 
+          id: 1, 
+          settings: schedule,
+          updated_at: new Date().toISOString()
+        });
 
       if (error) throw error;
 
@@ -214,7 +228,7 @@ const ReportSettings = () => {
   };
 
   // Handle schedule changes
-  const handleScheduleChange = (type: keyof ReportSchedule, field: string, value: any) => {
+  const handleScheduleChange = (type: keyof ReportScheduleSettings, field: string, value: any) => {
     setSchedule(prev => ({
       ...prev,
       [type]: {

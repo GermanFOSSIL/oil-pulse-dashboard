@@ -1,4 +1,3 @@
-
 import { supabase } from "@/integrations/supabase/client";
 import { BulkUserData, UserCreateData, UserUpdateData, PasswordChangeData } from "@/services/types";
 
@@ -483,23 +482,28 @@ export const setRodrigoAsAdmin = async (): Promise<boolean> => {
         }
         
         // Update to admin role with all permissions
-        const { error: updateError } = await supabase
-          .from('profiles')
-          .update({
-            role: 'admin',
-            permissions: AVAILABLE_PERMISSIONS,
-            updated_at: new Date().toISOString()
-          })
-          .eq('id', rodrigoProfile.id);
-        
-        if (updateError) {
+        try {
+          const { error: updateError } = await supabase
+            .from('profiles')
+            .update({
+              role: 'admin',
+              permissions: AVAILABLE_PERMISSIONS,
+              updated_at: new Date().toISOString()
+            })
+            .eq('id', rodrigoProfile.id);
+          
+          if (updateError) {
+            console.error("Error updating Rodrigo to admin:", updateError);
+            resolve(false);
+            return;
+          }
+          
+          console.log("Successfully set Rodrigo Peredo as admin with all permissions");
+          resolve(true);
+        } catch (updateError) {
           console.error("Error updating Rodrigo to admin:", updateError);
           resolve(false);
-          return;
         }
-        
-        console.log("Successfully set Rodrigo Peredo as admin with all permissions");
-        resolve(true);
       } catch (error) {
         console.error("Error in setRodrigoAsAdmin:", error);
         resolve(false);

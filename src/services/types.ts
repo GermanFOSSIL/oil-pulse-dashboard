@@ -157,3 +157,42 @@ export type DbActivityLog = {
   details: any;
   user_id: string | null;
 };
+
+// Add GanttTask type for the EnhancedGanttChart component
+export type GanttTask = {
+  id: string;
+  task: string;
+  start: string;
+  end: string;
+  progress: number;
+  dependencies: string;
+};
+
+// Add missing table types for TypeScript type safety
+export type ReportRecipient = {
+  id: string;
+  email: string;
+  created_at?: string;
+};
+
+export type ReportSchedule = {
+  id: string;
+  settings: {
+    daily: {
+      enabled: boolean;
+      time: string;
+    };
+    weekly: {
+      enabled: boolean;
+      time: string;
+      day: string;
+    };
+    monthly: {
+      enabled: boolean;
+      time: string;
+      day: string;
+    };
+  };
+  created_at?: string;
+  updated_at?: string;
+};

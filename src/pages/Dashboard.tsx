@@ -15,6 +15,7 @@ import html2canvas from 'html2canvas';
 import jsPDF from 'jspdf';
 import 'jspdf-autotable';
 import { getDashboardStats, getDashboardChartsData } from "@/services/dashboardService";
+import { GanttTask } from "@/services/types";
 
 const Dashboard = () => {
   const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null);
@@ -24,6 +25,7 @@ const Dashboard = () => {
   const [testPacksData, setTestPacksData] = useState<any[]>([]);
   const [tagsData, setTagsData] = useState<any[]>([]);
   const [activeTab, setActiveTab] = useState("overview");
+  const [ganttTasks, setGanttTasks] = useState<GanttTask[]>([]);
 
   useEffect(() => {
     const fetchStats = async () => {
@@ -31,6 +33,11 @@ const Dashboard = () => {
       try {
         const dashboardStats = await getDashboardStats(selectedProjectId);
         setStats(dashboardStats);
+        
+        // Set gantt data
+        if (dashboardStats?.ganttData) {
+          setGanttTasks(dashboardStats.ganttData);
+        }
         
         // Fetch chart data
         const chartsData = await getDashboardChartsData(selectedProjectId);
@@ -40,12 +47,10 @@ const Dashboard = () => {
           setMonthlyData(chartsData.monthlyData || []);
           
           // Set test packs chart data
-          let testPacksSystemData = chartsData.systemsData || [];
-          setTestPacksData(testPacksSystemData);
+          setTestPacksData(chartsData.systemsData || []);
           
           // Set tags data
-          let tagsChartData = chartsData.tagsData || [];
-          setTagsData(tagsChartData);
+          setTagsData(chartsData.tagsData || []);
         }
       } catch (error) {
         console.error("Error fetching dashboard data:", error);
@@ -279,9 +284,9 @@ const Dashboard = () => {
                 <CardTitle>Cronograma de Proyectos</CardTitle>
               </CardHeader>
               <CardContent>
-                {!isLoading && stats?.ganttData ? (
+                {!isLoading && ganttTasks.length > 0 ? (
                   <EnhancedGanttChart 
-                    tasks={stats.ganttData} 
+                    tasks={ganttTasks} 
                     height={500} 
                   />
                 ) : (
