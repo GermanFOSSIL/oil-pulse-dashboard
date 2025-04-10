@@ -1,607 +1,360 @@
 import { useState, useEffect } from "react";
-import { useToast } from "@/hooks/use-toast";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
-import { 
-  Clock, 
-  Mail, 
-  Save, 
-  AlertTriangle,
-  Calendar,
-  RefreshCw,
-  Trash2
-} from "lucide-react";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Label } from "@/components/ui/label";
+import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
-import { ReportRecipient, ReportSchedule } from "@/services/types";
+import { 
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue
+} from "@/components/ui/select";
+import { 
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow
+} from "@/components/ui/table";
+import { PlusCircle, Trash2, Send, InfoIcon } from "lucide-react";
+import { ReportScheduleSettings, EmailRecipient } from "@/services/types";
 
-interface EmailRecipient {
-  id: string;
-  email: string;
-}
+interface ReportSettingsProps {}
 
-interface ReportScheduleSettings {
-  daily: {
-    enabled: boolean;
-    time: string;
-  };
-  weekly: {
-    enabled: boolean;
-    time: string;
-    day: string;
-  };
-  monthly: {
-    enabled: boolean;
-    time: string;
-    day: string;
-  };
-}
-
-const ReportSettings = () => {
-  const { toast } = useToast();
-  const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
-  const [recipients, setRecipients] = useState<EmailRecipient[]>([]);
-  const [newEmail, setNewEmail] = useState("");
-  const [schedule, setSchedule] = useState<ReportScheduleSettings>({
-    daily: { enabled: false, time: "07:00" },
-    weekly: { enabled: false, time: "07:00", day: "monday" },
-    monthly: { enabled: false, time: "07:00", day: "1" }
+const ReportSettings: React.FC<ReportSettingsProps> = () => {
+  const [scheduleSettings, setScheduleSettings] = useState<ReportScheduleSettings>({
+    daily: { time: '08:00', enabled: false },
+    weekly: { day: 'monday', time: '08:00', enabled: false },
+    monthly: { day: '1', time: '08:00', enabled: false },
   });
+  const [recipients, setRecipients] = useState<EmailRecipient[]>([]);
+  const [newRecipientEmail, setNewRecipientEmail] = useState("");
+  const [loading, setLoading] = useState(true);
+  const [isSaving, setIsSaving] = useState(false);
+  const { toast } = useToast();
+  
+  const daysOfWeek = [
+    { value: 'monday', label: 'Lunes' },
+    { value: 'tuesday', label: 'Martes' },
+    { value: 'wednesday', label: 'Miércoles' },
+    { value: 'thursday', label: 'Jueves' },
+    { value: 'friday', label: 'Viernes' },
+    { value: 'saturday', label: 'Sábado' },
+    { value: 'sunday', label: 'Domingo' },
+  ];
+  
+  const handleScheduleChange = (type: keyof ReportScheduleSettings, field: string, value: any) => {
+    setScheduleSettings(prev => ({
+      ...prev,
+      [type]: {
+        ...prev[type],
+        [field]: value,
+      },
+    }));
+  };
+  
+  const handleAddRecipient = async () => {
+    if (!newRecipientEmail) return;
+    
+    try {
+      setIsSaving(true);
+      const { data, error } = await supabase
+        .from('report_recipients')
+        .insert([{ email: newRecipientEmail }])
+        .select();
+      
+      if (error) throw error;
+      
+      setRecipients([...recipients, { id: data[0].id, email: newRecipientEmail }]);
+      setNewRecipientEmail("");
+      toast({
+        title: "Destinatario agregado",
+        description: "El destinatario se ha agregado correctamente."
+      });
+    } catch (error) {
+      console.error("Error adding recipient:", error);
+      toast({
+        title: "Error",
+        description: "No se pudo agregar el destinatario.",
+        variant: "destructive"
+      });
+    } finally {
+      setIsSaving(false);
+    }
+  };
+  
+  const handleDeleteRecipient = async (id: string) => {
+    try {
+      setIsSaving(true);
+      const { error } = await supabase
+        .from('report_recipients')
+        .delete()
+        .eq('id', id);
+      
+      if (error) throw error;
+      
+      setRecipients(recipients.filter(r => r.id !== id));
+      toast({
+        title: "Destinatario eliminado",
+        description: "El destinatario se ha eliminado correctamente."
+      });
+    } catch (error) {
+      console.error("Error deleting recipient:", error);
+      toast({
+        title: "Error",
+        description: "No se pudo eliminar el destinatario.",
+        variant: "destructive"
+      });
+    } finally {
+      setIsSaving(false);
+    }
+  };
+  
+  const fetchRecipients = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('report_recipients')
+        .select('*');
+      
+      if (error) throw error;
+      
+      setRecipients(data || []);
+    } catch (error) {
+      console.error("Error fetching recipients:", error);
+      toast({
+        title: "Error",
+        description: "No se pudieron cargar los destinatarios.",
+        variant: "destructive"
+      });
+    }
+  };
 
   useEffect(() => {
     const fetchSettings = async () => {
-      setLoading(true);
       try {
-        const { data: recipientsData, error: recipientsError } = await supabase
-          .from("report_recipients")
-          .select("*");
-
-        if (recipientsError) {
-          throw recipientsError;
-        }
-
-        const { data: scheduleData, error: scheduleError } = await supabase
-          .from("report_schedule")
-          .select("*")
+        setLoading(true);
+        const { data, error } = await supabase
+          .from('report_schedule')
+          .select('*')
           .single();
-
-        if (scheduleError && scheduleError.code !== "PGRST116") {
-          throw scheduleError;
+        
+        if (error) {
+          if (error.code === 'PGRST116') {
+            // No record found, we'll create one later
+            console.info("No schedule settings found, will create new.");
+          } else {
+            throw error;
+          }
         }
-
-        if (recipientsData) {
-          const typedRecipients: EmailRecipient[] = recipientsData.map(recipient => ({
-            id: recipient.id,
-            email: recipient.email
-          }));
-          setRecipients(typedRecipients);
-        }
-
-        if (scheduleData && scheduleData.settings) {
-          const settingsObj = typeof scheduleData.settings === 'string' 
-            ? JSON.parse(scheduleData.settings) 
-            : scheduleData.settings;
-            
-          const validatedSettings: ReportScheduleSettings = {
-            daily: {
-              enabled: settingsObj.daily?.enabled || false,
-              time: settingsObj.daily?.time || "07:00"
-            },
-            weekly: {
-              enabled: settingsObj.weekly?.enabled || false,
-              time: settingsObj.weekly?.time || "07:00",
-              day: settingsObj.weekly?.day || "monday"
-            },
-            monthly: {
-              enabled: settingsObj.monthly?.enabled || false,
-              time: settingsObj.monthly?.time || "07:00",
-              day: settingsObj.monthly?.day || "1"
-            }
-          };
-          
-          setSchedule(validatedSettings);
+        
+        if (data) {
+          // Convert the settings from JSON to our ReportScheduleSettings type
+          const typedSettings = data.settings as ReportScheduleSettings;
+          setScheduleSettings(typedSettings);
         }
       } catch (error) {
-        console.error("Error fetching report settings:", error);
+        console.error("Error fetching report schedule settings:", error);
         toast({
           title: "Error",
-          description: "No se pudieron cargar las configuraciones de reportes",
-          variant: "destructive",
+          description: "No se pudieron cargar las configuraciones de reportes.",
+          variant: "destructive"
         });
       } finally {
         setLoading(false);
       }
     };
-
+    
     fetchSettings();
-  }, [toast]);
+    fetchRecipients();
+  }, []);
 
-  const addRecipient = async () => {
-    if (!newEmail.trim() || !isValidEmail(newEmail)) {
-      toast({
-        title: "Error",
-        description: "Por favor, ingrese un correo electrónico válido",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    setSaving(true);
+  const saveScheduleSettings = async () => {
     try {
-      if (recipients.some(r => r.email === newEmail.trim())) {
-        toast({
-          title: "Error",
-          description: "Este correo ya está en la lista",
-          variant: "destructive",
-        });
-        return;
-      }
-
-      const { data, error } = await supabase
-        .from("report_recipients")
-        .insert({ email: newEmail.trim() })
-        .select();
-
-      if (error) throw error;
-
-      if (data && data.length > 0) {
-        const newRecipient: EmailRecipient = {
-          id: data[0].id,
-          email: data[0].email
-        };
-        
-        setRecipients([...recipients, newRecipient]);
-        setNewEmail("");
-        toast({
-          title: "Éxito",
-          description: "Correo electrónico añadido con éxito",
-        });
-      }
-    } catch (error) {
-      console.error("Error adding email recipient:", error);
-      toast({
-        title: "Error",
-        description: "No se pudo añadir el correo electrónico",
-        variant: "destructive",
-      });
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  const removeRecipient = async (id: string) => {
-    setSaving(true);
-    try {
-      const { error } = await supabase
-        .from("report_recipients")
-        .delete()
-        .eq("id", id);
-
-      if (error) throw error;
-
-      setRecipients(recipients.filter(r => r.id !== id));
-      toast({
-        title: "Éxito",
-        description: "Correo electrónico eliminado con éxito",
-      });
-    } catch (error) {
-      console.error("Error removing email recipient:", error);
-      toast({
-        title: "Error",
-        description: "No se pudo eliminar el correo electrónico",
-        variant: "destructive",
-      });
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  const updateSchedule = async () => {
-    setSaving(true);
-    try {
-      const settingsJson = JSON.stringify(schedule);
+      setIsSaving(true);
       
-      const { error } = await supabase
-        .from("report_schedule")
-        .upsert({ 
-          id: '1',
-          settings: settingsJson,
-          updated_at: new Date().toISOString()
-        });
-
+      // Create a properly formatted settings object for Supabase
+      const { data, error } = await supabase
+        .from('report_schedule')
+        .upsert({
+          id: '1', // Using a fixed ID as there will be only one settings record
+          settings: scheduleSettings as any // Cast to any to satisfy Supabase's Json type
+        })
+        .select();
+      
       if (error) throw error;
-
+      
       toast({
-        title: "Éxito",
-        description: "Configuración de programación guardada con éxito",
+        title: "Configuración guardada",
+        description: "La configuración de reportes se ha actualizado correctamente."
       });
     } catch (error) {
-      console.error("Error updating schedule:", error);
+      console.error("Error saving schedule settings:", error);
       toast({
         title: "Error",
-        description: "No se pudo guardar la configuración de programación",
-        variant: "destructive",
+        description: "No se pudo guardar la configuración de reportes.",
+        variant: "destructive"
       });
     } finally {
-      setSaving(false);
+      setIsSaving(false);
     }
   };
-
-  const isValidEmail = (email: string) => {
-    return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
-  };
-
-  const handleScheduleChange = (type: keyof ReportScheduleSettings, field: string, value: any) => {
-    setSchedule(prev => ({
-      ...prev,
-      [type]: {
-        ...prev[type],
-        [field]: value
-      }
-    }));
-  };
-
-  if (loading) {
-    return (
-      <div className="space-y-6">
-        <div className="flex items-center justify-between">
-          <h1 className="text-3xl font-bold tracking-tight">Configuración de Reportes</h1>
-        </div>
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-          {[...Array(3)].map((_, i) => (
-            <Card key={i} className="animate-pulse">
-              <CardHeader className="bg-gray-100 h-20"></CardHeader>
-              <CardContent className="h-40 mt-2 space-y-4">
-                <div className="h-10 bg-gray-100 rounded-md"></div>
-                <div className="h-10 bg-gray-100 rounded-md"></div>
-                <div className="h-10 bg-gray-100 rounded-md"></div>
-              </CardContent>
-            </Card>
-          ))}
-        </div>
-      </div>
-    );
-  }
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">Configuración de Reportes</h1>
-          <p className="text-muted-foreground">
-            Configura los emails y la frecuencia de envío de reportes automáticos
-          </p>
-        </div>
-      </div>
-
-      <Tabs defaultValue="recipients" className="space-y-4">
-        <TabsList>
-          <TabsTrigger value="recipients">Destinatarios</TabsTrigger>
-          <TabsTrigger value="schedule">Programación</TabsTrigger>
-          <TabsTrigger value="preview">Vista Previa</TabsTrigger>
-        </TabsList>
-
-        <TabsContent value="recipients" className="space-y-4">
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Mail className="h-5 w-5" />
-                Destinatarios de Reportes
-              </CardTitle>
-              <CardDescription>
-                Añade o elimina direcciones de correo electrónico para enviar reportes automáticos
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="flex gap-2">
-                <div className="flex-1">
-                  <Input
-                    type="email"
-                    placeholder="nombre@empresa.com"
-                    value={newEmail}
-                    onChange={(e) => setNewEmail(e.target.value)}
-                  />
-                </div>
-                <Button onClick={addRecipient} disabled={saving}>
-                  {saving ? (
-                    <>
-                      <RefreshCw className="mr-2 h-4 w-4 animate-spin" />
-                      Añadiendo...
-                    </>
-                  ) : (
-                    "Añadir"
-                  )}
-                </Button>
+      <Card>
+        <CardHeader>
+          <CardTitle>Configuración de Reportes</CardTitle>
+          <CardDescription>
+            Administra la programación y los destinatarios de los reportes automáticos.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <Tabs defaultValue="daily" className="space-y-4">
+            <TabsList>
+              <TabsTrigger value="daily">Diario</TabsTrigger>
+              <TabsTrigger value="weekly">Semanal</TabsTrigger>
+              <TabsTrigger value="monthly">Mensual</TabsTrigger>
+            </TabsList>
+            <TabsContent value="daily" className="space-y-2">
+              <div className="flex items-center justify-between">
+                <Label htmlFor="daily-enabled">Enviar reporte diario</Label>
+                <Switch 
+                  id="daily-enabled"
+                  checked={scheduleSettings.daily.enabled}
+                  onCheckedChange={(checked) => handleScheduleChange('daily', 'enabled', checked)}
+                />
               </div>
-
-              {recipients.length === 0 ? (
-                <div className="p-4 border border-dashed rounded-md flex justify-center items-center">
-                  <div className="text-center text-muted-foreground">
-                    <AlertTriangle className="mx-auto h-8 w-8 mb-2" />
-                    <p>No hay destinatarios configurados</p>
-                    <p className="text-sm">Añade al menos un correo electrónico para recibir reportes</p>
-                  </div>
-                </div>
-              ) : (
-                <div className="space-y-2">
-                  {recipients.map((recipient) => (
-                    <div key={recipient.id} className="flex items-center justify-between p-3 border rounded-md">
-                      <span>{recipient.email}</span>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => removeRecipient(recipient.id)}
-                        disabled={saving}
-                      >
-                        <Trash2 className="h-4 w-4 text-destructive" />
-                      </Button>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        <TabsContent value="schedule" className="space-y-4">
-          <div className="grid gap-4 md:grid-cols-3">
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Clock className="h-5 w-5" />
-                  Reporte Diario
-                </CardTitle>
-                <CardDescription>
-                  Configuración para envíos diarios
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <Label htmlFor="daily-enabled">Activar</Label>
-                  <Switch
-                    id="daily-enabled"
-                    checked={schedule.daily.enabled}
-                    onCheckedChange={(checked) => handleScheduleChange('daily', 'enabled', checked)}
-                  />
-                </div>
-                
-                <div className="space-y-2">
-                  <Label htmlFor="daily-time">Hora de envío</Label>
-                  <Input
-                    id="daily-time"
-                    type="time"
-                    value={schedule.daily.time}
-                    onChange={(e) => handleScheduleChange('daily', 'time', e.target.value)}
-                    disabled={!schedule.daily.enabled}
-                  />
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Calendar className="h-5 w-5" />
-                  Reporte Semanal
-                </CardTitle>
-                <CardDescription>
-                  Configuración para envíos semanales
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <Label htmlFor="weekly-enabled">Activar</Label>
-                  <Switch
-                    id="weekly-enabled"
-                    checked={schedule.weekly.enabled}
-                    onCheckedChange={(checked) => handleScheduleChange('weekly', 'enabled', checked)}
-                  />
-                </div>
-                
-                <div className="space-y-2">
-                  <Label htmlFor="weekly-day">Día de la semana</Label>
-                  <select
-                    id="weekly-day"
-                    className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
-                    value={schedule.weekly.day}
-                    onChange={(e) => handleScheduleChange('weekly', 'day', e.target.value)}
-                    disabled={!schedule.weekly.enabled}
-                  >
-                    <option value="monday">Lunes</option>
-                    <option value="tuesday">Martes</option>
-                    <option value="wednesday">Miércoles</option>
-                    <option value="thursday">Jueves</option>
-                    <option value="friday">Viernes</option>
-                    <option value="saturday">Sábado</option>
-                    <option value="sunday">Domingo</option>
-                  </select>
-                </div>
-                
-                <div className="space-y-2">
-                  <Label htmlFor="weekly-time">Hora de envío</Label>
-                  <Input
-                    id="weekly-time"
-                    type="time"
-                    value={schedule.weekly.time}
-                    onChange={(e) => handleScheduleChange('weekly', 'time', e.target.value)}
-                    disabled={!schedule.weekly.enabled}
-                  />
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Calendar className="h-5 w-5" />
-                  Reporte Mensual
-                </CardTitle>
-                <CardDescription>
-                  Configuración para envíos mensuales
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <Label htmlFor="monthly-enabled">Activar</Label>
-                  <Switch
-                    id="monthly-enabled"
-                    checked={schedule.monthly.enabled}
-                    onCheckedChange={(checked) => handleScheduleChange('monthly', 'enabled', checked)}
-                  />
-                </div>
-                
-                <div className="space-y-2">
-                  <Label htmlFor="monthly-day">Día del mes</Label>
-                  <select
-                    id="monthly-day"
-                    className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
-                    value={schedule.monthly.day}
-                    onChange={(e) => handleScheduleChange('monthly', 'day', e.target.value)}
-                    disabled={!schedule.monthly.enabled}
-                  >
-                    {[...Array(28)].map((_, i) => (
-                      <option key={i} value={(i + 1).toString()}>
-                        {i + 1}
-                      </option>
+              <div className="grid grid-cols-2 items-center gap-4">
+                <Label htmlFor="daily-time">Hora de envío</Label>
+                <Input 
+                  type="time" 
+                  id="daily-time" 
+                  value={scheduleSettings.daily.time}
+                  onChange={(e) => handleScheduleChange('daily', 'time', e.target.value)}
+                  disabled={!scheduleSettings.daily.enabled}
+                />
+              </div>
+            </TabsContent>
+            <TabsContent value="weekly" className="space-y-2">
+              <div className="flex items-center justify-between">
+                <Label htmlFor="weekly-enabled">Enviar reporte semanal</Label>
+                <Switch 
+                  id="weekly-enabled"
+                  checked={scheduleSettings.weekly.enabled}
+                  onCheckedChange={(checked) => handleScheduleChange('weekly', 'enabled', checked)}
+                />
+              </div>
+              <div className="grid grid-cols-2 items-center gap-4">
+                <Label htmlFor="weekly-day">Día de la semana</Label>
+                <Select 
+                  value={scheduleSettings.weekly.day}
+                  onValueChange={(value) => handleScheduleChange('weekly', 'day', value)}
+                  disabled={!scheduleSettings.weekly.enabled}
+                >
+                  <SelectTrigger className="w-[180px]">
+                    <SelectValue placeholder="Selecciona un día" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {daysOfWeek.map((day) => (
+                      <SelectItem key={day.value} value={day.value}>{day.label}</SelectItem>
                     ))}
-                  </select>
-                </div>
-                
-                <div className="space-y-2">
-                  <Label htmlFor="monthly-time">Hora de envío</Label>
-                  <Input
-                    id="monthly-time"
-                    type="time"
-                    value={schedule.monthly.time}
-                    onChange={(e) => handleScheduleChange('monthly', 'time', e.target.value)}
-                    disabled={!schedule.monthly.enabled}
-                  />
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-
-          <div className="flex justify-center">
-            <Button onClick={updateSchedule} disabled={saving} className="w-full md:w-auto">
-              {saving ? (
-                <>
-                  <RefreshCw className="mr-2 h-4 w-4 animate-spin" />
-                  Guardando...
-                </>
-              ) : (
-                <>
-                  <Save className="mr-2 h-4 w-4" />
-                  Guardar configuración
-                </>
-              )}
+                  </SelectContent>
+                </Select>
+                <Label htmlFor="weekly-time">Hora de envío</Label>
+                <Input 
+                  type="time" 
+                  id="weekly-time"
+                  value={scheduleSettings.weekly.time}
+                  onChange={(e) => handleScheduleChange('weekly', 'time', e.target.value)}
+                  disabled={!scheduleSettings.weekly.enabled}
+                />
+              </div>
+            </TabsContent>
+            <TabsContent value="monthly" className="space-y-2">
+              <div className="flex items-center justify-between">
+                <Label htmlFor="monthly-enabled">Enviar reporte mensual</Label>
+                <Switch 
+                  id="monthly-enabled"
+                  checked={scheduleSettings.monthly.enabled}
+                  onCheckedChange={(checked) => handleScheduleChange('monthly', 'enabled', checked)}
+                />
+              </div>
+              <div className="grid grid-cols-2 items-center gap-4">
+                <Label htmlFor="monthly-day">Día del mes</Label>
+                <Input 
+                  type="number"
+                  id="monthly-day"
+                  value={scheduleSettings.monthly.day}
+                  onChange={(e) => handleScheduleChange('monthly', 'day', e.target.value)}
+                  disabled={!scheduleSettings.monthly.enabled}
+                  min="1"
+                  max="31"
+                />
+                <Label htmlFor="monthly-time">Hora de envío</Label>
+                <Input 
+                  type="time" 
+                  id="monthly-time"
+                  value={scheduleSettings.monthly.time}
+                  onChange={(e) => handleScheduleChange('monthly', 'time', e.target.value)}
+                  disabled={!scheduleSettings.monthly.enabled}
+                />
+              </div>
+            </TabsContent>
+          </Tabs>
+          <Button onClick={saveScheduleSettings} disabled={isSaving}>
+            {isSaving ? "Guardando..." : "Guardar configuración"}
+          </Button>
+        </CardContent>
+      </Card>
+      
+      <Card>
+        <CardHeader>
+          <CardTitle>Destinatarios de Reportes</CardTitle>
+          <CardDescription>
+            Administra la lista de destinatarios que recibirán los reportes.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Email</TableHead>
+                <TableHead className="text-right">Acciones</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {recipients.map((recipient) => (
+                <TableRow key={recipient.id}>
+                  <TableCell>{recipient.email}</TableCell>
+                  <TableCell className="text-right">
+                    <Button variant="ghost" size="sm" onClick={() => handleDeleteRecipient(recipient.id)} disabled={isSaving}>
+                      <Trash2 className="h-4 w-4 mr-2" />
+                      Eliminar
+                    </Button>
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+          <div className="flex items-center space-x-2">
+            <Input 
+              type="email"
+              placeholder="Nuevo destinatario"
+              value={newRecipientEmail}
+              onChange={(e) => setNewRecipientEmail(e.target.value)}
+            />
+            <Button onClick={handleAddRecipient} disabled={isSaving}>
+              Agregar <PlusCircle className="w-4 h-4 ml-2" />
             </Button>
           </div>
-        </TabsContent>
-
-        <TabsContent value="preview" className="space-y-4">
-          <Card>
-            <CardHeader>
-              <CardTitle>Vista Previa de Reportes</CardTitle>
-              <CardDescription>
-                Previsualización de los reportes automáticos
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="p-0">
-              <div className="p-6 border-y">
-                <h3 className="text-lg font-semibold mb-4">Contenido del reporte</h3>
-                <div className="bg-muted p-4 rounded-md">
-                  <p className="mb-2">El reporte incluirá:</p>
-                  <ul className="list-disc pl-5 space-y-2">
-                    <li>Captura del Dashboard completo</li>
-                    <li>Resumen de KPIs actuales</li>
-                    <li>Listado de Test Packs completados en el período</li>
-                    <li>Tags liberados en el período</li>
-                    <li>Proyección de avance para los próximos 30 días</li>
-                  </ul>
-                </div>
-              </div>
-              <div className="p-6">
-                <h3 className="text-lg font-semibold mb-4">Destinatarios configurados</h3>
-                {recipients.length === 0 ? (
-                  <div className="p-4 border border-dashed rounded-md flex justify-center items-center">
-                    <div className="text-center text-muted-foreground">
-                      <AlertTriangle className="mx-auto h-8 w-8 mb-2" />
-                      <p>No hay destinatarios configurados</p>
-                      <p className="text-sm">Añade al menos un correo electrónico para recibir reportes</p>
-                    </div>
-                  </div>
-                ) : (
-                  <div className="bg-muted p-4 rounded-md">
-                    <ul className="space-y-2">
-                      {recipients.map((recipient) => (
-                        <li key={recipient.id} className="flex items-center">
-                          <Mail className="h-4 w-4 mr-2" />
-                          {recipient.email}
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-                )}
-              </div>
-              <div className="p-6 border-t">
-                <h3 className="text-lg font-semibold mb-4">Programación activa</h3>
-                <div className="space-y-4">
-                  {schedule.daily.enabled && (
-                    <div className="flex items-center">
-                      <Clock className="h-5 w-5 mr-2 text-primary" />
-                      <span>Reporte diario a las {schedule.daily.time}</span>
-                    </div>
-                  )}
-                  
-                  {schedule.weekly.enabled && (
-                    <div className="flex items-center">
-                      <Calendar className="h-5 w-5 mr-2 text-primary" />
-                      <span>
-                        Reporte semanal los{' '}
-                        {
-                          {
-                            monday: 'lunes',
-                            tuesday: 'martes',
-                            wednesday: 'miércoles',
-                            thursday: 'jueves',
-                            friday: 'viernes',
-                            saturday: 'sábados',
-                            sunday: 'domingos'
-                          }[schedule.weekly.day]
-                        }{' '}
-                        a las {schedule.weekly.time}
-                      </span>
-                    </div>
-                  )}
-                  
-                  {schedule.monthly.enabled && (
-                    <div className="flex items-center">
-                      <Calendar className="h-5 w-5 mr-2 text-primary" />
-                      <span>
-                        Reporte mensual el día {schedule.monthly.day} a las {schedule.monthly.time}
-                      </span>
-                    </div>
-                  )}
-                  
-                  {!schedule.daily.enabled && !schedule.weekly.enabled && !schedule.monthly.enabled && (
-                    <div className="p-4 border border-dashed rounded-md flex justify-center items-center">
-                      <div className="text-center text-muted-foreground">
-                        <AlertTriangle className="mx-auto h-8 w-8 mb-2" />
-                        <p>No hay reportes programados</p>
-                        <p className="text-sm">Activa al menos un tipo de reporte en la pestaña Programación</p>
-                      </div>
-                    </div>
-                  )}
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
-      </Tabs>
+        </CardContent>
+      </Card>
     </div>
   );
 };

@@ -1,4 +1,3 @@
-
 import { supabase } from "@/integrations/supabase/client";
 import { BulkUserData, UserCreateData, UserUpdateData, PasswordChangeData } from "@/services/types";
 
@@ -529,4 +528,19 @@ const generateRandomPassword = () => {
   }
   
   return password;
+};
+
+export const resetPassword = async (email: string): Promise<void> => {
+  try {
+    const { error } = await supabase.auth.resetPasswordForEmail(email, {
+      redirectTo: `${window.location.origin}/auth?reset=true`,
+    });
+    
+    if (error) {
+      throw error;
+    }
+  } catch (error) {
+    console.error("Error resetting password:", error);
+    throw error;
+  }
 };

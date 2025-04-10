@@ -1,4 +1,5 @@
 import { supabase } from "@/integrations/supabase/client";
+import { GanttTask } from "./types";
 
 export const getDashboardStats = async (projectId: string | null = null) => {
   try {
@@ -140,7 +141,7 @@ export const getDashboardStats = async (projectId: string | null = null) => {
       }
     }
     
-    const ganttData = tasks?.map(task => {
+    const ganttData: GanttTask[] = tasks?.map(task => {
       const startDate = new Date(task.created_at);
       const endDate = task.updated_at ? new Date(task.updated_at) : new Date(startDate);
       if (endDate <= startDate) {
@@ -154,7 +155,10 @@ export const getDashboardStats = async (projectId: string | null = null) => {
         end: endDate.toISOString().split('T')[0],
         progress: task.status === 'complete' ? 100 : 
                  task.status === 'inprogress' ? 50 : 30,
-        dependencies: ''
+        dependencies: '',
+        type: 'task',
+        status: task.status,
+        quantity: 1
       };
     }) || [];
     
