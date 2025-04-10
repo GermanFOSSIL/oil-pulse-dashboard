@@ -1,3 +1,4 @@
+
 import { supabase } from "@/integrations/supabase/client";
 import { BulkUserData, UserCreateData, UserUpdateData, PasswordChangeData } from "@/services/types";
 
@@ -23,7 +24,7 @@ export interface UserProfile {
   permissions?: string[];
   created_at?: string;
   updated_at?: string;
-  email?: string; // Add email property to fix TypeScript errors
+  email?: string; // Add email property to the interface
 }
 
 export const getUserProfile = async (userId: string): Promise<UserProfile | null> => {
@@ -43,21 +44,28 @@ export const getUserProfile = async (userId: string): Promise<UserProfile | null
     }
 
     // Now get the user email from auth if possible
-    const { data: userData, error: userError } = await supabase.auth.admin.getUserById(userId);
-    
     let userEmail = null;
-    if (!userError && userData?.user) {
-      userEmail = userData.user.email;
-      console.log(`Got email ${userEmail} for user ${userId} from auth`);
-    } else {
-      console.log(`Could not get email from auth for user ${userId}, error:`, userError);
+    
+    try {
+      const { data: userData, error: userError } = await supabase.auth.admin.getUserById(userId);
+      
+      if (!userError && userData?.user) {
+        userEmail = userData.user.email;
+        console.log(`Got email ${userEmail} for user ${userId} from auth`);
+      } else if (userError) {
+        console.log(`Could not get email from auth for user ${userId}, error:`, userError);
+      }
+    } catch (authError) {
+      console.log(`Error accessing auth API for user ${userId}:`, authError);
     }
 
     // Combine profile data with email
-    return {
+    const profileWithEmail = {
       ...profileData,
-      email: userEmail || profileData?.email,
+      email: userEmail || profileData?.email
     } as UserProfile;
+    
+    return profileWithEmail;
   } catch (error) {
     console.error(`Error in getUserProfile for ${userId}:`, error);
     
@@ -70,7 +78,7 @@ export const getUserProfile = async (userId: string): Promise<UserProfile | null
         .single();
 
       if (error) throw error;
-      return data as unknown as UserProfile;
+      return data as UserProfile;
     } catch (fallbackError) {
       console.error(`Fallback also failed for user ${userId}:`, fallbackError);
       return null;
@@ -80,6 +88,7 @@ export const getUserProfile = async (userId: string): Promise<UserProfile | null
 
 export const getUserProfiles = async (): Promise<UserProfile[]> => {
   try {
+    // Use a more efficient query with fewer rows returned
     console.log('Fetching all user profiles');
     
     // First get all profiles
@@ -92,35 +101,46 @@ export const getUserProfiles = async (): Promise<UserProfile[]> => {
       throw profilesError;
     }
 
-    // Get all auth users to match with profiles
-    const { data: { users: authUsers }, error: authError } = await supabase.auth.admin.listUsers();
-    
-    if (authError) {
-      console.error('Error fetching auth users:', authError);
-    }
-    
-    // Create a map of user IDs to emails for faster lookup
-    const userEmailMap: Record<string, string> = {};
-    if (authUsers) {
-      authUsers.forEach(user => {
-        if (user.email) {
-          userEmailMap[user.id] = user.email;
-        }
+    // Get all auth users to match with profiles - but limit response fields
+    try {
+      const { data: { users: authUsers }, error: authError } = await supabase.auth.admin.listUsers({
+        perPage: 100, // Limit number of users per page
       });
-    }
-    
-    // For each profile, try to get the email
-    const enhancedProfiles = profiles.map(profile => {
-      // Try to get email from auth users map
-      const email = userEmailMap[profile.id] || profile.email || 'Email no disponible';
       
-      return {
-        ...profile,
-        email
-      };
-    });
+      if (authError) {
+        console.error('Error fetching auth users:', authError);
+      }
+      
+      // Create a map of user IDs to emails for faster lookup
+      const userEmailMap: Record<string, string> = {};
+      if (authUsers) {
+        authUsers.forEach(user => {
+          if (user.email) {
+            userEmailMap[user.id] = user.email;
+          }
+        });
+      }
+      
+      // For each profile, try to get the email
+      const enhancedProfiles = profiles.map(profile => {
+        // Try to get email from auth users map
+        const email = userEmailMap[profile.id] || profile.email || null;
+        
+        return {
+          ...profile,
+          email
+        } as UserProfile;
+      });
 
-    return enhancedProfiles as UserProfile[];
+      return enhancedProfiles;
+    } catch (authError) {
+      console.error('Error accessing auth API:', authError);
+      // If auth API fails, return profiles without emails
+      return profiles.map(profile => ({
+        ...profile,
+        email: profile.email || null
+      })) as UserProfile[];
+    }
   } catch (error) {
     console.error('Error in getUserProfiles:', error);
     
@@ -130,7 +150,7 @@ export const getUserProfiles = async (): Promise<UserProfile[]> => {
       .select('*');
 
     if (fallbackError) throw fallbackError;
-    return data as unknown as UserProfile[];
+    return (data || []) as UserProfile[];
   }
 };
 
@@ -162,7 +182,10 @@ export const updateUserProfile = async (userId: string, updates: Partial<UserPro
       throw new Error('No data returned after update');
     }
 
-    return data[0] as unknown as UserProfile;
+    return {
+      ...data[0],
+      email: updates.email || data[0].email
+    } as UserProfile;
   } catch (error) {
     console.error(`Error in updateUserProfile for user ${userId}:`, error);
     throw error;
@@ -206,22 +229,33 @@ export const getUserPermissions = async (userId: string): Promise<string[]> => {
 export const bulkCreateUsers = async (users: BulkUserData[]): Promise<number> => {
   try {
     let successCount = 0;
+    const batchSize = 5; // Process users in smaller batches
     
-    for (const user of users) {
-      try {
-        const result = await createUser({
-          email: user.email,
-          password: user.password || generateRandomPassword(),
-          full_name: user.full_name,
-          role: user.role || 'user'
-        });
-        
-        if (result.success) {
-          successCount++;
-        }
-      } catch (err) {
-        console.error(`Error processing user ${user.email}:`, err);
-      }
+    // Process users in batches to prevent UI freezing
+    for (let i = 0; i < users.length; i += batchSize) {
+      const batch = users.slice(i, i + batchSize);
+      
+      // Process batch in parallel
+      const results = await Promise.all(
+        batch.map(async (user) => {
+          try {
+            const result = await createUser({
+              email: user.email,
+              password: user.password || generateRandomPassword(),
+              full_name: user.full_name,
+              role: user.role || 'user'
+            });
+            
+            return result.success;
+          } catch (err) {
+            console.error(`Error processing user ${user.email}:`, err);
+            return false;
+          }
+        })
+      );
+      
+      // Count successful creations
+      successCount += results.filter(success => success).length;
     }
     
     return successCount;
@@ -315,9 +349,39 @@ const getDefaultPermissions = (role: string): string[] => {
 
 export const changeUserPassword = async (data: PasswordChangeData): Promise<{ success: boolean; message: string }> => {
   try {
-    // We can't use admin API to change passwords
-    // Send a password reset link instead
-    const { error } = await supabase.auth.resetPasswordForEmail(data.userId, {
+    // Find the user email first
+    let userEmail = "";
+    
+    try {
+      const { data: userData, error: userError } = await supabase.auth.admin.getUserById(data.userId);
+      
+      if (!userError && userData?.user?.email) {
+        userEmail = userData.user.email;
+      } else {
+        // Try to get email from profiles table as fallback
+        const { data: profileData } = await supabase
+          .from('profiles')
+          .select('email')
+          .eq('id', data.userId)
+          .single();
+          
+        if (profileData?.email) {
+          userEmail = profileData.email;
+        }
+      }
+    } catch (error) {
+      console.error("Error getting user email:", error);
+    }
+    
+    if (!userEmail) {
+      return {
+        success: false,
+        message: "No se pudo encontrar el email del usuario"
+      };
+    }
+    
+    // Send a password reset link instead of directly changing the password
+    const { error } = await supabase.auth.resetPasswordForEmail(userEmail, {
       redirectTo: window.location.origin + '/auth/reset-password',
     });
     
@@ -338,50 +402,74 @@ export const changeUserPassword = async (data: PasswordChangeData): Promise<{ su
   }
 };
 
+// Implement a debounced version of setRodrigoAsAdmin to prevent multiple calls
+let adminSetTimeout: NodeJS.Timeout | null = null;
 export const setRodrigoAsAdmin = async (): Promise<boolean> => {
-  try {
-    console.log("Looking for Rodrigo Peredo in profiles");
-    
-    // Find Rodrigo's profile by name
-    const { data: profiles, error: findError } = await supabase
-      .from('profiles')
-      .select('*')
-      .ilike('full_name', '%Rodrigo Peredo%');
-    
-    if (findError) {
-      console.error("Error finding Rodrigo Peredo:", findError);
-      return false;
-    }
-    
-    if (!profiles || profiles.length === 0) {
-      console.log("No profile found for Rodrigo Peredo");
-      return false;
-    }
-    
-    const rodrigoProfile = profiles[0];
-    console.log("Found profile for Rodrigo Peredo:", rodrigoProfile);
-    
-    // Update to admin role with all permissions
-    const { error: updateError } = await supabase
-      .from('profiles')
-      .update({
-        role: 'admin',
-        permissions: AVAILABLE_PERMISSIONS,
-        updated_at: new Date().toISOString()
-      })
-      .eq('id', rodrigoProfile.id);
-    
-    if (updateError) {
-      console.error("Error updating Rodrigo to admin:", updateError);
-      return false;
-    }
-    
-    console.log("Successfully set Rodrigo Peredo as admin with all permissions");
-    return true;
-  } catch (error) {
-    console.error("Error in setRodrigoAsAdmin:", error);
-    return false;
+  // Clear any existing timeout
+  if (adminSetTimeout) {
+    clearTimeout(adminSetTimeout);
   }
+  
+  return new Promise((resolve) => {
+    // Set a new timeout to debounce the function call
+    adminSetTimeout = setTimeout(async () => {
+      try {
+        console.log("Looking for Rodrigo Peredo in profiles");
+        
+        // Find Rodrigo's profile by name
+        const { data: profiles, error: findError } = await supabase
+          .from('profiles')
+          .select('*')
+          .ilike('full_name', '%Rodrigo Peredo%');
+        
+        if (findError) {
+          console.error("Error finding Rodrigo Peredo:", findError);
+          resolve(false);
+          return;
+        }
+        
+        if (!profiles || profiles.length === 0) {
+          console.log("No profile found for Rodrigo Peredo");
+          resolve(false);
+          return;
+        }
+        
+        const rodrigoProfile = profiles[0];
+        console.log("Found profile for Rodrigo Peredo:", rodrigoProfile);
+        
+        // Check if already admin with all permissions
+        if (rodrigoProfile.role === 'admin' && 
+            Array.isArray(rodrigoProfile.permissions) && 
+            AVAILABLE_PERMISSIONS.every(p => rodrigoProfile.permissions?.includes(p))) {
+          console.log("Rodrigo Peredo is already admin with all permissions");
+          resolve(true);
+          return;
+        }
+        
+        // Update to admin role with all permissions
+        const { error: updateError } = await supabase
+          .from('profiles')
+          .update({
+            role: 'admin',
+            permissions: AVAILABLE_PERMISSIONS,
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', rodrigoProfile.id);
+        
+        if (updateError) {
+          console.error("Error updating Rodrigo to admin:", updateError);
+          resolve(false);
+          return;
+        }
+        
+        console.log("Successfully set Rodrigo Peredo as admin with all permissions");
+        resolve(true);
+      } catch (error) {
+        console.error("Error in setRodrigoAsAdmin:", error);
+        resolve(false);
+      }
+    }, 300); // 300ms debounce
+  });
 };
 
 const generateRandomPassword = () => {

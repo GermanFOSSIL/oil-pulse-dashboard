@@ -12,53 +12,70 @@ import {
   FormMessage,
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
+import { useState } from "react";
+import { Eye, EyeOff } from "lucide-react";
 
-const formSchema = z.object({
-  newPassword: z.string().min(6, {
+const passwordChangeSchema = z.object({
+  password: z.string().min(6, {
     message: "La contraseña debe tener al menos 6 caracteres",
   }),
-  confirmPassword: z.string().min(6, {
-    message: "La contraseña debe tener al menos 6 caracteres",
-  }),
-}).refine((data) => data.newPassword === data.confirmPassword, {
+  confirmPassword: z.string()
+}).refine(data => data.password === data.confirmPassword, {
   message: "Las contraseñas no coinciden",
   path: ["confirmPassword"],
 });
 
 interface PasswordChangeFormProps {
   userId: string;
-  onSubmit: (userId: string, newPassword: string) => Promise<void>;
+  onSubmit: (userId: string, password: string) => Promise<void>;
+  isSubmitting?: boolean;
 }
 
-const PasswordChangeForm = ({ userId, onSubmit }: PasswordChangeFormProps) => {
-  const form = useForm<z.infer<typeof formSchema>>({
-    resolver: zodResolver(formSchema),
+const PasswordChangeForm = ({ userId, onSubmit, isSubmitting = false }: PasswordChangeFormProps) => {
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  
+  const form = useForm<z.infer<typeof passwordChangeSchema>>({
+    resolver: zodResolver(passwordChangeSchema),
     defaultValues: {
-      newPassword: "",
+      password: "",
       confirmPassword: "",
     },
   });
-  
-  const handleSubmit = async (values: z.infer<typeof formSchema>) => {
-    await onSubmit(userId, values.newPassword);
+
+  const handleSubmit = async (values: z.infer<typeof passwordChangeSchema>) => {
+    if (isSubmitting) return;
+    await onSubmit(userId, values.password);
   };
-  
+
   return (
     <Form {...form}>
       <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-6">
         <FormField
           control={form.control}
-          name="newPassword"
+          name="password"
           render={({ field }) => (
             <FormItem>
               <FormLabel>Nueva Contraseña</FormLabel>
-              <FormControl>
-                <Input 
-                  type="password" 
-                  placeholder="Nueva contraseña" 
-                  {...field} 
-                />
-              </FormControl>
+              <div className="relative">
+                <FormControl>
+                  <Input 
+                    type={showPassword ? "text" : "password"}
+                    placeholder="Escriba la nueva contraseña" 
+                    disabled={isSubmitting}
+                    {...field} 
+                  />
+                </FormControl>
+                <Button 
+                  type="button"
+                  variant="ghost" 
+                  size="icon"
+                  className="absolute right-0 top-0"
+                  onClick={() => setShowPassword(!showPassword)}
+                >
+                  {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                </Button>
+              </div>
               <FormMessage />
             </FormItem>
           )}
@@ -70,20 +87,43 @@ const PasswordChangeForm = ({ userId, onSubmit }: PasswordChangeFormProps) => {
           render={({ field }) => (
             <FormItem>
               <FormLabel>Confirmar Contraseña</FormLabel>
-              <FormControl>
-                <Input 
-                  type="password" 
-                  placeholder="Confirmar contraseña" 
-                  {...field} 
-                />
-              </FormControl>
+              <div className="relative">
+                <FormControl>
+                  <Input 
+                    type={showConfirmPassword ? "text" : "password"}
+                    placeholder="Confirme la nueva contraseña" 
+                    disabled={isSubmitting}
+                    {...field} 
+                  />
+                </FormControl>
+                <Button 
+                  type="button"
+                  variant="ghost" 
+                  size="icon"
+                  className="absolute right-0 top-0"
+                  onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                >
+                  {showConfirmPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                </Button>
+              </div>
               <FormMessage />
             </FormItem>
           )}
         />
         
-        <Button type="submit" className="w-full">
-          Cambiar Contraseña
+        <Button 
+          type="submit" 
+          className="w-full"
+          disabled={isSubmitting}
+        >
+          {isSubmitting ? (
+            <>
+              <span className="mr-2 inline-block h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent"></span>
+              Procesando...
+            </>
+          ) : (
+            "Cambiar Contraseña"
+          )}
         </Button>
       </form>
     </Form>

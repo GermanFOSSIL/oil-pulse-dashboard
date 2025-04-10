@@ -49,7 +49,7 @@ import { useAuth } from "@/contexts/AuthContext";
 
 const Users = () => {
   const { toast } = useToast();
-  const { user: currentUser } = useAuth(); // Get the current user from Auth context
+  const { user: currentUser } = useAuth(); 
   const [users, setUsers] = useState<Array<any>>([]);
   const [searchTerm, setSearchTerm] = useState("");
   const [loading, setLoading] = useState(true);
@@ -65,12 +65,49 @@ const Users = () => {
   const [isSettingAdmin, setIsSettingAdmin] = useState(false);
   const [adminSetSuccess, setAdminSetSuccess] = useState(false);
   
+  // Track loading states for operations
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [isChangingPassword, setIsChangingPassword] = useState(false);
+  
+  // Setup realtime subscription for profile changes
+  useEffect(() => {
+    const profiles = supabase
+      .channel('public:profiles')
+      .on('postgres_changes', { 
+        event: '*', 
+        schema: 'public', 
+        table: 'profiles' 
+      }, (payload) => {
+        // Handle profile changes without refetching all users
+        if (payload.eventType === 'UPDATE') {
+          setUsers(prevUsers => prevUsers.map(user => 
+            user.id === payload.new.id 
+              ? { ...user, profile: { ...user.profile, ...payload.new } } 
+              : user
+          ));
+        } else if (payload.eventType === 'INSERT') {
+          // Handle new user - append to list if not already present
+          fetchUsers();
+        } else if (payload.eventType === 'DELETE') {
+          setUsers(prevUsers => prevUsers.filter(user => user.id !== payload.old.id));
+        }
+      })
+      .subscribe();
+      
+    return () => {
+      supabase.removeChannel(profiles);
+    };
+  }, []);
+  
   // Fetch all user profiles (not auth users)
   const fetchUsers = useCallback(async () => {
+    // Don't fetch if we're already loading
+    if (loading && users.length > 0) return;
+    
     setLoading(true);
     setError(null);
     try {
-      console.log("Fetching user profiles");
       // Get all profiles from the public.profiles table with enhanced data
       const profiles = await getUserProfiles();
       
@@ -90,18 +127,25 @@ const Users = () => {
     } catch (err: any) {
       console.error("Error fetching users:", err);
       setError(`No se pudieron cargar los usuarios: ${err.message}`);
-      toast({
-        title: "Error",
-        description: "No se pudieron cargar los usuarios. Verifica tus permisos de acceso.",
-        variant: "destructive",
-      });
+      
+      // Only show toast if there are no users loaded yet
+      if (users.length === 0) {
+        toast({
+          title: "Error",
+          description: "No se pudieron cargar los usuarios. Verifica tus permisos de acceso.",
+          variant: "destructive",
+        });
+      }
     } finally {
       setLoading(false);
     }
-  }, [toast]);
+  }, [toast, users.length, loading]);
   
   // Handle setting Rodrigo as admin
   const handleSetRodrigoAsAdmin = useCallback(async () => {
+    // Prevent multiple clicks
+    if (isSettingAdmin) return;
+    
     setIsSettingAdmin(true);
     try {
       const success = await setRodrigoAsAdmin();
@@ -115,9 +159,8 @@ const Users = () => {
         fetchUsers();
       } else {
         toast({
-          title: "Error",
-          description: "No se pudo configurar a Rodrigo Peredo como administrador.",
-          variant: "destructive",
+          title: "Aviso",
+          description: "No se pudo configurar a Rodrigo Peredo como administrador o ya está configurado.",
         });
       }
     } catch (err: any) {
@@ -129,18 +172,22 @@ const Users = () => {
     } finally {
       setIsSettingAdmin(false);
     }
-  }, [fetchUsers, toast]);
+  }, [fetchUsers, toast, isSettingAdmin]);
   
   useEffect(() => {
     fetchUsers();
     
-    // Try to set Rodrigo as admin on first load if not already done
+    // Only try to set Rodrigo as admin on first load if not already done
     if (!adminSetSuccess) {
       handleSetRodrigoAsAdmin();
     }
   }, [fetchUsers, handleSetRodrigoAsAdmin, adminSetSuccess]);
   
   const handleCreateUser = useCallback(async (formData: any) => {
+    // Prevent duplicate submissions
+    if (isSubmitting) return;
+    
+    setIsSubmitting(true);
     try {
       // Check if current user has admin permissions
       if (!currentUser) {
@@ -166,7 +213,29 @@ const Users = () => {
           description: "El usuario se ha creado exitosamente",
         });
         setIsUserFormOpen(false);
-        fetchUsers();
+        
+        // Optimistically add the new user to the list
+        if (result.userId) {
+          const newUser = {
+            id: result.userId,
+            email: formData.email,
+            profile: {
+              id: result.userId,
+              full_name: formData.full_name,
+              role: formData.role,
+              permissions: formData.permissions,
+              email: formData.email,
+              created_at: new Date().toISOString(),
+              updated_at: new Date().toISOString()
+            },
+            created_at: new Date().toISOString()
+          };
+          
+          setUsers(prev => [...prev, newUser]);
+        } else {
+          // Fallback to fetching if we couldn't create a proper optimistic update
+          fetchUsers();
+        }
       } else {
         toast({
           title: "Error",
@@ -180,12 +249,15 @@ const Users = () => {
         description: `No se pudo crear el usuario: ${err.message}`,
         variant: "destructive",
       });
+    } finally {
+      setIsSubmitting(false);
     }
-  }, [currentUser, fetchUsers, toast]);
+  }, [currentUser, fetchUsers, toast, isSubmitting]);
   
   const handleUpdateUser = useCallback(async (formData: any) => {
-    if (!currentEditUser) return;
+    if (!currentEditUser || isSubmitting) return;
     
+    setIsSubmitting(true);
     try {
       await updateUserProfile(currentEditUser.id, {
         full_name: formData.full_name,
@@ -194,20 +266,40 @@ const Users = () => {
         email: formData.email // Store email in profile
       });
       
+      // Optimistically update the user in the list
+      setUsers(prev => prev.map(user => {
+        if (user.id === currentEditUser.id) {
+          return {
+            ...user,
+            email: formData.email,
+            profile: {
+              ...user.profile,
+              full_name: formData.full_name,
+              role: formData.role,
+              permissions: formData.permissions,
+              email: formData.email,
+              updated_at: new Date().toISOString()
+            }
+          };
+        }
+        return user;
+      }));
+      
       toast({
         title: "Usuario actualizado",
         description: "El usuario se ha actualizado exitosamente",
       });
       setIsUserFormOpen(false);
-      fetchUsers();
     } catch (err: any) {
       toast({
         title: "Error",
         description: `No se pudo actualizar el usuario: ${err.message}`,
         variant: "destructive",
       });
+    } finally {
+      setIsSubmitting(false);
     }
-  }, [currentEditUser, fetchUsers, toast]);
+  }, [currentEditUser, toast, isSubmitting]);
   
   const handleSubmitUserForm = useCallback((formData: any) => {
     if (currentEditUser) {
@@ -228,6 +320,9 @@ const Users = () => {
   }, []);
   
   const handleChangePassword = useCallback(async (userId: string, newPassword: string) => {
+    if (isChangingPassword) return;
+    
+    setIsChangingPassword(true);
     try {
       const result = await changeUserPassword({
         userId,
@@ -249,12 +344,15 @@ const Users = () => {
         description: `No se pudo procesar la solicitud: ${err.message}`,
         variant: "destructive",
       });
+    } finally {
+      setIsChangingPassword(false);
     }
-  }, [toast]);
+  }, [toast, isChangingPassword]);
   
   const handleDeleteUser = useCallback(async () => {
-    if (!userToDelete) return;
+    if (!userToDelete || isDeleting) return;
     
+    setIsDeleting(true);
     try {
       // Delete the profile from database
       const { error } = await supabase
@@ -266,20 +364,24 @@ const Users = () => {
         throw error;
       }
       
+      // Optimistically remove user from list
+      setUsers(prev => prev.filter(user => user.id !== userToDelete));
+      
       toast({
         title: "Usuario eliminado",
         description: "El perfil de usuario se ha eliminado exitosamente",
       });
       setUserToDelete(null);
-      fetchUsers();
     } catch (err: any) {
       toast({
         title: "Error",
         description: `No se pudo eliminar el usuario: ${err.message}`,
         variant: "destructive",
       });
+    } finally {
+      setIsDeleting(false);
     }
-  }, [fetchUsers, toast, userToDelete]);
+  }, [toast, userToDelete, isDeleting]);
   
   const handleBulkUpload = useCallback(async (users: BulkUserData[]): Promise<number> => {
     try {
@@ -288,6 +390,8 @@ const Users = () => {
         title: "Usuarios creados",
         description: `Se han creado ${successCount} usuarios exitosamente`,
       });
+      
+      // Fetch updated users list
       fetchUsers();
       return successCount;
     } catch (err: any) {
@@ -310,12 +414,17 @@ const Users = () => {
   };
   
   // Filter users based on search term - using memoization for performance
-  const filteredUsers = useMemo(() => users.filter(user => 
-    user.email?.toLowerCase().includes(searchTerm.toLowerCase()) || 
-    user.profile?.full_name?.toLowerCase().includes(searchTerm.toLowerCase())
-  ), [users, searchTerm]);
+  const filteredUsers = useMemo(() => {
+    if (!searchTerm.trim()) return users;
+    
+    const lowerSearch = searchTerm.toLowerCase();
+    return users.filter(user => 
+      user.email?.toLowerCase().includes(lowerSearch) || 
+      user.profile?.full_name?.toLowerCase().includes(lowerSearch)
+    );
+  }, [users, searchTerm]);
   
-  if (error) {
+  if (error && users.length === 0) {
     return (
       <div className="space-y-6">
         <div className="flex items-center justify-between">
@@ -334,9 +443,23 @@ const Users = () => {
             <p className="text-muted-foreground mb-4 text-center">
               {error}
             </p>
-            <Button variant="default" onClick={fetchUsers} className="gap-2">
-              <RefreshCw className="h-4 w-4" />
-              Reintentar
+            <Button 
+              variant="default" 
+              onClick={fetchUsers} 
+              className="gap-2"
+              disabled={loading}
+            >
+              {loading ? (
+                <>
+                  <span className="animate-spin h-4 w-4 rounded-full border-2 border-current border-t-transparent"></span>
+                  Cargando...
+                </>
+              ) : (
+                <>
+                  <RefreshCw className="h-4 w-4" />
+                  Reintentar
+                </>
+              )}
             </Button>
           </CardContent>
         </Card>
@@ -374,10 +497,13 @@ const Users = () => {
               )}
             </Button>
           )}
-          <Button onClick={() => {
-            setCurrentEditUser(null);
-            setIsUserFormOpen(true);
-          }}>
+          <Button 
+            onClick={() => {
+              setCurrentEditUser(null);
+              setIsUserFormOpen(true);
+            }}
+            disabled={loading}
+          >
             <PlusCircle className="mr-2 h-4 w-4" />
             Nuevo Usuario
           </Button>
@@ -404,7 +530,7 @@ const Users = () => {
             <Button 
               variant="outline" 
               size="icon" 
-              onClick={fetchUsers}
+              onClick={() => fetchUsers()}
               className="ml-2"
               disabled={loading}
             >
@@ -414,22 +540,13 @@ const Users = () => {
 
           <Card>
             <CardContent className="p-0">
-              {loading ? (
-                <div className="flex items-center justify-center h-64">
-                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
-                </div>
-              ) : filteredUsers.length === 0 ? (
-                <div className="flex flex-col items-center justify-center h-64">
-                  <p className="text-muted-foreground">No se encontraron usuarios</p>
-                </div>
-              ) : (
-                <UsersList 
-                  users={filteredUsers}
-                  onEdit={handleEditUser}
-                  onDelete={(userId) => setUserToDelete(userId)}
-                  onResetPassword={handleResetPassword}
-                />
-              )}
+              <UsersList 
+                users={filteredUsers}
+                onEdit={handleEditUser}
+                onDelete={(userId) => setUserToDelete(userId)}
+                onResetPassword={handleResetPassword}
+                isLoading={loading && users.length === 0}
+              />
             </CardContent>
           </Card>
         </TabsContent>
@@ -440,8 +557,17 @@ const Users = () => {
       </Tabs>
 
       {/* User Form Dialog */}
-      <Dialog open={isUserFormOpen} onOpenChange={setIsUserFormOpen}>
-        <DialogContent className="sm:max-w-md">
+      <Dialog 
+        open={isUserFormOpen} 
+        onOpenChange={(open) => {
+          // Only allow closing dialog if not submitting
+          if (!isSubmitting) setIsUserFormOpen(open);
+        }}
+      >
+        <DialogContent className="sm:max-w-md" onInteractOutside={(e) => {
+          // Prevent closing when submitting
+          if (isSubmitting) e.preventDefault();
+        }}>
           <DialogHeader>
             <DialogTitle>{currentEditUser ? "Editar Usuario" : "Nuevo Usuario"}</DialogTitle>
             <DialogDescription>
@@ -454,13 +580,26 @@ const Users = () => {
           <UserForm 
             user={currentEditUser || undefined}
             onSubmit={handleSubmitUserForm}
+            isSubmitting={isSubmitting}
           />
         </DialogContent>
       </Dialog>
 
       {/* Password Change Dialog */}
-      <Dialog open={isPasswordChangeOpen} onOpenChange={setIsPasswordChangeOpen}>
-        <DialogContent className="sm:max-w-md">
+      <Dialog 
+        open={isPasswordChangeOpen} 
+        onOpenChange={(open) => {
+          // Only allow closing if not processing
+          if (!isChangingPassword) setIsPasswordChangeOpen(open);
+        }}
+      >
+        <DialogContent 
+          className="sm:max-w-md"
+          onInteractOutside={(e) => {
+            // Prevent closing when processing
+            if (isChangingPassword) e.preventDefault();
+          }}
+        >
           <DialogHeader>
             <DialogTitle>Cambiar Contraseña</DialogTitle>
             <DialogDescription>
@@ -472,13 +611,20 @@ const Users = () => {
             <PasswordChangeForm 
               userId={userIdForPasswordChange}
               onSubmit={handleChangePassword}
+              isSubmitting={isChangingPassword}
             />
           )}
         </DialogContent>
       </Dialog>
 
       {/* Delete Confirmation Dialog */}
-      <AlertDialog open={!!userToDelete} onOpenChange={(open) => !open && setUserToDelete(null)}>
+      <AlertDialog 
+        open={!!userToDelete} 
+        onOpenChange={(open) => {
+          // Only allow closing if not deleting
+          if (!isDeleting && !open) setUserToDelete(null);
+        }}
+      >
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>¿Está seguro?</AlertDialogTitle>
@@ -487,12 +633,20 @@ const Users = () => {
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogCancel disabled={isDeleting}>Cancelar</AlertDialogCancel>
             <AlertDialogAction 
               onClick={handleDeleteUser}
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              disabled={isDeleting}
             >
-              Eliminar
+              {isDeleting ? (
+                <>
+                  <span className="mr-2 inline-block h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent"></span>
+                  Eliminando...
+                </>
+              ) : (
+                "Eliminar"
+              )}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

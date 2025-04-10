@@ -23,7 +23,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
-import { useEffect, memo } from "react";
+import { useEffect, memo, useState } from "react";
 
 const formSchema = z.object({
   email: z.string().email({
@@ -44,10 +44,11 @@ type FormValues = z.infer<typeof formSchema>;
 interface UserFormProps {
   user?: User & { profile?: UserProfile };
   onSubmit: (values: FormValues) => void;
+  isSubmitting?: boolean;
 }
 
-const UserForm = memo(({ user, onSubmit }: UserFormProps) => {
-  console.log("UserForm user data:", user);
+const UserForm = memo(({ user, onSubmit, isSubmitting = false }: UserFormProps) => {
+  const [isFormLoaded, setIsFormLoaded] = useState(false);
   
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
@@ -66,26 +67,41 @@ const UserForm = memo(({ user, onSubmit }: UserFormProps) => {
       // Try to get email from multiple sources with fallbacks
       const email = user.email || user.profile?.email || "";
       
-      console.log("Setting form values from user:", {
+      const formValues = {
         email,
-        full_name: user.profile?.full_name,
-        role: user.profile?.role,
-        permissions: user.profile?.permissions
-      });
-      
-      form.reset({
-        email,
-        password: "",
+        password: "", // Password always empty for edit
         full_name: user.profile?.full_name || "",
         role: user.profile?.role || "user",
         permissions: user.profile?.permissions || [],
+      };
+      
+      form.reset(formValues);
+      setIsFormLoaded(true);
+    } else {
+      // Reset form for new user
+      form.reset({
+        email: "",
+        password: "",
+        full_name: "",
+        role: "user",
+        permissions: [],
       });
+      setIsFormLoaded(true);
     }
   }, [form, user]);
 
+  const handleSubmit = (values: FormValues) => {
+    if (isSubmitting) return; // Prevent multiple submissions
+    onSubmit(values);
+  };
+
+  if (!isFormLoaded) {
+    return <div className="p-4 text-center">Cargando formulario...</div>;
+  }
+
   return (
     <Form {...form}>
-      <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+      <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-6">
         <FormField
           control={form.control}
           name="email"
@@ -97,6 +113,7 @@ const UserForm = memo(({ user, onSubmit }: UserFormProps) => {
                   placeholder="correo@ejemplo.com" 
                   {...field} 
                   readOnly={!!user}
+                  disabled={!!user || isSubmitting}
                 />
               </FormControl>
               <FormMessage />
@@ -115,7 +132,8 @@ const UserForm = memo(({ user, onSubmit }: UserFormProps) => {
                   <Input 
                     type="password" 
                     placeholder="Contraseña" 
-                    {...field} 
+                    {...field}
+                    disabled={isSubmitting} 
                   />
                 </FormControl>
                 <FormMessage />
@@ -134,6 +152,7 @@ const UserForm = memo(({ user, onSubmit }: UserFormProps) => {
                 <Input 
                   placeholder="Nombre Completo" 
                   {...field} 
+                  disabled={isSubmitting}
                 />
               </FormControl>
               <FormMessage />
@@ -147,7 +166,7 @@ const UserForm = memo(({ user, onSubmit }: UserFormProps) => {
           render={({ field }) => (
             <FormItem>
               <FormLabel>Rol</FormLabel>
-              <Select onValueChange={field.onChange} defaultValue={field.value}>
+              <Select onValueChange={field.onChange} defaultValue={field.value} disabled={isSubmitting}>
                 <FormControl>
                   <SelectTrigger>
                     <SelectValue placeholder="Seleccionar rol" />
@@ -199,6 +218,7 @@ const UserForm = memo(({ user, onSubmit }: UserFormProps) => {
                                       )
                                     );
                               }}
+                              disabled={isSubmitting}
                             />
                           </FormControl>
                           <FormLabel className="font-normal">
@@ -215,8 +235,19 @@ const UserForm = memo(({ user, onSubmit }: UserFormProps) => {
           )}
         />
         
-        <Button type="submit" className="w-full">
-          {user ? "Actualizar Usuario" : "Crear Usuario"}
+        <Button 
+          type="submit" 
+          className="w-full"
+          disabled={isSubmitting}
+        >
+          {isSubmitting ? (
+            <>
+              <span className="mr-2 inline-block h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent"></span>
+              {user ? "Actualizando..." : "Creando..."}
+            </>
+          ) : (
+            user ? "Actualizar Usuario" : "Crear Usuario"
+          )}
         </Button>
       </form>
     </Form>
