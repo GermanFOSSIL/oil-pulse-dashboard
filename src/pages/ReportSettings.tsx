@@ -79,7 +79,7 @@ const ReportSettings = () => {
 
         // Set recipients
         if (recipientsData) {
-          setRecipients(recipientsData as EmailRecipient[]);
+          setRecipients(recipientsData);
         }
 
         // Set schedule
@@ -134,7 +134,7 @@ const ReportSettings = () => {
 
       // Update local state
       if (data && data.length > 0) {
-        setRecipients([...recipients, data[0] as EmailRecipient]);
+        setRecipients([...recipients, data[0]]);
         setNewEmail("");
         toast({
           title: "Éxito",

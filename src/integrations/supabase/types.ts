@@ -190,45 +190,6 @@ export type Database = {
         }
         Relationships: []
       }
-      report_recipients: {
-        Row: {
-          created_at: string
-          email: string
-          id: string
-        }
-        Insert: {
-          created_at?: string
-          email: string
-          id?: string
-        }
-        Update: {
-          created_at?: string
-          email?: string
-          id?: string
-        }
-        Relationships: []
-      }
-      report_schedule: {
-        Row: {
-          created_at: string
-          id: string
-          settings: Json
-          updated_at: string
-        }
-        Insert: {
-          created_at?: string
-          id?: string
-          settings?: Json
-          updated_at?: string
-        }
-        Update: {
-          created_at?: string
-          id?: string
-          settings?: Json
-          updated_at?: string
-        }
-        Relationships: []
-      }
       subsystems: {
         Row: {
           completion_rate: number | null

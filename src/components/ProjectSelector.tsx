@@ -1,82 +1,74 @@
 
 import { useState, useEffect } from "react";
-import { Button } from "@/components/ui/button";
-import { 
-  DropdownMenu, 
-  DropdownMenuContent, 
-  DropdownMenuItem, 
-  DropdownMenuTrigger 
-} from "@/components/ui/dropdown-menu";
-import { getProjects } from "@/services/supabaseService";
-import { ChevronDown, Check } from "lucide-react";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { getProjects, Project } from "@/services/supabaseService";
+import { useToast } from "@/hooks/use-toast";
 
-export interface ProjectSelectorProps {
+interface ProjectSelectorProps {
   onSelectProject: (projectId: string | null) => void;
   selectedProjectId: string | null;
-  className?: string;
 }
 
-export const ProjectSelector = ({ 
-  onSelectProject, 
-  selectedProjectId,
-  className = "" 
-}: ProjectSelectorProps) => {
-  const [projects, setProjects] = useState<any[]>([]);
+export const ProjectSelector = ({ onSelectProject, selectedProjectId }: ProjectSelectorProps) => {
+  const [projects, setProjects] = useState<Project[]>([]);
   const [loading, setLoading] = useState(true);
+  const { toast } = useToast();
 
   useEffect(() => {
     const fetchProjects = async () => {
+      setLoading(true);
       try {
         const projectsData = await getProjects();
         setProjects(projectsData);
       } catch (error) {
-        console.error("Error fetching projects:", error);
+        console.error("Error al cargar proyectos:", error);
+        toast({
+          title: "Error",
+          description: "No se pudieron cargar los proyectos",
+          variant: "destructive"
+        });
       } finally {
         setLoading(false);
       }
     };
 
     fetchProjects();
-  }, []);
+  }, [toast]);
 
-  const selectedProject = selectedProjectId
-    ? projects.find(project => project.id === selectedProjectId)
-    : null;
+  const handleProjectChange = (value: string) => {
+    if (value === "all") {
+      onSelectProject(null);
+    } else {
+      onSelectProject(value);
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="w-[250px] h-10 bg-secondary/20 animate-pulse rounded-md"></div>
+    );
+  }
 
   return (
-    <DropdownMenu>
-      <DropdownMenuTrigger asChild>
-        <Button variant="outline" className={`w-full justify-between ${className}`} disabled={loading}>
-          <span className="truncate">
-            {loading
-              ? "Cargando proyectos..."
-              : selectedProject
-              ? selectedProject.name
-              : "Todos los proyectos"
-            }
-          </span>
-          <ChevronDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-        </Button>
-      </DropdownMenuTrigger>
-      <DropdownMenuContent className="w-56">
-        <DropdownMenuItem onClick={() => onSelectProject(null)}>
-          <span className="flex items-center">
-            {!selectedProjectId && <Check className="mr-2 h-4 w-4" />}
-            <span className={!selectedProjectId ? "font-medium" : ""}>Todos los proyectos</span>
-          </span>
-        </DropdownMenuItem>
-        {projects.map((project) => (
-          <DropdownMenuItem 
-            key={project.id} 
-            onClick={() => onSelectProject(project.id)}
-          >
-            <span className="flex items-center">
-              {selectedProjectId === project.id && <Check className="mr-2 h-4 w-4" />}
-              <span className={selectedProjectId === project.id ? "font-medium" : ""}>{project.name}</span>
-            </span>
-          </DropdownMenuItem>
-        ))}
-      </DropdownMenuContent>
-    </DropdownMenu>
+    <div className="flex items-center space-x-2">
+      <span className="text-sm font-medium">Proyecto:</span>
+      <Select
+        value={selectedProjectId || "all"}
+        onValueChange={handleProjectChange}
+        disabled={projects.length === 0}
+      >
+        <SelectTrigger className="w-[250px]">
+          <SelectValue placeholder="Seleccionar proyecto" />
+        </SelectTrigger>
+        <SelectContent>
+          <SelectItem value="all">Todos los proyectos</SelectItem>
+          {projects.map((project) => (
+            <SelectItem key={project.id} value={project.id}>
+              {project.name}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+    </div>
   );
 };
