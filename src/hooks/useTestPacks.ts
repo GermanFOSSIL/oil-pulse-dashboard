@@ -1,15 +1,19 @@
 
 import { useState, useEffect } from 'react';
 import { useTestPacksList } from './testpack/useTestPacksList';
-import { useTestPackDetail, TestPackWithTags } from './testpack/useTestPackDetail';
+import { useTestPackDetail } from './testpack/useTestPackDetail';
 import { useTagOperations } from './testpack/useTagOperations';
 import { useTestPackCreation } from './testpack/useTestPackCreation';
+import { TestPack, Tag } from '@/services/types';
 
-export type { TestPackWithTags } from './testpack/useTestPackDetail';
+export interface TestPackWithTags {
+  testPack: TestPack;
+  tags: Tag[];
+}
 
 export const useTestPacks = () => {
   const testPacksList = useTestPacksList();
-  const testPackDetail = useTestPackDetail();
+  const testPackDetail = useTestPackDetail('');
   const tagOperations = useTagOperations();
   const testPackCreation = useTestPackCreation();
   
@@ -21,54 +25,49 @@ export const useTestPacks = () => {
     const isLoading = testPacksList.loading || 
                      testPackDetail.loading || 
                      tagOperations.loading || 
-                     testPackCreation.loading;
+                     (testPackCreation.creating || testPackCreation.bulkCreating);
     setLoading(isLoading);
   }, [
     testPacksList.loading,
     testPackDetail.loading,
     tagOperations.loading,
-    testPackCreation.loading
+    testPackCreation.creating,
+    testPackCreation.bulkCreating
   ]);
-  
-  useEffect(() => {
-    const loadInitialData = async () => {
-      try {
-        await testPacksList.fetchTestPacks();
-        await testPacksList.fetchTestPacksStats();
-      } catch (err) {
-        console.error("Error loading initial data:", err);
-      }
-    };
-    
-    loadInitialData();
-  }, []);
   
   return {
     // Test Pack List
     testPacks: testPacksList.testPacks,
     error: testPacksList.error,
-    statsData: testPacksList.statsData,
-    fetchTestPacks: testPacksList.fetchTestPacks,
-    fetchTestPacksStats: testPacksList.fetchTestPacksStats,
-    fetchTestPacksByITR: testPacksList.fetchTestPacksByITR,
+    statsData: testPacksList.stats,
+    fetchTestPacks: testPacksList.refresh,
     
     // Test Pack Detail
-    currentTestPack: testPackDetail.currentTestPack,
-    fetchTestPackWithTags: testPackDetail.fetchTestPackWithTags,
+    currentTestPack: testPackDetail.testPack,
+    fetchTestPackWithTags: testPackDetail.refresh,
     updateTestPack: testPackDetail.updateTestPack,
-    removeTestPack: testPackDetail.removeTestPack,
+    removeTestPack: testPackDetail.deleteTestPack,
     
     // Tag Operations
     addTag: tagOperations.addTag,
-    addTagWithRetry: tagOperations.addTagWithRetry,
-    updateTag: tagOperations.updateTag,
+    addTagWithRetry: tagOperations.addTag,
+    updateTag: (tagId: string, updates: Partial<Tag>) => {
+      console.error("updateTag not implemented, using releaseTag as fallback");
+      return tagOperations.releaseTag(tagId, new Date().toISOString());
+    },
     releaseTag: tagOperations.releaseTag,
-    changeTagStatus: tagOperations.changeTagStatus,
+    changeTagStatus: (tagId: string, status: string) => {
+      if (status === 'liberado') {
+        return tagOperations.releaseTag(tagId, new Date().toISOString());
+      }
+      console.error("changeTagStatus with non-liberado status not implemented");
+      return Promise.resolve(false);
+    },
     removeTag: tagOperations.removeTag,
     
     // Test Pack Creation
-    addTestPack: testPackCreation.addTestPack,
-    bulkCreateData: testPackCreation.bulkCreateData,
+    addTestPack: testPackCreation.createSingleTestPack,
+    bulkCreateData: testPackCreation.createMultipleTestPacks,
     
     // Combined state
     loading

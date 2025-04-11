@@ -1,387 +1,227 @@
+import { useState, useEffect } from 'react';
+import { supabase } from '@/integrations/supabase/client';
+import { useToast } from '@/hooks/use-toast';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Label } from '@/components/ui/label';
+import { Input } from '@/components/ui/input';
+import { Button } from '@/components/ui/button';
+import { Switch } from '@/components/ui/switch';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { format } from 'date-fns';
 
-import { useState, useEffect } from "react";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Switch } from "@/components/ui/switch";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { EmptyPlaceholder } from "@/components/ui/EmptyPlaceholder";
-import { useToast } from "@/hooks/use-toast";
-import { supabase } from "@/integrations/supabase/client";
-import { ReportScheduleSettings } from "@/services/types";
-
-const days = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
-const monthDays = Array.from({ length: 31 }, (_, i) => (i + 1).toString());
+interface ReportScheduleSettings {
+  daily: {
+    time: string;
+    enabled: boolean;
+  };
+  weekly: {
+    day: string;
+    time: string;
+    enabled: boolean;
+  };
+  monthly: {
+    day: string;
+    time: string;
+    enabled: boolean;
+  };
+}
 
 const ReportSettings = () => {
-  const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
-  const [recipients, setRecipients] = useState<{ id: string; email: string }[]>([]);
-  const [newEmail, setNewEmail] = useState("");
   const [settings, setSettings] = useState<ReportScheduleSettings>({
-    daily: {
-      time: "08:00",
-      enabled: false
-    },
-    weekly: {
-      day: "Monday",
-      time: "08:00",
-      enabled: false
-    },
-    monthly: {
-      day: "1",
-      time: "08:00",
-      enabled: false
-    }
+    daily: { time: '08:00', enabled: false },
+    weekly: { day: 'Monday', time: '08:00', enabled: false },
+    monthly: { day: '1', time: '08:00', enabled: false },
   });
-
+  const [isSaving, setIsSaving] = useState(false);
   const { toast } = useToast();
 
   useEffect(() => {
-    const fetchData = async () => {
-      setLoading(true);
-      try {
-        // Fetch recipients
-        const { data: recipientsData, error: recipientsError } = await supabase
-          .from('report_recipients')
-          .select('*');
+    const fetchSchedule = async () => {
+      const { data, error } = await supabase
+        .from('report_schedule')
+        .select('*')
+        .limit(1)
+        .single();
 
-        if (recipientsError) {
-          console.error("Error fetching recipients:", recipientsError);
-          throw recipientsError;
-        }
+      if (error) {
+        console.error('Error fetching schedule:', error);
+        return;
+      }
 
-        setRecipients(recipientsData || []);
-
-        // Fetch schedule settings
-        const { data: scheduleData, error: scheduleError } = await supabase
-          .from('report_schedule')
-          .select('*')
-          .eq('id', '1')
-          .single();
-
-        if (scheduleError) {
-          if (scheduleError.code === 'PGRST116') {
-            // No settings found, use defaults
-            console.log("No settings found, using defaults");
-          } else {
-            console.error("Error fetching schedule settings:", scheduleError);
-            throw scheduleError;
-          }
-        } else if (scheduleData && scheduleData.settings) {
-          // Convert the settings from JSON to our type
-          const reportSettings = scheduleData.settings as ReportScheduleSettings;
-          setSettings(reportSettings);
-        }
-      } catch (error) {
-        console.error("Error loading report settings:", error);
-        toast({
-          title: "Error",
-          description: "Failed to load report settings",
-          variant: "destructive"
-        });
-      } finally {
-        setLoading(false);
+      if (data && data.settings) {
+        // Cast to ReportScheduleSettings with type assertion
+        setSettings(data.settings as ReportScheduleSettings);
       }
     };
 
-    fetchData();
-  }, [toast]);
+    fetchSchedule();
+  }, []);
 
-  const handleAddRecipient = async () => {
-    if (!newEmail.trim() || !/\S+@\S+\.\S+/.test(newEmail)) {
-      toast({
-        title: "Invalid Email",
-        description: "Please enter a valid email address",
-        variant: "destructive"
-      });
-      return;
-    }
+  const handleInputChange = (section: string, field: string, value: any) => {
+    setSettings(prevSettings => ({
+      ...prevSettings,
+      [section]: {
+        ...prevSettings[section as keyof ReportScheduleSettings],
+        [field]: value,
+      },
+    }));
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsSaving(true);
 
     try {
       const { data, error } = await supabase
-        .from('report_recipients')
-        .insert([{ email: newEmail.trim() }])
-        .select();
-
-      if (error) {
-        throw error;
-      }
-
-      setRecipients([...recipients, ...(data || [])]);
-      setNewEmail("");
-      toast({
-        title: "Success",
-        description: "Recipient added successfully"
-      });
-    } catch (error) {
-      console.error("Error adding recipient:", error);
-      toast({
-        title: "Error",
-        description: "Failed to add recipient",
-        variant: "destructive"
-      });
-    }
-  };
-
-  const handleRemoveRecipient = async (id: string) => {
-    try {
-      const { error } = await supabase
-        .from('report_recipients')
-        .delete()
-        .eq('id', id);
-
-      if (error) {
-        throw error;
-      }
-
-      setRecipients(recipients.filter(r => r.id !== id));
-      toast({
-        title: "Success",
-        description: "Recipient removed successfully"
-      });
-    } catch (error) {
-      console.error("Error removing recipient:", error);
-      toast({
-        title: "Error",
-        description: "Failed to remove recipient",
-        variant: "destructive"
-      });
-    }
-  };
-
-  const handleSaveSettings = async () => {
-    setSaving(true);
-    try {
-      // Convert settings to proper format for Supabase
-      const { error } = await supabase
         .from('report_schedule')
-        .upsert({
-          id: '1',
-          settings: settings as any
+        .upsert({ 
+          id: '1', 
+          settings: settings as any, // Cast to any to avoid type issues
+          updated_at: new Date().toISOString() 
         });
 
-      if (error) {
-        throw error;
-      }
+      if (error) throw error;
 
       toast({
-        title: "Success",
-        description: "Report schedule settings saved successfully"
+        title: 'Configuration Saved',
+        description: 'Report schedule settings have been updated successfully',
       });
     } catch (error) {
-      console.error("Error saving schedule settings:", error);
+      console.error('Error saving settings:', error);
       toast({
-        title: "Error",
-        description: "Failed to save schedule settings",
-        variant: "destructive"
+        title: 'Error',
+        description: 'Failed to save settings. Please try again.',
+        variant: 'destructive',
       });
     } finally {
-      setSaving(false);
+      setIsSaving(false);
     }
   };
 
   return (
-    <div className="space-y-6 container">
-      <div>
-        <h2 className="text-3xl font-bold tracking-tight">Report Settings</h2>
-        <p className="text-muted-foreground">Configure automatic report delivery</p>
-      </div>
-
-      <div className="grid gap-6 md:grid-cols-2">
-        {/* Recipients */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Report Recipients</CardTitle>
-            <CardDescription>
-              Add or remove email addresses for report delivery
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="flex gap-2">
-              <Input
-                placeholder="Enter email address"
-                value={newEmail}
-                onChange={(e) => setNewEmail(e.target.value)}
-              />
-              <Button onClick={handleAddRecipient}>Add</Button>
-            </div>
-            {recipients.length === 0 ? (
-              <EmptyPlaceholder
-                title="No recipients"
-                description="Add email addresses to receive automated reports"
-              />
-            ) : (
-              <div className="space-y-2">
-                {recipients.map((recipient) => (
-                  <div key={recipient.id} className="flex justify-between items-center p-2 bg-muted rounded-md">
-                    <span>{recipient.email}</span>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => handleRemoveRecipient(recipient.id)}
-                    >
-                      Remove
-                    </Button>
-                  </div>
-                ))}
-              </div>
-            )}
-          </CardContent>
-        </Card>
-
-        {/* Schedule Settings */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Schedule Settings</CardTitle>
-            <CardDescription>
-              Configure when reports should be sent
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-6">
-            {/* Daily reports */}
+    <div className="container mx-auto py-10">
+      <Card>
+        <CardHeader>
+          <CardTitle>Report Schedule Settings</CardTitle>
+          <CardDescription>Configure when to send automated reports.</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <form onSubmit={handleSubmit} className="space-y-6">
+            {/* Daily Settings */}
             <div className="space-y-2">
-              <div className="flex justify-between">
-                <Label>Daily Reports</Label>
+              <div className="flex items-center justify-between">
+                <Label htmlFor="daily-enabled">Daily Report</Label>
                 <Switch
+                  id="daily-enabled"
                   checked={settings.daily.enabled}
-                  onCheckedChange={(checked) => setSettings({
-                    ...settings,
-                    daily: { ...settings.daily, enabled: checked }
-                  })}
+                  onCheckedChange={(checked) => handleInputChange('daily', 'enabled', checked)}
                 />
               </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-1">
-                  <Label htmlFor="daily-time">Time</Label>
+              {settings.daily.enabled && (
+                <div className="grid grid-cols-2 items-center gap-4">
+                  <Label htmlFor="daily-time">Time:</Label>
                   <Input
+                    type="time"
                     id="daily-time"
-                    type="time"
                     value={settings.daily.time}
-                    onChange={(e) => setSettings({
-                      ...settings,
-                      daily: { ...settings.daily, time: e.target.value }
-                    })}
-                    disabled={!settings.daily.enabled}
+                    onChange={(e) => handleInputChange('daily', 'time', e.target.value)}
                   />
                 </div>
-              </div>
+              )}
             </div>
 
-            {/* Weekly reports */}
+            {/* Weekly Settings */}
             <div className="space-y-2">
-              <div className="flex justify-between">
-                <Label>Weekly Reports</Label>
+              <div className="flex items-center justify-between">
+                <Label htmlFor="weekly-enabled">Weekly Report</Label>
                 <Switch
+                  id="weekly-enabled"
                   checked={settings.weekly.enabled}
-                  onCheckedChange={(checked) => setSettings({
-                    ...settings,
-                    weekly: { ...settings.weekly, enabled: checked }
-                  })}
+                  onCheckedChange={(checked) => handleInputChange('weekly', 'enabled', checked)}
                 />
               </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-1">
-                  <Label htmlFor="weekly-day">Day</Label>
-                  <Select
-                    value={settings.weekly.day}
-                    onValueChange={(value) => setSettings({
-                      ...settings,
-                      weekly: { ...settings.weekly, day: value }
-                    })}
-                    disabled={!settings.weekly.enabled}
-                  >
-                    <SelectTrigger id="weekly-day">
-                      <SelectValue placeholder="Select day" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {days.map((day) => (
-                        <SelectItem key={day} value={day}>
-                          {day}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+              {settings.weekly.enabled && (
+                <div className="space-y-2">
+                  <div className="grid grid-cols-2 items-center gap-4">
+                    <Label htmlFor="weekly-day">Day:</Label>
+                    <Select
+                      onValueChange={(value) => handleInputChange('weekly', 'day', value)}
+                      defaultValue={settings.weekly.day}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select a day" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="Monday">Monday</SelectItem>
+                        <SelectItem value="Tuesday">Tuesday</SelectItem>
+                        <SelectItem value="Wednesday">Wednesday</SelectItem>
+                        <SelectItem value="Thursday">Thursday</SelectItem>
+                        <SelectItem value="Friday">Friday</SelectItem>
+                        <SelectItem value="Saturday">Saturday</SelectItem>
+                        <SelectItem value="Sunday">Sunday</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="grid grid-cols-2 items-center gap-4">
+                    <Label htmlFor="weekly-time">Time:</Label>
+                    <Input
+                      type="time"
+                      id="weekly-time"
+                      value={settings.weekly.time}
+                      onChange={(e) => handleInputChange('weekly', 'time', e.target.value)}
+                    />
+                  </div>
                 </div>
-                <div className="space-y-1">
-                  <Label htmlFor="weekly-time">Time</Label>
-                  <Input
-                    id="weekly-time"
-                    type="time"
-                    value={settings.weekly.time}
-                    onChange={(e) => setSettings({
-                      ...settings,
-                      weekly: { ...settings.weekly, time: e.target.value }
-                    })}
-                    disabled={!settings.weekly.enabled}
-                  />
-                </div>
-              </div>
+              )}
             </div>
 
-            {/* Monthly reports */}
+            {/* Monthly Settings */}
             <div className="space-y-2">
-              <div className="flex justify-between">
-                <Label>Monthly Reports</Label>
+              <div className="flex items-center justify-between">
+                <Label htmlFor="monthly-enabled">Monthly Report</Label>
                 <Switch
+                  id="monthly-enabled"
                   checked={settings.monthly.enabled}
-                  onCheckedChange={(checked) => setSettings({
-                    ...settings,
-                    monthly: { ...settings.monthly, enabled: checked }
-                  })}
+                  onCheckedChange={(checked) => handleInputChange('monthly', 'enabled', checked)}
                 />
               </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-1">
-                  <Label htmlFor="monthly-day">Day</Label>
-                  <Select
-                    value={settings.monthly.day}
-                    onValueChange={(value) => setSettings({
-                      ...settings,
-                      monthly: { ...settings.monthly, day: value }
-                    })}
-                    disabled={!settings.monthly.enabled}
-                  >
-                    <SelectTrigger id="monthly-day">
-                      <SelectValue placeholder="Select day" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {monthDays.map((day) => (
-                        <SelectItem key={day} value={day}>
-                          {day}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+              {settings.monthly.enabled && (
+                <div className="space-y-2">
+                  <div className="grid grid-cols-2 items-center gap-4">
+                    <Label htmlFor="monthly-day">Day:</Label>
+                    <Select
+                      onValueChange={(value) => handleInputChange('monthly', 'day', value)}
+                      defaultValue={settings.monthly.day}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select a day" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {Array.from({ length: 31 }, (_, i) => i + 1).map((day) => (
+                          <SelectItem key={day} value={String(day)}>{day}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="grid grid-cols-2 items-center gap-4">
+                    <Label htmlFor="monthly-time">Time:</Label>
+                    <Input
+                      type="time"
+                      id="monthly-time"
+                      value={settings.monthly.time}
+                      onChange={(e) => handleInputChange('monthly', 'time', e.target.value)}
+                    />
+                  </div>
                 </div>
-                <div className="space-y-1">
-                  <Label htmlFor="monthly-time">Time</Label>
-                  <Input
-                    id="monthly-time"
-                    type="time"
-                    value={settings.monthly.time}
-                    onChange={(e) => setSettings({
-                      ...settings,
-                      monthly: { ...settings.monthly, time: e.target.value }
-                    })}
-                    disabled={!settings.monthly.enabled}
-                  />
-                </div>
-              </div>
+              )}
             </div>
-          </CardContent>
-          <CardFooter>
-            <Button
-              onClick={handleSaveSettings}
-              disabled={saving}
-              className="w-full"
-            >
-              {saving ? "Saving..." : "Save Settings"}
+
+            <Button type="submit" disabled={isSaving}>
+              {isSaving ? 'Saving...' : 'Save Configuration'}
             </Button>
-          </CardFooter>
-        </Card>
-      </div>
+          </form>
+        </CardContent>
+      </Card>
     </div>
   );
 };

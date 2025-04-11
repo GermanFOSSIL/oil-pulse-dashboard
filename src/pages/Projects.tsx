@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { ProjectList } from "@/components/project/ProjectList";
 import { ProjectFormModal } from "@/components/modals/ProjectFormModal";
@@ -86,11 +85,10 @@ const Projects = () => {
         onDelete={handleProjectDeleted}
       />
       <ProjectFormModal
-        open={isFormModalOpen}
+        isOpen={isFormModalOpen}
         onClose={handleCloseModal}
+        onSuccess={handleProjectCreated}
         project={selectedProject}
-        onProjectCreated={handleProjectCreated}
-        onProjectUpdated={handleProjectUpdated}
       />
     </div>
   );

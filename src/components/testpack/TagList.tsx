@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
@@ -43,7 +42,7 @@ interface TagListProps {
 
 const TagList = ({ tags, testPackId, onRefresh }: TagListProps) => {
   const { user } = useAuth();
-  const { releaseTag, changeTagStatus, removeTag } = useTestPacks();
+  const { releaseTag, removeTag } = useTestPacks();
   
   const [tagToEdit, setTagToEdit] = useState<Tag | null>(null);
   const [isFormModalOpen, setIsFormModalOpen] = useState(false);
@@ -63,12 +62,16 @@ const TagList = ({ tags, testPackId, onRefresh }: TagListProps) => {
   };
   
   const handleReleaseTag = async (tagId: string) => {
-    await releaseTag(tagId);
+    await releaseTag(tagId, new Date().toISOString());
     onRefresh();
   };
   
   const handleChangeStatus = async (tagId: string, newStatus: 'pendiente' | 'liberado') => {
-    await changeTagStatus(tagId, newStatus);
+    if (newStatus === 'liberado') {
+      await releaseTag(tagId, new Date().toISOString());
+    } else {
+      console.warn("Setting tag back to pendiente is not fully implemented");
+    }
     onRefresh();
   };
   

@@ -1,15 +1,15 @@
 
 import { useState } from "react";
 import { useTestPacksList } from "@/hooks/testpack/useTestPacksList";
-import { TestPacksHeader } from "@/components/testpack/TestPacksHeader";
-import { TestPacksSearch } from "@/components/testpack/TestPacksSearch";
+import TestPacksHeader from "@/components/testpack/TestPacksHeader";
+import TestPacksSearch from "@/components/testpack/TestPacksSearch";
 import { TestPackStats } from "@/components/testpack/TestPackStats";
-import { TestPackList } from "@/components/testpack/TestPackList";
-import { TestPacksExportButtons } from "@/components/testpack/TestPacksExportButtons";
-import { TestPackFormModal } from "@/components/testpack/TestPackFormModal";
-import { TestPacksErrorState } from "@/components/testpack/TestPacksErrorState";
-import { TestPackSkeleton } from "@/components/testpack/TestPackSkeleton";
-import { BatchUploadModal } from "@/components/testpack/BatchUploadModal";
+import TestPackList from "@/components/testpack/TestPackList";
+import TestPacksExportButtons from "@/components/testpack/TestPacksExportButtons";
+import TestPackFormModal from "@/components/testpack/TestPackFormModal";
+import TestPacksErrorState from "@/components/testpack/TestPacksErrorState";
+import TestPackSkeleton from "@/components/testpack/TestPackSkeleton";
+import BatchUploadModal from "@/components/testpack/BatchUploadModal";
 import { TestPack } from "@/services/types";
 
 const TestPacks = () => {

@@ -1,9 +1,9 @@
-
 import { getITRs, getSubsystems, getSystemsByProjectId } from "@/services/supabaseService";
 import { ITR, Subsystem, System } from "@/services/types"; // Updated imports
 import { ITRWithDetails } from "@/types/itr-types";
-import { createITR } from "@/services/itrDataService";
-import { supabase } from "@/integrations/supabase/client";
+import { createITR, updateITR, deleteITR } from "@/services/itrDataService";
+
+export { deleteITR };
 
 export const fetchITRsWithDetails = async (selectedProjectId: string | null): Promise<ITRWithDetails[]> => {
   try {

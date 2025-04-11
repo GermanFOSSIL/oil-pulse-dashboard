@@ -11,6 +11,7 @@ export interface UserProfile {
   permissions?: string[];
   created_at?: string;
   updated_at?: string;
+  avatar_url?: string;
 }
 
 // Available permissions
@@ -36,7 +37,7 @@ export const AVAILABLE_PERMISSIONS = [
 export const getUserProfiles = async (): Promise<UserProfile[]> => {
   try {
     const { data, error } = await supabase
-      .from('user_profiles')
+      .from('profiles')
       .select('*');
       
     if (error) {
@@ -55,7 +56,7 @@ export const getUserProfiles = async (): Promise<UserProfile[]> => {
 export const getUserPermissions = async (userId: string): Promise<string[]> => {
   try {
     const { data, error } = await supabase
-      .from('user_profiles')
+      .from('profiles')
       .select('permissions')
       .eq('id', userId)
       .single();
@@ -95,7 +96,7 @@ export const updateUserProfile = async (userData: UserUpdateData): Promise<UserP
     }
     
     const { data, error } = await supabase
-      .from('user_profiles')
+      .from('profiles')
       .update(updates)
       .eq('id', userData.id)
       .select()
@@ -144,7 +145,7 @@ export const bulkCreateUsers = async (users: BulkUserData[]): Promise<{ created:
       const userId = authData.user.id;
       
       const { error: profileError } = await supabase
-        .from('user_profiles')
+        .from('profiles')
         .insert({
           id: userId,
           full_name: user.full_name,
@@ -209,7 +210,7 @@ export const deleteUser = async (userId: string): Promise<void> => {
   try {
     // First delete the user profile
     const { error: profileError } = await supabase
-      .from('user_profiles')
+      .from('profiles')
       .delete()
       .eq('id', userId);
       

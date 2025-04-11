@@ -8,10 +8,10 @@ import {
   AVAILABLE_PERMISSIONS
 } from "@/services/userService";
 import { UserProfile, PasswordChangeData } from "@/services/types";
-import { UsersList } from "@/components/users/UsersList";
-import { UserForm } from "@/components/users/UserForm";
-import { BulkUserUpload } from "@/components/users/BulkUserUpload";
-import { PasswordChangeForm } from "@/components/users/PasswordChangeForm";
+import UsersList from "@/components/users/UsersList";
+import UserForm from "@/components/users/UserForm";
+import BulkUserUpload from "@/components/users/BulkUserUpload";
+import PasswordChangeForm from "@/components/users/PasswordChangeForm";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Plus, Upload } from "lucide-react";
