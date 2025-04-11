@@ -1,89 +1,192 @@
 
-import { useState } from "react";
-import { useTestPacksList } from "@/hooks/testpack/useTestPacksList";
+import { useState, useEffect } from "react";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { useTestPacks } from "@/hooks/useTestPacks";
+import TestPackList from "@/components/testpack/TestPackList";
+import TestPackStats from "@/components/testpack/TestPackStats";
+import TestPackFormModal from "@/components/testpack/TestPackFormModal";
+import BatchUploadModal from "@/components/testpack/BatchUploadModal";
+import { DatabaseActivityTimeline } from "@/components/DatabaseActivityTimeline";
+import TestPackSkeleton from "@/components/testpack/TestPackSkeleton";
+import ErrorBoundary from "@/components/ErrorBoundary";
+import { useTimeout } from "@/hooks/useTimeout";
+import { generateReport, exportToExcel } from "@/services/reportService";
+import { useToast } from "@/hooks/use-toast";
 import TestPacksHeader from "@/components/testpack/TestPacksHeader";
 import TestPacksSearch from "@/components/testpack/TestPacksSearch";
-import { TestPackStats } from "@/components/testpack/TestPackStats";
-import TestPackList from "@/components/testpack/TestPackList";
 import TestPacksExportButtons from "@/components/testpack/TestPacksExportButtons";
-import TestPackFormModal from "@/components/testpack/TestPackFormModal";
 import TestPacksErrorState from "@/components/testpack/TestPacksErrorState";
-import TestPackSkeleton from "@/components/testpack/TestPackSkeleton";
-import BatchUploadModal from "@/components/testpack/BatchUploadModal";
-import { TestPack } from "@/services/types";
 
 const TestPacks = () => {
-  const [searchQuery, setSearchQuery] = useState("");
+  const { testPacks, loading, error, statsData, fetchTestPacks } = useTestPacks();
+  const [searchTerm, setSearchTerm] = useState("");
   const [isFormModalOpen, setIsFormModalOpen] = useState(false);
-  const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
-  const { testPacks, stats, loading, error, refresh } = useTestPacksList();
-
-  const filteredTestPacks = testPacks.filter((testPack) => {
-    const query = searchQuery.toLowerCase();
+  const [isBatchUploadModalOpen, setIsBatchUploadModalOpen] = useState(false);
+  const [isExporting, setIsExporting] = useState(false);
+  const { toast } = useToast();
+  
+  const { isTimedOut, startTimeout, cancelTimeout } = useTimeout(20000);
+  
+  useEffect(() => {
+    if (loading) {
+      startTimeout();
+    } else {
+      cancelTimeout();
+    }
+  }, [loading, startTimeout, cancelTimeout]);
+  
+  const filteredTestPacks = testPacks.filter(
+    (testPack) => testPack.nombre_paquete.toLowerCase().includes(searchTerm.toLowerCase())
+  );
+  
+  const handleRetry = () => {
+    cancelTimeout();
+    fetchTestPacks();
+  };
+  
+  const handleExportPDF = async () => {
+    try {
+      setIsExporting(true);
+      const pdfUrl = await generateReport('project_status');
+      window.open(pdfUrl, '_blank');
+      toast({
+        title: "PDF generado exitosamente",
+        description: "El reporte se ha abierto en una nueva pestaña",
+      });
+    } catch (error) {
+      console.error("Error al generar PDF:", error);
+      toast({
+        title: "Error",
+        description: "No se pudo generar el reporte PDF",
+        variant: "destructive",
+      });
+    } finally {
+      setIsExporting(false);
+    }
+  };
+  
+  const handleExportExcel = () => {
+    try {
+      setIsExporting(true);
+      
+      const testPacksForExcel = testPacks.map(tp => ({
+        Nombre: tp.nombre_paquete,
+        ITR: tp.itr_asociado,
+        Sistema: tp.sistema,
+        Subsistema: tp.subsistema,
+        Estado: tp.estado
+      }));
+      
+      exportToExcel(testPacksForExcel, 'Test_Packs', 'test_packs_export.xlsx');
+      
+      toast({
+        title: "Excel generado exitosamente",
+        description: "El archivo se ha descargado",
+      });
+    } catch (error) {
+      console.error("Error al generar Excel:", error);
+      toast({
+        title: "Error",
+        description: "No se pudo generar el archivo Excel",
+        variant: "destructive",
+      });
+    } finally {
+      setIsExporting(false);
+    }
+  };
+  
+  if ((error || isTimedOut) && !loading) {
     return (
-      testPack.nombre_paquete.toLowerCase().includes(query) ||
-      testPack.sistema.toLowerCase().includes(query) ||
-      testPack.subsistema.toLowerCase().includes(query) ||
-      testPack.estado.toLowerCase().includes(query)
+      <TestPacksErrorState 
+        errorMessage={error} 
+        onRetry={handleRetry} 
+      />
     );
-  });
-
-  // Handle search input
-  const handleSearch = (query: string) => {
-    setSearchQuery(query);
-  };
-
-  // Handle "Add Test Pack" button click
-  const handleAddClick = () => {
-    setIsFormModalOpen(true);
-  };
-
-  // Handle "Batch Upload" button click
-  const handleBatchUploadClick = () => {
-    setIsUploadModalOpen(true);
-  };
-
-  // Handle successful creation/update
-  const handleSuccess = () => {
-    refresh();
-    setIsFormModalOpen(false);
-    setIsUploadModalOpen(false);
-  };
+  }
 
   return (
-    <div className="space-y-6">
-      <TestPacksHeader
-        onAddClick={handleAddClick}
-        onBatchUploadClick={handleBatchUploadClick}
-      />
+    <ErrorBoundary>
+      <div className="space-y-6">
+        <TestPacksHeader 
+          onCreateNew={() => setIsFormModalOpen(true)}
+          onBatchUpload={() => setIsBatchUploadModalOpen(true)}
+          statsData={statsData?.testPacks}
+        />
 
-      <TestPackStats />
+        <Tabs defaultValue="dashboard" className="space-y-4">
+          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+            <TabsList>
+              <TabsTrigger value="dashboard">Dashboard</TabsTrigger>
+              <TabsTrigger value="list">Lista</TabsTrigger>
+              <TabsTrigger value="activity">Actividad</TabsTrigger>
+            </TabsList>
+            
+            <TestPacksSearch 
+              searchTerm={searchTerm}
+              onSearchChange={setSearchTerm}
+            />
+          </div>
 
-      <div className="flex flex-col md:flex-row justify-between gap-4 mb-6">
-        <TestPacksSearch onSearch={handleSearch} />
-        <TestPacksExportButtons testPacks={filteredTestPacks} />
+          <TabsContent value="dashboard" className="space-y-4">
+            <TestPacksExportButtons 
+              isExporting={isExporting}
+              isLoading={loading}
+              hasData={testPacks.length > 0}
+              onExportExcel={handleExportExcel}
+              onExportPDF={handleExportPDF}
+            />
+            
+            {loading ? (
+              <TestPackSkeleton />
+            ) : (
+              <TestPackStats statsData={statsData} />
+            )}
+          </TabsContent>
+          
+          <TabsContent value="list" className="space-y-4">
+            <TestPacksExportButtons 
+              isExporting={isExporting}
+              isLoading={loading}
+              hasData={testPacks.length > 0}
+              onExportExcel={handleExportExcel}
+              onExportPDF={handleExportPDF}
+            />
+            
+            {loading ? (
+              <TestPackSkeleton />
+            ) : (
+              <TestPackList 
+                testPacks={filteredTestPacks} 
+                loading={loading} 
+                onRefresh={fetchTestPacks}
+              />
+            )}
+          </TabsContent>
+
+          <TabsContent value="activity" className="space-y-4">
+            <DatabaseActivityTimeline />
+          </TabsContent>
+        </Tabs>
+
+        <TestPackFormModal 
+          isOpen={isFormModalOpen} 
+          onClose={() => setIsFormModalOpen(false)} 
+          onSuccess={() => {
+            setIsFormModalOpen(false);
+            fetchTestPacks();
+          }}
+        />
+
+        <BatchUploadModal
+          isOpen={isBatchUploadModalOpen}
+          onClose={() => setIsBatchUploadModalOpen(false)}
+          onSuccess={() => {
+            setIsBatchUploadModalOpen(false);
+            fetchTestPacks();
+          }}
+        />
       </div>
-
-      {error ? (
-        <TestPacksErrorState error={error} onRetry={refresh} />
-      ) : loading ? (
-        <TestPackSkeleton />
-      ) : (
-        <TestPackList testPacks={filteredTestPacks} onRefresh={refresh} />
-      )}
-
-      <TestPackFormModal
-        isOpen={isFormModalOpen}
-        onClose={() => setIsFormModalOpen(false)}
-        onSuccess={handleSuccess}
-      />
-
-      <BatchUploadModal
-        isOpen={isUploadModalOpen}
-        onClose={() => setIsUploadModalOpen(false)}
-        onSuccess={handleSuccess}
-      />
-    </div>
+    </ErrorBoundary>
   );
 };
 

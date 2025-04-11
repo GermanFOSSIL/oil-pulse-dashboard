@@ -1,10 +1,12 @@
-import { useState, useEffect } from 'react';
-import { supabase } from '@/integrations/supabase/client';
-import { getUserProfiles } from '@/services/userService';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { format, parseISO } from 'date-fns';
-import { es } from 'date-fns/locale';
+
+import { useState, useEffect } from "react";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { supabase } from "@/integrations/supabase/client";
+import { getUserProfile } from "@/services/userService";
+import { Separator } from "@/components/ui/separator";
+import { format } from "date-fns";
+import { es } from "date-fns/locale";
+import { Calendar, User } from "lucide-react";
 
 interface DatabaseActivity {
   id: string;
@@ -25,6 +27,7 @@ export const DatabaseActivityTimeline = () => {
     const fetchActivities = async () => {
       try {
         setLoading(true);
+        // Execute a raw query to get activity log data
         const { data, error } = await supabase
           .from('db_activity_log')
           .select('*')
@@ -36,13 +39,14 @@ export const DatabaseActivityTimeline = () => {
           return;
         }
 
+        // Enrich with user names
         const enrichedActivities = await Promise.all((data || []).map(async (activity: any) => {
           if (activity.user_id) {
             try {
-              const profiles = await getUserProfiles([activity.user_id]);
+              const profile = await getUserProfile(activity.user_id);
               return {
                 ...activity,
-                userName: profiles[0]?.full_name || "Usuario desconocido"
+                userName: profile?.full_name || "Usuario desconocido"
               };
             } catch (error) {
               console.error('Error fetching user profile:', error);
@@ -68,6 +72,7 @@ export const DatabaseActivityTimeline = () => {
 
     fetchActivities();
     
+    // Set up real-time subscription
     const channel = supabase
       .channel('db-activity-changes')
       .on(
@@ -76,6 +81,7 @@ export const DatabaseActivityTimeline = () => {
         (payload) => {
           setActivities(prevActivities => {
             const newActivity = payload.new as DatabaseActivity;
+            // To avoid duplicates
             if (prevActivities.some(act => act.id === newActivity.id)) {
               return prevActivities;
             }
@@ -114,7 +120,7 @@ export const DatabaseActivityTimeline = () => {
 
   const formatDateTime = (dateString: string) => {
     try {
-      return format(parseISO(dateString), "d 'de' MMMM, yyyy HH:mm", { locale: es });
+      return format(new Date(dateString), "d 'de' MMMM, yyyy HH:mm", { locale: es });
     } catch (e) {
       return dateString;
     }

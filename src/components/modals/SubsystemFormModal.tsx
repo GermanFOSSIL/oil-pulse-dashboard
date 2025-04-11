@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
@@ -6,14 +5,13 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
-import { Subsystem, System } from "@/services/types";
-import { createSubsystem, updateSubsystem } from "@/services/subsystemService";
+import { Subsystem, System, createSubsystem, updateSubsystem } from "@/services/supabaseService";
 
 interface SubsystemFormModalProps {
   open: boolean;
   onClose: () => void;
   onSuccess: () => void;
-  subsystem?: Subsystem | null;
+  subsystem?: Subsystem;
   systems: System[];
 }
 

@@ -1,3 +1,4 @@
+
 import React, { useEffect, useRef, useState } from 'react';
 import { gantt } from 'dhtmlx-gantt';
 import 'dhtmlx-gantt/codebase/dhtmlxgantt.css';
@@ -17,7 +18,6 @@ import { jsPDF } from 'jspdf';
 import 'jspdf-autotable';
 import html2canvas from 'html2canvas';
 import { useToast } from "@/hooks/use-toast";
-import { GanttTask } from "@/services/types";
 
 interface GanttItem {
   id: string;
@@ -33,12 +33,10 @@ interface GanttItem {
 }
 
 interface EnhancedGanttProps {
-  data?: GanttItem[];
-  tasks: GanttTask[];
-  height?: number;
+  data: GanttItem[];
 }
 
-export const EnhancedGanttChart: React.FC<EnhancedGanttProps> = ({ data, tasks, height = 500 }) => {
+export const EnhancedGanttChart: React.FC<EnhancedGanttProps> = ({ data }) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const ganttChartRef = useRef<HTMLDivElement>(null);
   const [currentDate, setCurrentDate] = useState(new Date());
@@ -70,7 +68,7 @@ export const EnhancedGanttChart: React.FC<EnhancedGanttProps> = ({ data, tasks, 
           'Fin': item.end,
           'Progreso (%)': item.progress,
           'Estado': item.status || 'No definido',
-          'Cantidad': item.quantity || 1
+          'Cantidad': item.quantity || 1 // Exportamos la cantidad
         };
       });
       
@@ -84,7 +82,7 @@ export const EnhancedGanttChart: React.FC<EnhancedGanttProps> = ({ data, tasks, 
         { wch: 15 },
         { wch: 15 },
         { wch: 15 },
-        { wch: 10 }
+        { wch: 10 }  // Ancho para la columna de cantidad
       ];
       ws['!cols'] = colWidths;
       
@@ -271,10 +269,12 @@ export const EnhancedGanttChart: React.FC<EnhancedGanttProps> = ({ data, tasks, 
         }
       ];
       
+      // Fix the progress text to not overlap with task name
       gantt.templates.progress_text = function(start, end, task) {
-        return "";
+        return ""; // Remove the text inside the progress bar
       };
       
+      // Add a custom right-aligned progress display
       gantt.templates.rightside_text = function(start, end, task) {
         return "<span class='gantt-task-progress-value'>" + Math.round(task.progress * 100) + "%</span>";
       };
@@ -489,8 +489,8 @@ export const EnhancedGanttChart: React.FC<EnhancedGanttProps> = ({ data, tasks, 
   }, [initialized]);
   
   useEffect(() => {
-    if (initialized && tasks && tasks.length > 0) {
-      const processedData = tasks.map(item => {
+    if (initialized && data.length > 0) {
+      const processedData = data.map(item => {
         const startDate = item.start ? new Date(item.start) : new Date();
         const endDate = item.end ? new Date(item.end) : new Date(startDate);
         
@@ -507,7 +507,7 @@ export const EnhancedGanttChart: React.FC<EnhancedGanttProps> = ({ data, tasks, 
           parent: item.parent || 0,
           type: item.type,
           status: item.status,
-          quantity: item.quantity || 1,
+          quantity: item.quantity || 1, // Agregamos la cantidad
           open: true,
           duration: Math.ceil((endDate.getTime() - startDate.getTime()) / (24 * 60 * 60 * 1000)),
           color_class: item.type === "project" ? "gantt-task-project" : 
@@ -518,10 +518,23 @@ export const EnhancedGanttChart: React.FC<EnhancedGanttProps> = ({ data, tasks, 
         };
       });
 
-      gantt.config.scales = [
-        { unit: "month", step: 1, format: "%F %Y" },
-        { unit: "day", step: 1, format: "%j" }
-      ];
+      // Configuración de escalas basada en el modo de vista seleccionado
+      if (viewMode === "month") {
+        gantt.config.scales = [
+          { unit: "month", step: 1, format: "%F %Y" },
+          { unit: "day", step: 1, format: "%j" }
+        ];
+      } else if (viewMode === "week") {
+        gantt.config.scales = [
+          { unit: "week", step: 1, format: "Semana #%W" },
+          { unit: "day", step: 1, format: "%j %D" }
+        ];
+      } else if (viewMode === "day") {
+        gantt.config.scales = [
+          { unit: "day", step: 1, format: "%j %D" },
+          { unit: "hour", step: 2, format: "%H:00" }
+        ];
+      }
       
       gantt.templates.task_class = (start, end, task) => {
         return task.color_class || "gantt-task-itr";
@@ -533,10 +546,12 @@ export const EnhancedGanttChart: React.FC<EnhancedGanttProps> = ({ data, tasks, 
         links: []
       });
       
+      // Asegúrate de que showDate funcione correctamente
       try {
         gantt.showDate(currentDate);
       } catch (error) {
         console.error("Error al mostrar la fecha en el Gantt:", error);
+        // Si falla, intentamos con setCurrentScale como alternativa
         try {
           gantt.setCurrentScale(viewMode === "day" ? "day" : viewMode === "week" ? "week" : "month");
         } catch (error) {
@@ -551,7 +566,7 @@ export const EnhancedGanttChart: React.FC<EnhancedGanttProps> = ({ data, tasks, 
       gantt.render();
       setTimeout(updateTodayMarker, 100);
     }
-  }, [tasks, currentDate, viewMode, initialized]);
+  }, [data, currentDate, viewMode, initialized]);
   
   return (
     <div className="flex flex-col space-y-4" ref={ganttChartRef}>
@@ -600,6 +615,7 @@ export const EnhancedGanttChart: React.FC<EnhancedGanttProps> = ({ data, tasks, 
       </div>
       
       <div className="border rounded-lg mx-4">
+        {/* Timeline header with current year and date range */}
         <div className="border-b bg-gray-50 p-2 flex justify-between items-center">
           <div className="text-sm font-medium text-gray-700">
             Año: {getYear(currentDate)}

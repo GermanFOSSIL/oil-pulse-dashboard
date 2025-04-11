@@ -1,282 +1,304 @@
 
-import { useState, useEffect } from 'react';
-import { zodResolver } from '@hookform/resolvers/zod';
-import { useForm } from 'react-hook-form';
-import { z } from 'zod';
-import { 
-  Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle 
-} from '@/components/ui/dialog';
-import { Button } from '@/components/ui/button';
-import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
-import { Input } from '@/components/ui/input';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { useToast } from '@/hooks/use-toast';
-import { ITR, Subsystem, System } from '@/services/types';
-import { ITRWithActions } from '@/types/itr-types';
-import { createITR, updateITR, deleteITR } from '@/services/itrDataService';
+import { useState, useEffect } from "react";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Label } from "@/components/ui/label";
+import { useToast } from "@/hooks/use-toast";
+import { ITR, Subsystem } from "@/services/types";
+import { createITR, updateITR } from "@/services/itrDataService";
 
-export interface ITRFormModalProps {
+interface ITRFormModalProps {
   open: boolean;
   onClose: () => void;
-  itr?: ITRWithActions;
-  systems: System[];
-  subsystems: Subsystem[];
   onSuccess: () => void;
+  itr?: ITR;
+  subsystems: Subsystem[];
 }
 
-const formSchema = z.object({
-  name: z.string().min(1, 'El nombre es requerido'),
-  subsystem_id: z.string().min(1, 'Debe seleccionar un subsistema'),
-  status: z.enum(['complete', 'inprogress', 'delayed']),
-  assigned_to: z.string().optional(),
-  start_date: z.string().optional(),
-  end_date: z.string().optional(),
-  progress: z.coerce.number().min(0).max(100).optional(),
-  quantity: z.coerce.number().min(1).optional()
-});
-
-type FormValues = z.infer<typeof formSchema>;
-
-export default function ITRFormModal({ open, onClose, itr, systems, subsystems, onSuccess }: ITRFormModalProps) {
-  const [isSubmitting, setIsSubmitting] = useState(false);
+export const ITRFormModal = ({ 
+  open, 
+  onClose, 
+  onSuccess, 
+  itr, 
+  subsystems 
+}: ITRFormModalProps) => {
+  const isEditMode = !!itr;
   const { toast } = useToast();
-
-  const defaultValues: FormValues = {
-    name: '',
-    subsystem_id: '',
-    status: 'inprogress' as const,
-    assigned_to: '',
-    start_date: new Date().toISOString().split('T')[0],
-    end_date: '',
+  
+  const [formData, setFormData] = useState({
+    name: "",
+    subsystem_id: "",
+    status: "inprogress" as "inprogress" | "complete" | "delayed",
     progress: 0,
+    assigned_to: "",
+    start_date: "",
+    end_date: "",
     quantity: 1
-  };
-
-  const form = useForm<FormValues>({
-    resolver: zodResolver(formSchema),
-    defaultValues
   });
-
+  
+  const [loading, setLoading] = useState(false);
+  
+  // Initialize form data when the modal opens or when the ITR changes
   useEffect(() => {
     if (itr) {
-      form.reset({
-        name: itr.name,
-        subsystem_id: itr.subsystem_id,
-        status: itr.status,
-        assigned_to: itr.assigned_to || '',
-        start_date: itr.start_date ? new Date(itr.start_date).toISOString().split('T')[0] : '',
-        end_date: itr.end_date ? new Date(itr.end_date).toISOString().split('T')[0] : '',
+      setFormData({
+        name: itr.name || "",
+        subsystem_id: itr.subsystem_id || "",
+        status: itr.status || "inprogress",
         progress: itr.progress || 0,
-        quantity: itr.quantity || 1
+        assigned_to: itr.assigned_to || "",
+        start_date: itr.start_date ? new Date(itr.start_date).toISOString().split('T')[0] : "",
+        end_date: itr.end_date ? new Date(itr.end_date).toISOString().split('T')[0] : "",
+        quantity: itr.quantity || 1 // Get quantity directly from ITR object
       });
     } else {
-      form.reset(defaultValues);
+      // Reset form for new ITR
+      setFormData({
+        name: "",
+        subsystem_id: subsystems.length > 0 ? subsystems[0].id : "",
+        status: "inprogress",
+        progress: 0,
+        assigned_to: "",
+        start_date: "",
+        end_date: "",
+        quantity: 1 // Default new ITRs to quantity 1
+      });
     }
-  }, [itr, form, open]);
+  }, [itr, subsystems, open]);
+  
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const { name, value } = e.target;
+    setFormData(prev => ({ ...prev, [name]: value }));
+  };
+  
+  const handleSelectChange = (name: string, value: string) => {
+    setFormData(prev => ({ ...prev, [name]: value }));
+  };
+  
+  const validateForm = () => {
+    if (!formData.name.trim()) {
+      toast({
+        title: "Nombre requerido",
+        description: "Por favor ingrese un nombre para el ITR",
+        variant: "destructive"
+      });
+      return false;
+    }
+    
+    if (!formData.subsystem_id) {
+      toast({
+        title: "Subsistema requerido",
+        description: "Por favor seleccione un subsistema",
+        variant: "destructive"
+      });
+      return false;
+    }
 
-  const onSubmit = async (values: FormValues) => {
-    setIsSubmitting(true);
+    if (!formData.quantity || formData.quantity < 1) {
+      toast({
+        title: "Cantidad inválida",
+        description: "La cantidad debe ser al menos 1",
+        variant: "destructive"
+      });
+      return false;
+    }
+    
+    return true;
+  };
+  
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    if (!validateForm()) {
+      return;
+    }
+    
+    setLoading(true);
+    
     try {
-      if (itr) {
-        await updateITR(itr.id, values);
+      // Log para depuración
+      console.log("Formulario a enviar:", {
+        ...formData,
+        progress: Number(formData.progress),
+        quantity: Number(formData.quantity)
+      });
+      
+      const dataToSend = {
+        ...formData,
+        progress: Number(formData.progress),
+        quantity: Number(formData.quantity),
+        assigned_to: formData.assigned_to || null,
+        start_date: formData.start_date || null,
+        end_date: formData.end_date || null
+      };
+      
+      if (isEditMode && itr) {
+        console.log("Actualizando ITR con ID:", itr.id);
+        const updatedITR = await updateITR(itr.id, dataToSend);
+        
+        console.log("ITR actualizado:", updatedITR);
+        
         toast({
-          title: 'ITR Actualizado',
-          description: 'El ITR ha sido actualizado correctamente.'
+          title: "ITR actualizado",
+          description: "El ITR ha sido actualizado correctamente"
         });
       } else {
-        await createITR(values);
+        console.log("Creando nuevo ITR");
+        const newITR = await createITR(dataToSend);
+        
+        console.log("ITR creado:", newITR);
+        
         toast({
-          title: 'ITR Creado',
-          description: 'El ITR ha sido creado correctamente.'
+          title: "ITR creado",
+          description: "El ITR ha sido creado correctamente"
         });
       }
+      
       onSuccess();
       onClose();
-    } catch (error) {
-      console.error('Error al guardar el ITR:', error);
+    } catch (error: any) {
+      console.error("Error al guardar ITR:", error);
       toast({
-        title: 'Error',
-        description: 'Ocurrió un error al guardar el ITR. Por favor, intente nuevamente.',
-        variant: 'destructive'
+        title: "Error",
+        description: "No se pudo guardar el ITR: " + (error instanceof Error ? error.message : "Error desconocido"),
+        variant: "destructive"
       });
     } finally {
-      setIsSubmitting(false);
+      setLoading(false);
     }
   };
-
-  // Filtrar subsistemas por sistema seleccionado
-  const filteredSubsystems = subsystems;
-
+  
   return (
-    <Dialog open={open} onOpenChange={(isOpen) => !isOpen && onClose()}>
+    <Dialog open={open} onOpenChange={onClose}>
       <DialogContent className="sm:max-w-[425px]">
         <DialogHeader>
-          <DialogTitle>{itr ? 'Editar ITR' : 'Crear Nuevo ITR'}</DialogTitle>
+          <DialogTitle>
+            {isEditMode ? "Editar ITR" : "Nuevo ITR"}
+          </DialogTitle>
         </DialogHeader>
-        <Form {...form}>
-          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-            <FormField
-              control={form.control}
+        
+        <form onSubmit={handleSubmit} className="space-y-4 pt-4">
+          <div className="space-y-2">
+            <Label htmlFor="name">Nombre del ITR *</Label>
+            <Input
+              id="name"
               name="name"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Nombre</FormLabel>
-                  <FormControl>
-                    <Input placeholder="Nombre del ITR" {...field} />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
+              value={formData.name}
+              onChange={handleInputChange}
+              placeholder="Ingrese nombre del ITR"
+              required
             />
+          </div>
+          
+          <div className="space-y-2">
+            <Label htmlFor="subsystem_id">Subsistema *</Label>
+            <Select
+              value={formData.subsystem_id}
+              onValueChange={(value) => handleSelectChange("subsystem_id", value)}
+            >
+              <SelectTrigger id="subsystem_id">
+                <SelectValue placeholder="Seleccionar subsistema" />
+              </SelectTrigger>
+              <SelectContent>
+                {subsystems.map(subsystem => (
+                  <SelectItem key={subsystem.id} value={subsystem.id}>
+                    {subsystem.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
 
-            <FormField
-              control={form.control}
-              name="subsystem_id"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Subsistema</FormLabel>
-                  <Select 
-                    onValueChange={field.onChange} 
-                    defaultValue={field.value}
-                  >
-                    <FormControl>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Seleccionar subsistema" />
-                      </SelectTrigger>
-                    </FormControl>
-                    <SelectContent>
-                      {filteredSubsystems.map((subsystem) => (
-                        <SelectItem key={subsystem.id} value={subsystem.id}>
-                          {subsystem.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <FormMessage />
-                </FormItem>
-              )}
+          <div className="space-y-2">
+            <Label htmlFor="quantity">Cantidad *</Label>
+            <Input
+              id="quantity"
+              name="quantity"
+              type="number"
+              min="1"
+              value={formData.quantity}
+              onChange={handleInputChange}
+              placeholder="Cantidad de ITRs"
+              required
             />
+          </div>
 
-            <FormField
-              control={form.control}
-              name="status"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Estado</FormLabel>
-                  <Select 
-                    onValueChange={field.onChange} 
-                    defaultValue={field.value}
-                  >
-                    <FormControl>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Seleccionar estado" />
-                      </SelectTrigger>
-                    </FormControl>
-                    <SelectContent>
-                      <SelectItem value="inprogress">En Progreso</SelectItem>
-                      <SelectItem value="complete">Completado</SelectItem>
-                      <SelectItem value="delayed">Retrasado</SelectItem>
-                    </SelectContent>
-                  </Select>
-                  <FormMessage />
-                </FormItem>
-              )}
+          <div className="space-y-2">
+            <Label htmlFor="start_date">Fecha de inicio</Label>
+            <Input
+              id="start_date"
+              name="start_date"
+              type="date"
+              value={formData.start_date}
+              onChange={handleInputChange}
             />
+          </div>
 
-            <FormField
-              control={form.control}
+          <div className="space-y-2">
+            <Label htmlFor="end_date">Fecha de fin</Label>
+            <Input
+              id="end_date"
+              name="end_date"
+              type="date"
+              value={formData.end_date}
+              onChange={handleInputChange}
+            />
+          </div>
+          
+          <div className="space-y-2">
+            <Label htmlFor="progress">Progreso (%)</Label>
+            <Input
+              id="progress"
+              name="progress"
+              type="number"
+              min="0"
+              max="100"
+              value={formData.progress}
+              onChange={handleInputChange}
+              placeholder="0"
+            />
+          </div>
+          
+          <div className="space-y-2">
+            <Label htmlFor="status">Estado</Label>
+            <Select
+              value={formData.status}
+              onValueChange={(value) => handleSelectChange("status", value as "inprogress" | "complete" | "delayed")}
+            >
+              <SelectTrigger id="status">
+                <SelectValue placeholder="Seleccionar estado" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="inprogress">En progreso</SelectItem>
+                <SelectItem value="complete">Completado</SelectItem>
+                <SelectItem value="delayed">Retrasado</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="assigned_to">Asignado a</Label>
+            <Input
+              id="assigned_to"
               name="assigned_to"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Asignado a</FormLabel>
-                  <FormControl>
-                    <Input placeholder="Responsable" {...field} />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
+              value={formData.assigned_to}
+              onChange={handleInputChange}
+              placeholder="Ingrese el nombre del responsable"
             />
-
-            <div className="grid grid-cols-2 gap-4">
-              <FormField
-                control={form.control}
-                name="start_date"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Fecha Inicio</FormLabel>
-                    <FormControl>
-                      <Input type="date" {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              <FormField
-                control={form.control}
-                name="end_date"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Fecha Fin</FormLabel>
-                    <FormControl>
-                      <Input type="date" {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-            </div>
-
-            <div className="grid grid-cols-2 gap-4">
-              <FormField
-                control={form.control}
-                name="progress"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Progreso (%)</FormLabel>
-                    <FormControl>
-                      <Input 
-                        type="number" 
-                        min="0"
-                        max="100"
-                        {...field} 
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              <FormField
-                control={form.control}
-                name="quantity"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Cantidad</FormLabel>
-                    <FormControl>
-                      <Input 
-                        type="number" 
-                        min="1"
-                        {...field} 
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-            </div>
-
-            <DialogFooter>
-              <Button type="button" variant="outline" onClick={onClose} disabled={isSubmitting}>
-                Cancelar
-              </Button>
-              <Button type="submit" disabled={isSubmitting}>
-                {isSubmitting ? 'Guardando...' : itr ? 'Actualizar' : 'Crear'}
-              </Button>
-            </DialogFooter>
-          </form>
-        </Form>
+          </div>
+          
+          <div className="flex justify-end space-x-2 pt-4">
+            <Button type="button" variant="outline" onClick={onClose}>
+              Cancelar
+            </Button>
+            <Button type="submit" disabled={loading}>
+              {loading ? "Guardando..." : isEditMode ? "Actualizar" : "Crear"}
+            </Button>
+          </div>
+        </form>
       </DialogContent>
     </Dialog>
   );
-}
+};

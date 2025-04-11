@@ -1,183 +1,159 @@
-
-export interface Task {
+export type Project = {
   id: string;
-  name: string;
-  description?: string;
-  status: string;
-  subsystem_id: string;
   created_at: string;
   updated_at: string;
-}
-
-export interface GanttTask {
-  id: string;
-  task: string;
-  start: string;
-  end: string;
-  progress: number;
-  type?: string;
-  parent?: string;
-  status?: string;
-  dependencies?: string;
-  quantity?: number;
-}
-
-export interface ReportScheduleSettings {
-  daily: {
-    time: string;
-    enabled: boolean;
-  };
-  weekly: {
-    day: string;
-    time: string;
-    enabled: boolean;
-  };
-  monthly: {
-    day: string;
-    time: string;
-    enabled: boolean;
-  };
-}
-
-export interface EmailRecipient {
-  id: string;
-  email: string;
-}
-
-// Add the missing interfaces
-export interface Project {
-  id: string;
   name: string;
-  location?: string;
-  status: string;
-  progress?: number;
-  start_date?: string;
-  end_date?: string;
+  location: string | null;
+  status: "complete" | "inprogress" | "delayed";
+  progress: number | null;
+  start_date: string | null;
+  end_date: string | null;
+};
+
+export type System = {
+  id: string;
   created_at: string;
   updated_at: string;
-}
-
-export interface System {
-  id: string;
   name: string;
   project_id: string;
-  completion_rate?: number;
-  start_date?: string;
-  end_date?: string;
+  completion_rate: number | null;
+  start_date: string | null;
+  end_date: string | null;
+};
+
+export type Subsystem = {
+  id: string;
   created_at: string;
   updated_at: string;
-}
-
-export interface Subsystem {
-  id: string;
   name: string;
   system_id: string;
-  completion_rate?: number;
-  start_date?: string;
-  end_date?: string;
+  completion_rate: number | null;
+  start_date: string | null;
+  end_date: string | null;
+};
+
+export type ITR = {
+  id: string;
   created_at: string;
   updated_at: string;
-}
-
-export type StatusType = "complete" | "inprogress" | "delayed" | string;
-
-export interface ITR {
-  id: string;
   name: string;
   subsystem_id: string;
-  status: StatusType;
-  progress?: number;
-  assigned_to?: string;
-  start_date?: string;
-  end_date?: string;
+  status: "complete" | "inprogress" | "delayed";
+  progress: number | null;
+  start_date: string | null;
+  end_date: string | null;
+  assigned_to: string | null;
+  quantity: number;
+};
+
+export type Task = {
+  id: string;
   created_at: string;
   updated_at: string;
-  quantity: number;
-}
+  name: string;
+  description: string | null;
+  subsystem_id: string;
+  status: string;
+};
 
-export interface TestPack {
+export type Profile = {
   id: string;
+  created_at: string;
+  updated_at: string;
+  full_name: string | null;
+  avatar_url: string | null;
+  role: string | null;
+  permissions?: string[] | null;
+  email?: string | null; // Added email field to Profile type
+};
+
+export type BulkUserData = {
+  email: string;
+  full_name: string;
+  role?: string;
+  password?: string;
+};
+
+export type ReportType = 'project_status' | 'itrs' | 'tasks';
+
+export type UserUpdateData = {
+  full_name?: string;
+  avatar_url?: string;
+  role?: string;
+  permissions?: string[];
+  email?: string; // Added email field to UserUpdateData
+};
+
+export type UserCreateData = {
+  email: string;
+  password: string;
+  full_name: string;
+  role?: string;
+  permissions?: string[];
+};
+
+export type PasswordChangeData = {
+  userId: string;
+  newPassword: string;
+};
+
+// Test Pack module types
+export type TestPack = {
+  id: string;
+  created_at: string;
+  updated_at: string;
   nombre_paquete: string;
+  itr_asociado: string;
   sistema: string;
   subsistema: string;
-  itr_asociado: string;
-  estado: string;
+  estado: "pendiente" | "listo";
+};
+
+export type Tag = {
+  id: string;
   created_at: string;
   updated_at: string;
-}
-
-export interface Tag {
-  id: string;
-  tag_name: string;
   test_pack_id: string;
-  estado: string;
-  fecha_liberacion?: string;
-  created_at: string;
-  updated_at: string;
-}
+  tag_name: string;
+  estado: "pendiente" | "liberado";
+  fecha_liberacion: string | null;
+};
 
-export interface AccionesLog {
+export type AccionesLog = {
   id: string;
+  usuario_id: string;
+  tag_id: string;
   accion: string;
   fecha: string;
-  tag_id: string;
-  usuario_id: string;
-}
+};
 
-export interface StatsData {
-  totalPacks: number;
-  pendingPacks: number;
-  completedPacks: number;
-  totalTags: number;
-  pendingTags: number;
-  releasedTags: number;
-  completionRate: number;
-}
+export type TestPackStats = {
+  total: number;
+  completed: number;
+  progress: number;
+};
 
-export interface BulkUserData {
-  email: string;
-  full_name: string;
-  role?: string;
-  permissions?: string[];
-}
+export type TagStats = {
+  total: number;
+  released: number;
+  progress: number;
+};
 
-export interface UserCreateData {
-  email: string;
-  password: string;
-  full_name: string;
-  role?: string;
-  permissions?: string[];
-}
+export type StatsData = {
+  testPacks: TestPackStats;
+  tags: TagStats;
+  systems: { name: string; value: number; }[];
+  subsystems: { name: string; value: number; }[];
+  itrs: { name: string; value: number; }[];
+};
 
-export interface UserUpdateData {
+// Database activity log
+export type DbActivityLog = {
   id: string;
-  full_name?: string;
-  email?: string;
-  role?: string;
-  permissions?: string[];
-}
-
-export interface PasswordChangeData {
-  id: string;
-  password: string;
-}
-
-export interface UserProfile {
-  id: string;
-  full_name?: string;
-  email?: string;
-  role?: string;
-  permissions?: string[];
-  created_at?: string;
-  updated_at?: string;
-}
-
-export interface ITRWithActions extends ITR {
-  actions?: {
-    canEdit: boolean;
-    canDelete: boolean;
-  };
-  subsystemName?: string;
-  systemName?: string;
-  projectName?: string;
-}
+  created_at: string;
+  action: string;
+  table_name: string;
+  record_id: string | null;
+  details: any;
+  user_id: string | null;
+};

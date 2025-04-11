@@ -1,302 +1,661 @@
 
-import { useState, useEffect } from "react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { KPICard } from "@/components/DashboardWidgets/KPICard";
+import { useState, useEffect, useCallback, useMemo } from "react";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { EnhancedGanttChart } from "@/components/EnhancedGanttChart";
+import { getProjects, getSystems, getSubsystems, getITRs, getDashboardStats } from "@/services/supabaseService";
+import { format, addMonths, subMonths } from "date-fns";
+import { es } from "date-fns/locale";
 import { ProjectSelector } from "@/components/ProjectSelector";
-import { MonthlyEfficiencyChart } from "@/components/Dashboard/MonthlyEfficiencyChart";
-import { TestPacksChart } from "@/components/Dashboard/TestPacksChart";
-import { TagsChart } from "@/components/Dashboard/TagsChart";
+import { 
+  CalendarIcon, 
+  Download, 
+  FileText, 
+  BarChart3, 
+  CheckCircle2, 
+  Clock3, 
+  AlertTriangle,
+  Tag
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Download } from "lucide-react";
 import * as XLSX from 'xlsx';
 import html2canvas from 'html2canvas';
-import jsPDF from 'jspdf';
+import { jsPDF } from 'jspdf';
 import 'jspdf-autotable';
-import { getDashboardStats, getDashboardChartsData } from "@/services/dashboardService";
-import { GanttTask } from "@/services/types";
+import { DatabaseActivityTimeline } from "@/components/DatabaseActivityTimeline";
+import { useToast } from "@/hooks/use-toast";
+import { KPICard } from "@/components/DashboardWidgets/KPICard";
+import { TestPacksChart } from "@/components/Dashboard/TestPacksChart";
+import { MonthlyEfficiencyChart } from "@/components/Dashboard/MonthlyEfficiencyChart";
+import { TagsChart } from "@/components/Dashboard/TagsChart";
+
+// Dashboard skeleton loader
+const DashboardSkeleton = () => (
+  <div className="space-y-6 animate-pulse">
+    <div className="grid gap-4 grid-cols-1 md:grid-cols-2 lg:grid-cols-4">
+      {[...Array(4)].map((_, i) => (
+        <Card key={i} className="overflow-hidden">
+          <CardHeader className="bg-gray-100 h-16"></CardHeader>
+          <CardContent>
+            <div className="h-10 bg-gray-100 rounded-md mb-2"></div>
+            <div className="h-4 bg-gray-100 rounded-md w-3/4"></div>
+          </CardContent>
+        </Card>
+      ))}
+    </div>
+    <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+      <Card className="lg:col-span-2 overflow-hidden">
+        <CardHeader className="bg-gray-100 h-12"></CardHeader>
+        <CardContent className="p-0">
+          <div className="h-80 bg-gray-100"></div>
+        </CardContent>
+      </Card>
+      <Card className="overflow-hidden">
+        <CardHeader className="bg-gray-100 h-12"></CardHeader>
+        <CardContent className="p-0">
+          <div className="h-80 bg-gray-100"></div>
+        </CardContent>
+      </Card>
+    </div>
+    <Card className="overflow-hidden">
+      <CardHeader className="bg-gray-100 h-12"></CardHeader>
+      <CardContent className="p-0">
+        <div className="h-96 bg-gray-100"></div>
+      </CardContent>
+    </Card>
+  </div>
+);
 
 const Dashboard = () => {
+  const { toast } = useToast();
+  const [loading, setLoading] = useState(true);
+  const [stats, setStats] = useState<any>({});
   const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null);
-  const [stats, setStats] = useState<any>(null);
-  const [isLoading, setIsLoading] = useState(true);
-  const [monthlyData, setMonthlyData] = useState<any[]>([]);
-  const [testPacksData, setTestPacksData] = useState<any[]>([]);
-  const [tagsData, setTagsData] = useState<any[]>([]);
-  const [activeTab, setActiveTab] = useState("overview");
-  const [ganttTasks, setGanttTasks] = useState<GanttTask[]>([]);
+  const [ganttData, setGanttData] = useState<any[]>([]);
+  const [exportLoading, setExportLoading] = useState<string | null>(null);
+  
+  // KPI data for charts
+  const [kpiChartData, setKpiChartData] = useState({
+    testPacks: [] as any[],
+    systems: [] as any[],
+    tags: [] as any[],
+    monthlyActivity: [] as any[]
+  });
+
+  const fetchProjectData = useCallback(async (projectId: string | null) => {
+    setLoading(true);
+    try {
+      const dashboardStats = await getDashboardStats(projectId);
+      setStats(dashboardStats);
+
+      // Prepare KPI chart data
+      const testPackData = [
+        { name: 'Completados', value: dashboardStats.completedProjects || 0 },
+        { name: 'En Progreso', value: dashboardStats.inProgressProjects || 0 },
+        { name: 'Retrasados', value: dashboardStats.delayedProjects || 0 }
+      ];
+      
+      const systemsData = dashboardStats.chartData || [];
+      
+      const tagsData = [
+        { name: 'Liberados', value: dashboardStats.tags?.released || 0 },
+        { name: 'Pendientes', value: dashboardStats.tags?.total - (dashboardStats.tags?.released || 0) || 0 }
+      ];
+      
+      // Ensure we have monthly data, or generate mock data
+      const monthlyData = dashboardStats.areaChartData || generateMonthlyMockData();
+      
+      setKpiChartData({
+        testPacks: testPackData,
+        systems: systemsData,
+        tags: tagsData,
+        monthlyActivity: monthlyData
+      });
+
+      // Fetch Gantt chart data
+      let projectsData: any[] = [];
+      let systemsData: any[] = [];
+      let subsystemsData: any[] = [];
+      let itrsData: any[] = [];
+
+      const projects = await getProjects();
+      const allSystems = await getSystems();
+      const allSubsystems = await getSubsystems();
+      const allITRs = await getITRs();
+
+      if (projectId) {
+        projectsData = projects.filter(p => p.id === projectId);
+        systemsData = allSystems.filter(s => s.project_id === projectId);
+      } else {
+        projectsData = projects;
+        systemsData = allSystems;
+      }
+      
+      const systemIds = systemsData.map(s => s.id);
+      subsystemsData = allSubsystems.filter(sub => systemIds.includes(sub.system_id));
+      
+      const subsystemIds = subsystemsData.map(sub => sub.id);
+      itrsData = allITRs.filter(itr => subsystemIds.includes(itr.subsystem_id));
+
+      // Build Gantt chart data structure
+      const ganttItems = buildGanttItems(projectsData, systemsData, subsystemsData, itrsData);
+      setGanttData(ganttItems);
+
+    } catch (error) {
+      console.error("Error fetching dashboard data:", error);
+      toast({
+        title: "Error",
+        description: "No se pudieron cargar los datos del dashboard.",
+        variant: "destructive",
+      });
+    } finally {
+      setLoading(false);
+    }
+  }, [toast]);
+
+  // Generate mock monthly data if needed
+  const generateMonthlyMockData = useCallback(() => {
+    const currentDate = new Date();
+    const monthlyData = [];
+    
+    for (let i = 5; i >= 0; i--) {
+      const date = subMonths(currentDate, i);
+      const monthName = format(date, 'MMM', { locale: es });
+      
+      monthlyData.push({
+        name: monthName,
+        inspections: Math.floor(Math.random() * 50) + 30,
+        completions: Math.floor(Math.random() * 40) + 20,
+        issues: Math.floor(Math.random() * 10) + 5
+      });
+    }
+    
+    return monthlyData;
+  }, []);
+
+  // Build Gantt chart data items
+  const buildGanttItems = useCallback((projects: any[], systems: any[], subsystems: any[], itrs: any[]) => {
+    const ganttItems = [];
+    
+    // Add projects
+    for (const project of projects) {
+      ganttItems.push({
+        id: `project-${project.id}`,
+        task: project.name,
+        start: project.start_date || new Date().toISOString(),
+        end: project.end_date || addMonths(new Date(), 3).toISOString(),
+        progress: project.progress || 0,
+        type: 'project',
+        status: project.status,
+        quantity: 1
+      });
+    }
+
+    // Add systems
+    for (const system of systems) {
+      const projectId = system.project_id;
+      ganttItems.push({
+        id: `system-${system.id}`,
+        task: system.name,
+        start: system.start_date || new Date().toISOString(),
+        end: system.end_date || addMonths(new Date(), 2).toISOString(),
+        progress: system.completion_rate || 0,
+        parent: `project-${projectId}`,
+        type: 'system',
+        status: 'inprogress',
+        quantity: 1
+      });
+    }
+
+    // Add subsystems
+    for (const subsystem of subsystems) {
+      const systemId = subsystem.system_id;
+      ganttItems.push({
+        id: `subsystem-${subsystem.id}`,
+        task: subsystem.name,
+        start: subsystem.start_date || new Date().toISOString(),
+        end: subsystem.end_date || addMonths(new Date(), 1).toISOString(),
+        progress: subsystem.completion_rate || 0,
+        parent: `system-${systemId}`,
+        type: 'subsystem',
+        status: 'inprogress',
+        quantity: 1
+      });
+    }
+
+    // Group ITRs by name and subsystem
+    const itrGroups: Record<string, {
+      count: number,
+      progress: number,
+      subsystemId: string,
+      start: string,
+      end: string,
+      status: string
+    }> = {};
+    
+    itrs.forEach(itr => {
+      const key = `${itr.name}-${itr.subsystem_id}`;
+      
+      if (!itrGroups[key]) {
+        itrGroups[key] = {
+          count: 0,
+          progress: 0,
+          subsystemId: itr.subsystem_id,
+          start: itr.start_date || new Date().toISOString(),
+          end: itr.end_date || addMonths(new Date(), 0.5).toISOString(),
+          status: itr.status
+        };
+      }
+      
+      itrGroups[key].count += 1;
+      itrGroups[key].progress += itr.progress || 0;
+    });
+    
+    // Add ITR groups to Gantt
+    Object.entries(itrGroups).forEach(([key, group], index) => {
+      const itrName = key.split('-')[0];
+      const avgProgress = group.count > 0 ? Math.round(group.progress / group.count) : 0;
+      
+      ganttItems.push({
+        id: `itr-group-${index}`,
+        task: itrName,
+        start: group.start,
+        end: group.end,
+        progress: avgProgress,
+        parent: `subsystem-${group.subsystemId}`,
+        type: 'task',
+        status: group.status,
+        quantity: group.count
+      });
+    });
+
+    return ganttItems;
+  }, []);
 
   useEffect(() => {
-    const fetchStats = async () => {
-      setIsLoading(true);
-      try {
-        const dashboardStats = await getDashboardStats(selectedProjectId);
-        setStats(dashboardStats);
-        
-        // Set gantt data
-        if (dashboardStats?.ganttData) {
-          setGanttTasks(dashboardStats.ganttData);
-        }
-        
-        // Fetch chart data
-        const chartsData = await getDashboardChartsData(selectedProjectId);
-        
-        if (chartsData) {
-          // Set monthly efficiency data
-          setMonthlyData(chartsData.monthlyData || []);
-          
-          // Set test packs chart data
-          setTestPacksData(chartsData.systemsData || []);
-          
-          // Set tags data
-          setTagsData(chartsData.tagsData || []);
-        }
-      } catch (error) {
-        console.error("Error fetching dashboard data:", error);
-      } finally {
-        setIsLoading(false);
-      }
-    };
+    fetchProjectData(selectedProjectId);
+  }, [selectedProjectId, fetchProjectData]);
 
-    fetchStats();
-  }, [selectedProjectId]);
+  const handleSelectProject = (projectId: string | null) => {
+    setSelectedProjectId(projectId);
+  };
 
-  const handleExportPDF = async () => {
-    const dashboardElement = document.getElementById("dashboard-content");
-    if (!dashboardElement) return;
-
+  // Export dashboard data to Excel
+  const exportDashboardData = useCallback(async () => {
+    setExportLoading('excel');
     try {
+      const wb = XLSX.utils.book_new();
+      
+      // KPI Summary sheet
+      const kpiData = [
+        ['Métrica', 'Valor'],
+        ['Total Test Packs', stats.testPacks?.total || 0],
+        ['Test Packs Completados', stats.testPacks?.completed || 0],
+        ['Progreso Test Packs', `${stats.testPacks?.progress || 0}%`],
+        ['Total Tags', stats.tags?.total || 0],
+        ['Tags Liberados', stats.tags?.released || 0],
+        ['Progreso Tags', `${stats.tags?.progress || 0}%`]
+      ];
+      
+      const kpiWs = XLSX.utils.aoa_to_sheet(kpiData);
+      XLSX.utils.book_append_sheet(wb, kpiWs, "Resumen");
+      
+      // Systems data
+      if (kpiChartData.systems && kpiChartData.systems.length > 0) {
+        const systemsExportData = kpiChartData.systems.map((system: any) => ({
+          'Sistema': system.name,
+          'Test Packs': system.value,
+          'Progreso': `${system.progress || 0}%`,
+          'Tags Liberados': system.completedITRs || 0,
+          'Total Tags': system.totalITRs || 0,
+        }));
+        
+        const systemsWs = XLSX.utils.json_to_sheet(systemsExportData);
+        XLSX.utils.book_append_sheet(wb, systemsWs, "Sistemas");
+      }
+      
+      // Monthly activity data
+      if (kpiChartData.monthlyActivity && kpiChartData.monthlyActivity.length > 0) {
+        const activityExportData = kpiChartData.monthlyActivity.map((item: any) => ({
+          'Mes': item.name,
+          'Inspecciones': item.inspections || 0,
+          'Completados': item.completions || 0,
+          'Problemas': item.issues || 0
+        }));
+        
+        const activityWs = XLSX.utils.json_to_sheet(activityExportData);
+        XLSX.utils.book_append_sheet(wb, activityWs, "Actividad Mensual");
+      }
+      
+      // Gantt data
+      if (ganttData && ganttData.length > 0) {
+        const ganttExportData = ganttData.map(item => ({
+          'Tarea': item.task,
+          'Tipo': item.type,
+          'Inicio': format(new Date(item.start), 'dd/MM/yyyy'),
+          'Fin': format(new Date(item.end), 'dd/MM/yyyy'),
+          'Progreso': `${item.progress}%`,
+          'Estado': item.status,
+          'Cantidad': item.quantity || 1
+        }));
+        
+        const ganttWs = XLSX.utils.json_to_sheet(ganttExportData);
+        XLSX.utils.book_append_sheet(wb, ganttWs, "Cronograma");
+      }
+      
+      // Generate file name with current date
+      const fileName = `Dashboard_FossilEnergies_${format(new Date(), 'yyyyMMdd')}.xlsx`;
+      XLSX.writeFile(wb, fileName);
+      
+      toast({
+        title: "Exportación completada",
+        description: `Los datos se han exportado exitosamente a ${fileName}`,
+      });
+    } catch (error) {
+      console.error("Error exporting dashboard data:", error);
+      toast({
+        title: "Error",
+        description: "No se pudieron exportar los datos del dashboard",
+        variant: "destructive",
+      });
+    } finally {
+      setExportLoading(null);
+    }
+  }, [stats, kpiChartData, ganttData, toast]);
+
+  // Export dashboard as PDF
+  const exportDashboardAsPdf = useCallback(async () => {
+    setExportLoading('pdf');
+    try {
+      // Target the dashboard content container
+      const dashboardElement = document.getElementById('dashboard-content');
+      if (!dashboardElement) {
+        throw new Error('No se pudo encontrar el contenido del dashboard');
+      }
+      
+      // Capture the dashboard as an image
       const canvas = await html2canvas(dashboardElement, {
-        scale: 2, // Higher scale for better quality
+        scale: 1.5, // Higher scale for better quality
         useCORS: true,
         logging: false,
+        allowTaint: true,
+        backgroundColor: '#ffffff'
       });
       
       const imgData = canvas.toDataURL('image/jpeg', 1.0);
-      const pdf = new jsPDF({
-        orientation: 'landscape',
-        unit: 'mm',
-        format: 'a4',
+      
+      // Calculate dimensions to fit in A4 page
+      const imgWidth = 210; // A4 width in mm
+      const pageHeight = 297; // A4 height in mm
+      const imgHeight = (canvas.height * imgWidth) / canvas.width;
+      
+      // Create PDF
+      const pdf = new jsPDF('p', 'mm', 'a4');
+      
+      // Add header
+      pdf.setFontSize(18);
+      pdf.setTextColor(40, 40, 40);
+      pdf.text('Dashboard Fossil Energies', 105, 15, { align: 'center' });
+      
+      pdf.setFontSize(12);
+      pdf.text(`Generado: ${format(new Date(), 'dd/MM/yyyy HH:mm')}`, 105, 22, { align: 'center' });
+      
+      // Add project filter if selected
+      if (selectedProjectId) {
+        const projectName = stats.projectName || 'Proyecto seleccionado';
+        pdf.text(`Proyecto: ${projectName}`, 105, 29, { align: 'center' });
+      }
+      
+      // Add image
+      let heightLeft = imgHeight;
+      let position = 35; // Start after header
+      
+      // Add first page
+      pdf.addImage(imgData, 'JPEG', 0, position, imgWidth, imgHeight);
+      heightLeft -= (pageHeight - position);
+      
+      // Add new pages if content is longer than one page
+      while (heightLeft > 0) {
+        position = 0;
+        pdf.addPage();
+        pdf.addImage(imgData, 'JPEG', 0, -pageHeight + position + imgHeight, imgWidth, imgHeight);
+        heightLeft -= pageHeight;
+      }
+      
+      // Generate file name with current date
+      const fileName = `Dashboard_FossilEnergies_${format(new Date(), 'yyyyMMdd')}.pdf`;
+      pdf.save(fileName);
+      
+      toast({
+        title: "Exportación completada",
+        description: `El dashboard se ha exportado exitosamente como ${fileName}`,
       });
-      
-      const pdfWidth = pdf.internal.pageSize.getWidth();
-      const pdfHeight = pdf.internal.pageSize.getHeight();
-      const imgWidth = canvas.width;
-      const imgHeight = canvas.height;
-      const ratio = Math.min(pdfWidth / imgWidth, pdfHeight / imgHeight);
-      const imgX = (pdfWidth - imgWidth * ratio) / 2;
-      
-      pdf.addImage(imgData, 'JPEG', imgX, 10, imgWidth * ratio, imgHeight * ratio);
-      pdf.save('dashboard-report.pdf');
     } catch (error) {
-      console.error("Error exporting PDF:", error);
+      console.error("Error exporting dashboard as PDF:", error);
+      toast({
+        title: "Error",
+        description: "No se pudo exportar el dashboard como PDF",
+        variant: "destructive",
+      });
+    } finally {
+      setExportLoading(null);
     }
-  };
+  }, [selectedProjectId, stats, toast]);
 
-  const handleExportExcel = () => {
-    try {
-      const workbook = XLSX.utils.book_new();
-      
-      // Add Dashboard Summary Sheet
-      if (stats) {
-        const summaryData = [
-          ['Metric', 'Value'],
-          ['Total Projects', stats.totalProjects],
-          ['Completed Projects', stats.completedProjects],
-          ['In Progress Projects', stats.inProgressProjects],
-          ['Delayed Projects', stats.delayedProjects],
-          ['Total Systems', stats.totalSystems],
-          ['Total ITRs', stats.totalITRs],
-          ['Completed ITRs', stats.completedITRs],
-          ['Overall Completion Rate', `${stats.completionRate}%`],
-        ];
-        
-        const summarySheet = XLSX.utils.aoa_to_sheet(summaryData);
-        XLSX.utils.book_append_sheet(workbook, summarySheet, 'Dashboard Summary');
+  // Compute KPI stats
+  const kpiStats = useMemo(() => {
+    return {
+      testPacks: {
+        total: stats.testPacks?.total || 0,
+        completed: stats.testPacks?.completed || 0,
+        progress: stats.testPacks?.progress || 0
+      },
+      tags: {
+        total: stats.tags?.total || 0,
+        released: stats.tags?.released || 0,
+        progress: stats.tags?.progress || 0
+      },
+      systems: stats.totalSystems || 0,
+      itrs: {
+        completed: stats.completedITRs || 0,
+        inProgress: stats.inProgressITRs || 0,
+        delayed: stats.delayedITRs || 0,
+        total: stats.totalITRs || 0
       }
-      
-      // Add Monthly Data Sheet
-      if (monthlyData && monthlyData.length > 0) {
-        const monthlySheet = XLSX.utils.json_to_sheet(monthlyData);
-        XLSX.utils.book_append_sheet(workbook, monthlySheet, 'Monthly Data');
-      }
-      
-      // Add Systems Data Sheet
-      if (testPacksData && testPacksData.length > 0) {
-        const systemsSheet = XLSX.utils.json_to_sheet(testPacksData);
-        XLSX.utils.book_append_sheet(workbook, systemsSheet, 'Systems Data');
-      }
-      
-      XLSX.writeFile(workbook, 'dashboard-data.xlsx');
-    } catch (error) {
-      console.error("Error exporting Excel:", error);
-    }
-  };
+    };
+  }, [stats]);
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-        <h1 className="text-3xl font-bold tracking-tight">Dashboard</h1>
-        <div className="flex items-center space-x-2">
-          <ProjectSelector onSelectProject={setSelectedProjectId} selectedProjectId={selectedProjectId} />
-          <Button variant="outline" size="sm" onClick={handleExportPDF}>
-            <Download className="h-4 w-4 mr-2" /> PDF
-          </Button>
-          <Button variant="outline" size="sm" onClick={handleExportExcel}>
-            <Download className="h-4 w-4 mr-2" /> Excel
-          </Button>
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+        <div>
+          <h1 className="text-3xl font-bold tracking-tight">Dashboard</h1>
+          <p className="text-muted-foreground">
+            Sistema de Gestión de Proyectos y Test Packs
+          </p>
+        </div>
+        <div className="flex flex-col sm:flex-row w-full md:w-auto gap-2">
+          <ProjectSelector
+            onSelectProject={handleSelectProject}
+            selectedProjectId={selectedProjectId}
+            className="w-full sm:w-auto"
+          />
+          <div className="flex gap-2">
+            <Button 
+              variant="outline" 
+              onClick={exportDashboardData}
+              disabled={!!exportLoading || loading}
+              className="w-full sm:w-auto"
+            >
+              {exportLoading === 'excel' ? (
+                <span className="flex items-center gap-2">
+                  <span className="h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent"></span>
+                  Exportando...
+                </span>
+              ) : (
+                <span className="flex items-center gap-2">
+                  <FileText className="h-4 w-4" />
+                  Excel
+                </span>
+              )}
+            </Button>
+            <Button 
+              variant="default" 
+              onClick={exportDashboardAsPdf}
+              disabled={!!exportLoading || loading}
+              className="w-full sm:w-auto"
+            >
+              {exportLoading === 'pdf' ? (
+                <span className="flex items-center gap-2">
+                  <span className="h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent"></span>
+                  Exportando...
+                </span>
+              ) : (
+                <span className="flex items-center gap-2">
+                  <Download className="h-4 w-4" />
+                  PDF
+                </span>
+              )}
+            </Button>
+          </div>
         </div>
       </div>
 
-      <div id="dashboard-content">
-        <Tabs defaultValue="overview" value={activeTab} onValueChange={setActiveTab}>
-          <TabsList className="mb-4">
-            <TabsTrigger value="overview">Visión General</TabsTrigger>
-            <TabsTrigger value="charts">Gráficos</TabsTrigger>
-            <TabsTrigger value="planning">Planificación</TabsTrigger>
-          </TabsList>
+      {loading ? (
+        <DashboardSkeleton />
+      ) : (
+        <div id="dashboard-content" className="space-y-6">
+          {/* KPI Cards */}
+          <div className="grid gap-4 grid-cols-1 md:grid-cols-2 lg:grid-cols-4">
+            <KPICard
+              title="Test Packs"
+              value={kpiStats.testPacks.total}
+              description={`${kpiStats.testPacks.completed} completados (${kpiStats.testPacks.progress}%)`}
+              icon={<BarChart3 className="h-4 w-4" />}
+              className="border-l-4 border-l-primary"
+            />
+            
+            <KPICard
+              title="Tags"
+              value={kpiStats.tags.total}
+              description={`${kpiStats.tags.released} liberados (${kpiStats.tags.progress}%)`}
+              icon={<Tag className="h-4 w-4" />}
+              className="border-l-4 border-l-orange-500"
+            />
+            
+            <KPICard
+              title="Completados"
+              value={kpiStats.itrs.completed}
+              description={`de ${kpiStats.itrs.total} ITRs totales`}
+              icon={<CheckCircle2 className="h-4 w-4" />}
+              className="border-l-4 border-l-green-500"
+            />
+            
+            <KPICard
+              title="Pendientes"
+              value={kpiStats.itrs.inProgress + kpiStats.itrs.delayed}
+              description={`${kpiStats.itrs.delayed} con retraso`}
+              icon={<Clock3 className="h-4 w-4" />}
+              className="border-l-4 border-l-red-500"
+            />
+          </div>
 
-          <TabsContent value="overview" className="space-y-4">
-            {!isLoading && stats ? (
-              <>
-                <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-                  <KPICard 
-                    title="Proyectos Totales" 
-                    value={stats.totalProjects} 
-                    description="Proyectos en la plataforma" 
-                    className="bg-blue-50"
-                  />
-                  <KPICard 
-                    title="Sistemas" 
-                    value={stats.totalSystems} 
-                    description="Sistemas registrados" 
-                    className="bg-purple-50" 
-                  />
-                  <KPICard 
-                    title="ITRs Totales" 
-                    value={stats.totalITRs} 
-                    description="Formularios de inspección" 
-                    className="bg-green-50" 
-                  />
-                  <KPICard 
-                    title="Tasa de Completado" 
-                    value={`${stats.completionRate}%`} 
-                    description="Promedio general" 
-                    className="bg-amber-50" 
-                  />
-                </div>
+          {/* Charts */}
+          <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+            <TestPacksChart 
+              data={kpiChartData.systems} 
+              className="lg:col-span-2"
+            />
+            
+            <TagsChart 
+              data={kpiChartData.tags} 
+            />
+          </div>
+          
+          <MonthlyEfficiencyChart 
+            data={kpiChartData.monthlyActivity} 
+          />
 
-                <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-                  <Card className="col-span-1">
-                    <CardHeader className="pb-2">
-                      <CardTitle>Estado de Proyectos</CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                      <div className="space-y-2">
-                        <div className="flex justify-between items-center">
-                          <span>Completados</span>
-                          <span className="font-semibold">{stats.completedProjects}</span>
-                        </div>
-                        <div className="flex justify-between items-center">
-                          <span>En Progreso</span>
-                          <span className="font-semibold">{stats.inProgressProjects}</span>
-                        </div>
-                        <div className="flex justify-between items-center">
-                          <span>Retrasados</span>
-                          <span className="font-semibold">{stats.delayedProjects}</span>
-                        </div>
-                      </div>
-                    </CardContent>
-                  </Card>
+          {/* Gantt Chart */}
+          <Card className="overflow-hidden">
+            <CardHeader>
+              <CardTitle>Cronograma de ITRs</CardTitle>
+              <CardDescription>
+                Planificación y progreso de Test Packs e ITRs
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="p-0">
+              <EnhancedGanttChart data={ganttData} />
+            </CardContent>
+          </Card>
 
-                  <Card className="col-span-1">
-                    <CardHeader className="pb-2">
-                      <CardTitle>ITRs por Estado</CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                      <div className="space-y-2">
-                        <div className="flex justify-between items-center">
-                          <span>Completados</span>
-                          <span className="font-semibold">{stats.completedITRs}</span>
-                        </div>
-                        <div className="flex justify-between items-center">
-                          <span>En Progreso</span>
-                          <span className="font-semibold">{stats.inProgressITRs}</span>
-                        </div>
-                        <div className="flex justify-between items-center">
-                          <span>Pendientes</span>
-                          <span className="font-semibold">{stats.pendingITRs}</span>
-                        </div>
-                      </div>
-                    </CardContent>
-                  </Card>
-
-                  <Card className="col-span-1">
-                    <CardHeader className="pb-2">
-                      <CardTitle>Distribución de Sistemas</CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                      <div className="space-y-2">
-                        {stats.topSystems && stats.topSystems.map((system: any, index: number) => (
-                          <div key={index} className="flex justify-between items-center">
-                            <span>{system.name}</span>
-                            <span className="font-semibold">{system.count}</span>
-                          </div>
-                        ))}
-                      </div>
-                    </CardContent>
-                  </Card>
-                </div>
-              </>
-            ) : (
-              // Loading state
-              <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-                {[...Array(4)].map((_, i) => (
-                  <div key={i} className="h-24 bg-gray-200 animate-pulse rounded-md"></div>
-                ))}
-              </div>
-            )}
-          </TabsContent>
-
-          <TabsContent value="charts" className="space-y-4">
-            <div className="grid gap-4 grid-cols-1 md:grid-cols-2">
-              <MonthlyEfficiencyChart 
-                data={monthlyData} 
-                className="col-span-1 md:col-span-2"
-                onExport={handleExportPDF}
-              />
-              <TestPacksChart 
-                data={testPacksData} 
-                className="col-span-1" 
-                onExport={handleExportExcel}
-              />
-              <TagsChart 
-                data={tagsData} 
-                className="col-span-1" 
-              />
-            </div>
-          </TabsContent>
-
-          <TabsContent value="planning" className="space-y-4">
+          {/* Database Activity */}
+          <div className="grid gap-4 md:grid-cols-2">
+            <DatabaseActivityTimeline />
+            
             <Card>
               <CardHeader>
-                <CardTitle>Cronograma de Proyectos</CardTitle>
+                <CardTitle>Recordatorios</CardTitle>
+                <CardDescription>
+                  Actividades pendientes
+                </CardDescription>
               </CardHeader>
               <CardContent>
-                {!isLoading && ganttTasks.length > 0 ? (
-                  <EnhancedGanttChart 
-                    tasks={ganttTasks} 
-                    height={500} 
-                  />
-                ) : (
-                  <div className="h-[500px] bg-gray-200 animate-pulse rounded-md"></div>
-                )}
+                <div className="relative">
+                  <div className="absolute left-4 h-full w-px bg-muted"></div>
+                  
+                  {[
+                    {
+                      date: addMonths(new Date(), 0.25),
+                      title: "Verificación de Tags pendientes",
+                      description: "Revisar Tags pendientes de liberación del sistema eléctrico",
+                      priority: "high"
+                    },
+                    {
+                      date: addMonths(new Date(), 0.5),
+                      title: "Reporte mensual de avance",
+                      description: "Preparar reporte mensual de avance para cliente",
+                      priority: "medium"
+                    },
+                    {
+                      date: addMonths(new Date(), 0.75),
+                      title: "Revisión de sistema mecánico",
+                      description: "Completar inspección de sistema mecánico",
+                      priority: "low"
+                    }
+                  ].map((event, index) => {
+                    let priorityColor = "bg-blue-500";
+                    if (event.priority === "high") priorityColor = "bg-red-500";
+                    if (event.priority === "medium") priorityColor = "bg-orange-500";
+                    
+                    return (
+                      <div key={index} className="mb-8 grid last:mb-0">
+                        <div className="flex items-start">
+                          <div className={`flex h-8 w-8 items-center justify-center rounded-full border border-muted bg-background z-10 mr-4`}>
+                            <span className={`flex h-2 w-2 rounded-full ${priorityColor}`}></span>
+                          </div>
+                          <div className="text-sm mr-4">
+                            {`${format(event.date, 'dd/MM')}`}
+                          </div>
+                          <div className="flex-1 rounded-lg border p-4">
+                            <h3 className="font-semibold tracking-tight">{event.title}</h3>
+                            <p className="text-sm text-muted-foreground mt-1">{event.description}</p>
+                            <div className="mt-2 flex items-center text-xs text-muted-foreground">
+                              <CalendarIcon className="mr-1 h-3 w-3" />
+                              <span>
+                                {format(event.date, 'dd MMM yyyy', { locale: es })}
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
               </CardContent>
             </Card>
-          </TabsContent>
-        </Tabs>
-      </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

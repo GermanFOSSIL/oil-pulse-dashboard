@@ -1,116 +1,139 @@
 
-import { useState, useEffect } from "react";
-import { getTestPackById, getTagsByTestPackId, updateTestPack, deleteTestPack } from "@/services/testPackService";
-import { TestPack, Tag } from "@/services/types";
-import { useToast } from "@/hooks/use-toast";
+import { useState, useCallback } from 'react';
+import { useToast } from '@/hooks/use-toast';
+import { 
+  getTestPackById, 
+  getTagsByTestPackId,
+  updateTestPack,
+  deleteTestPack
+} from '@/services/testPackService';
+import { TestPack, Tag } from '@/services/types';
 
-export const useTestPackDetail = (testPackId: string) => {
-  const [testPack, setTestPack] = useState<TestPack | null>(null);
-  const [tags, setTags] = useState<Tag[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [updating, setUpdating] = useState(false);
-  const [deleting, setDeleting] = useState(false);
+export type TestPackWithTags = TestPack & { tags: Tag[] };
+
+export const useTestPackDetail = () => {
+  const [currentTestPack, setCurrentTestPack] = useState<TestPackWithTags | null>(null);
+  const [loading, setLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
+  
   const { toast } = useToast();
-
-  const fetchTestPackDetails = async () => {
+  
+  const fetchTestPackWithTags = useCallback(async (id: string) => {
+    setLoading(true);
+    setError(null);
     try {
-      setLoading(true);
-      setError(null);
+      console.log(`Iniciando fetchTestPackWithTags para ID ${id}`);
+      const testPack = await getTestPackById(id);
+      if (!testPack) {
+        console.log("Test Pack no encontrado");
+        setError("Test Pack no encontrado");
+        toast({
+          title: "Error",
+          description: "Test Pack no encontrado",
+          variant: "destructive",
+        });
+        setCurrentTestPack(null);
+        return null;
+      }
       
-      const [packData, tagsData] = await Promise.all([
-        getTestPackById(testPackId),
-        getTagsByTestPackId(testPackId)
-      ]);
+      console.log("Test Pack encontrado, obteniendo TAGs");
+      const tags = await getTagsByTestPackId(id);
+      console.log(`TAGs obtenidos: ${tags?.length || 0}`);
+      const testPackWithTags = { ...testPack, tags };
       
-      setTestPack(packData);
-      setTags(tagsData);
+      setCurrentTestPack(testPackWithTags);
+      return testPackWithTags;
     } catch (err) {
-      console.error("Error fetching test pack details:", err);
-      setError("Failed to load test pack details. Please try again later.");
+      console.error(`Error fetching Test Pack with id ${id}:`, err);
+      setError("No se pudo cargar el Test Pack");
+      toast({
+        title: "Error",
+        description: "No se pudo cargar el Test Pack",
+        variant: "destructive",
+      });
+      setCurrentTestPack(null);
+      return null;
     } finally {
       setLoading(false);
     }
-  };
-
-  const updateTestPackDetails = async (updates: Partial<TestPack>) => {
-    if (updating || !testPack) return false;
-
+  }, [toast]);
+  
+  const updateTestPackData = useCallback(async (id: string, updates: Partial<TestPack>) => {
+    setLoading(true);
     try {
-      setUpdating(true);
-      setError(null);
+      const updatedTestPack = await updateTestPack(id, updates);
       
-      const updatedPack = await updateTestPack(testPackId, updates);
-      setTestPack(updatedPack);
+      // Update in currentTestPack if it's the active one
+      if (currentTestPack && currentTestPack.id === id) {
+        setCurrentTestPack(prevState => 
+          prevState ? { ...updatedTestPack, tags: prevState.tags } : null
+        );
+      }
       
       toast({
-        title: "Test Pack Updated",
-        description: "Test pack has been updated successfully.",
+        title: "Éxito",
+        description: "Test Pack actualizado correctamente",
       });
       
-      return true;
-    } catch (err) {
-      console.error("Error updating test pack:", err);
-      setError("Failed to update test pack. Please try again.");
-      
+      return updatedTestPack;
+    } catch (error) {
+      console.error(`Error updating Test Pack with id ${id}:`, error);
       toast({
         title: "Error",
-        description: "Failed to update test pack. Please try again.",
+        description: "No se pudo actualizar el Test Pack",
         variant: "destructive",
       });
-      
-      return false;
+      return null;
     } finally {
-      setUpdating(false);
+      setLoading(false);
     }
-  };
-
-  const removeTestPack = async () => {
-    if (deleting) return false;
-
+  }, [toast, currentTestPack]);
+  
+  const removeTestPack = useCallback(async (id: string) => {
+    setLoading(true);
     try {
-      setDeleting(true);
-      setError(null);
+      const result = await deleteTestPack(id);
       
-      await deleteTestPack(testPackId);
-      
-      toast({
-        title: "Test Pack Deleted",
-        description: "Test pack has been deleted successfully.",
-      });
-      
-      return true;
-    } catch (err) {
-      console.error("Error deleting test pack:", err);
-      setError("Failed to delete test pack. Please try again.");
-      
+      if (result) {
+        // Clear currentTestPack if it's the active one
+        if (currentTestPack && currentTestPack.id === id) {
+          setCurrentTestPack(null);
+        }
+        
+        toast({
+          title: "Éxito",
+          description: "Test Pack eliminado correctamente",
+        });
+        
+        return true;
+      } else {
+        toast({
+          title: "Advertencia",
+          description: "No se encontró el Test Pack para eliminar",
+          variant: "destructive",
+        });
+        return false;
+      }
+    } catch (error) {
+      console.error(`Error deleting Test Pack with id ${id}:`, error);
       toast({
         title: "Error",
-        description: "Failed to delete test pack. Please try again.",
+        description: "No se pudo eliminar el Test Pack",
         variant: "destructive",
       });
-      
       return false;
     } finally {
-      setDeleting(false);
+      setLoading(false);
     }
-  };
-
-  useEffect(() => {
-    if (testPackId) {
-      fetchTestPackDetails();
-    }
-  }, [testPackId]);
-
+  }, [toast, currentTestPack]);
+  
   return {
-    testPack,
-    tags,
+    currentTestPack,
     loading,
-    updating,
-    deleting,
     error,
-    refresh: fetchTestPackDetails,
-    updateTestPack: updateTestPackDetails,
-    deleteTestPack: removeTestPack
+    fetchTestPackWithTags,
+    updateTestPack: updateTestPackData,
+    removeTestPack,
+    setCurrentTestPack
   };
 };

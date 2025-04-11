@@ -1,3 +1,4 @@
+
 import { supabase } from "@/integrations/supabase/client";
 import { System, Subsystem } from "@/services/types";
 
@@ -32,13 +33,7 @@ export const getSystemById = async (id: string): Promise<System | null> => {
 export const createSystem = async (system: Omit<System, "id" | "created_at" | "updated_at">): Promise<System> => {
   const { data, error } = await supabase
     .from('systems')
-    .insert({
-      name: system.name,
-      project_id: system.project_id,
-      completion_rate: system.completion_rate,
-      start_date: system.start_date,
-      end_date: system.end_date
-    })
+    .insert(system)
     .select()
     .single();
 
@@ -92,6 +87,7 @@ export const getSystemsByProjectId = async (projectId: string): Promise<System[]
   return data as unknown as System[] || [];
 };
 
+// Método nuevo para obtener sistemas con sus subsistemas
 export const getSystemsWithSubsystems = async (): Promise<any[]> => {
   try {
     console.log("Obteniendo sistemas con sus subsistemas");
@@ -118,6 +114,7 @@ export const getSystemsWithSubsystems = async (): Promise<any[]> => {
   }
 };
 
+// Método para obtener proyectos con sistemas y subsistemas
 export const getProjectsHierarchy = async (): Promise<any[]> => {
   try {
     console.log("Obteniendo jerarquía completa de proyectos");
@@ -146,3 +143,4 @@ export const getProjectsHierarchy = async (): Promise<any[]> => {
     throw error;
   }
 };
+
