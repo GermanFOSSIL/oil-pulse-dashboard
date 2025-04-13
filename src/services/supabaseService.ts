@@ -24,7 +24,7 @@ export {
 export type { UserProfile };
 
 // Export types separately to avoid ambiguity
-export { Project, System, Subsystem, ITR } from './types';
+export type { Project, System, Subsystem, ITR } from './types';
 export type { 
   BulkUserData, 
   ReportType, 

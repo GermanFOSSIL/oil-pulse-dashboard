@@ -1,27 +1,10 @@
-
 import { useState, useEffect, useCallback, useMemo } from "react";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Card } from "@/components/ui/card";
 import { EnhancedGanttChart } from "@/components/EnhancedGanttChart";
 import { getProjects, getSystems, getSubsystems, getITRs } from "@/services/supabaseService";
 import { getDashboardStats } from "@/services/dashboardService";
 import { format, addMonths, subMonths } from "date-fns";
-import { es } from "date-fns/locale";
-import { ProjectSelector } from "@/components/ProjectSelector";
-import { 
-  CalendarIcon, 
-  Download, 
-  FileText, 
-  BarChart3, 
-  CheckCircle2, 
-  Clock3, 
-  AlertTriangle,
-  Tag
-} from "lucide-react";
-import { Button } from "@/components/ui/button";
-import * as XLSX from 'xlsx';
-import html2canvas from 'html2canvas';
-import { jsPDF } from 'jspdf';
-import 'jspdf-autotable';
+import { BarChart3, CheckCircle2, Clock3, Tag } from "lucide-react";
 import { DatabaseActivityTimeline } from "@/components/DatabaseActivityTimeline";
 import { useToast } from "@/hooks/use-toast";
 import { KPICard } from "@/components/DashboardWidgets/KPICard";
@@ -29,42 +12,9 @@ import { TestPacksChart } from "@/components/Dashboard/TestPacksChart";
 import { MonthlyEfficiencyChart } from "@/components/Dashboard/MonthlyEfficiencyChart";
 import { TagsChart } from "@/components/Dashboard/TagsChart";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-
-const DashboardSkeleton = () => (
-  <div className="space-y-6 animate-pulse">
-    <div className="grid gap-4 grid-cols-1 md:grid-cols-2 lg:grid-cols-4">
-      {[...Array(4)].map((_, i) => (
-        <Card key={i} className="overflow-hidden">
-          <CardHeader className="bg-gray-100 h-16"></CardHeader>
-          <CardContent>
-            <div className="h-10 bg-gray-100 rounded-md mb-2"></div>
-            <div className="h-4 bg-gray-100 rounded-md w-3/4"></div>
-          </CardContent>
-        </Card>
-      ))}
-    </div>
-    <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-      <Card className="lg:col-span-2 overflow-hidden">
-        <CardHeader className="bg-gray-100 h-12"></CardHeader>
-        <CardContent className="p-0">
-          <div className="h-80 bg-gray-100"></div>
-        </CardContent>
-      </Card>
-      <Card className="overflow-hidden">
-        <CardHeader className="bg-gray-100 h-12"></CardHeader>
-        <CardContent className="p-0">
-          <div className="h-80 bg-gray-100"></div>
-        </CardContent>
-      </Card>
-    </div>
-    <Card className="overflow-hidden">
-      <CardHeader className="bg-gray-100 h-12"></CardHeader>
-      <CardContent className="p-0">
-        <div className="h-96 bg-gray-100"></div>
-      </CardContent>
-    </Card>
-  </div>
-);
+import { DashboardSkeleton } from "@/components/Dashboard/DashboardSkeleton";
+import { DashboardActions } from "@/components/Dashboard/DashboardActions";
+import { RemindersCard } from "@/components/Dashboard/RemindersCard";
 
 const Dashboard = () => {
   const { toast } = useToast();
@@ -72,7 +22,6 @@ const Dashboard = () => {
   const [stats, setStats] = useState<any>({});
   const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null);
   const [ganttData, setGanttData] = useState<any[]>([]);
-  const [exportLoading, setExportLoading] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState("general");
   
   const [kpiChartData, setKpiChartData] = useState({
@@ -99,8 +48,8 @@ const Dashboard = () => {
       
       // Create default tags data if not available
       const tagsData = [
-        { name: 'Liberados', value: dashboardStats.tagsReleased || 0 },
-        { name: 'Pendientes', value: dashboardStats.tagsTotal - (dashboardStats.tagsReleased || 0) || 0 }
+        { name: 'Liberados', value: dashboardStats.tags?.released || 0 },
+        { name: 'Pendientes', value: dashboardStats.tags?.total - (dashboardStats.tags?.released || 0) || 0 }
       ];
       
       // Ensure we have monthly data, or generate mock data
@@ -273,151 +222,6 @@ const Dashboard = () => {
     setSelectedProjectId(projectId);
   };
 
-  const exportDashboardData = useCallback(async () => {
-    setExportLoading('excel');
-    try {
-      const wb = XLSX.utils.book_new();
-      
-      const kpiData = [
-        ['Métrica', 'Valor'],
-        ['Total Test Packs', stats.testPacks?.total || 0],
-        ['Test Packs Completados', stats.testPacks?.completed || 0],
-        ['Progreso Test Packs', `${stats.testPacks?.progress || 0}%`],
-        ['Total Tags', stats.tags?.total || 0],
-        ['Tags Liberados', stats.tags?.released || 0],
-        ['Progreso Tags', `${stats.tags?.progress || 0}%`]
-      ];
-      
-      const kpiWs = XLSX.utils.aoa_to_sheet(kpiData);
-      XLSX.utils.book_append_sheet(wb, kpiWs, "Resumen");
-      
-      if (kpiChartData.systems && kpiChartData.systems.length > 0) {
-        const systemsExportData = kpiChartData.systems.map((system: any) => ({
-          'Sistema': system.name,
-          'Test Packs': system.value,
-          'Progreso': `${system.progress || 0}%`,
-          'Tags Liberados': system.completedITRs || 0,
-          'Total Tags': system.totalITRs || 0,
-        }));
-        
-        const systemsWs = XLSX.utils.json_to_sheet(systemsExportData);
-        XLSX.utils.book_append_sheet(wb, systemsWs, "Sistemas");
-      }
-      
-      if (kpiChartData.monthlyActivity && kpiChartData.monthlyActivity.length > 0) {
-        const activityExportData = kpiChartData.monthlyActivity.map((item: any) => ({
-          'Mes': item.name,
-          'Inspecciones': item.inspections || 0,
-          'Completados': item.completions || 0,
-          'Problemas': item.issues || 0
-        }));
-        
-        const activityWs = XLSX.utils.json_to_sheet(activityExportData);
-        XLSX.utils.book_append_sheet(wb, activityWs, "Actividad Mensual");
-      }
-      
-      if (ganttData && ganttData.length > 0) {
-        const ganttExportData = ganttData.map(item => ({
-          'Tarea': item.task,
-          'Tipo': item.type,
-          'Inicio': format(new Date(item.start), 'dd/MM/yyyy'),
-          'Fin': format(new Date(item.end), 'dd/MM/yyyy'),
-          'Progreso': `${item.progress}%`,
-          'Estado': item.status,
-          'Cantidad': item.quantity || 1
-        }));
-        
-        const ganttWs = XLSX.utils.json_to_sheet(ganttExportData);
-        XLSX.utils.book_append_sheet(wb, ganttWs, "Cronograma");
-      }
-      
-      const fileName = `Dashboard_FossilEnergies_${format(new Date(), 'yyyyMMdd')}.xlsx`;
-      XLSX.writeFile(wb, fileName);
-      
-      toast({
-        title: "Exportación completada",
-        description: `Los datos se han exportado exitosamente a ${fileName}`,
-      });
-    } catch (error) {
-      console.error("Error exporting dashboard data:", error);
-      toast({
-        title: "Error",
-        description: "No se pudieron exportar los datos del dashboard",
-        variant: "destructive",
-      });
-    } finally {
-      setExportLoading(null);
-    }
-  }, [stats, kpiChartData, ganttData, toast]);
-
-  const exportDashboardAsPdf = useCallback(async () => {
-    setExportLoading('pdf');
-    try {
-      const dashboardElement = document.getElementById('dashboard-content');
-      if (!dashboardElement) {
-        throw new Error('No se pudo encontrar el contenido del dashboard');
-      }
-      
-      const canvas = await html2canvas(dashboardElement, {
-        scale: 1.5,
-        useCORS: true,
-        logging: false,
-        allowTaint: true,
-        backgroundColor: '#ffffff'
-      });
-      
-      const imgData = canvas.toDataURL('image/jpeg', 1.0);
-      
-      const imgWidth = 210;
-      const pageHeight = 297;
-      const imgHeight = (canvas.height * imgWidth) / canvas.width;
-      
-      const pdf = new jsPDF('p', 'mm', 'a4');
-      
-      pdf.setFontSize(18);
-      pdf.setTextColor(40, 40, 40);
-      pdf.text('Dashboard Fossil Energies', 105, 15, { align: 'center' });
-      
-      pdf.setFontSize(12);
-      pdf.text(`Generado: ${format(new Date(), 'dd/MM/yyyy HH:mm')}`, 105, 22, { align: 'center' });
-      
-      if (selectedProjectId) {
-        const projectName = stats.projectName || 'Proyecto seleccionado';
-        pdf.text(`Proyecto: ${projectName}`, 105, 29, { align: 'center' });
-      }
-      
-      let heightLeft = imgHeight;
-      let position = 35;
-      
-      pdf.addImage(imgData, 'JPEG', 0, position, imgWidth, imgHeight);
-      heightLeft -= (pageHeight - position);
-      
-      while (heightLeft > 0) {
-        position = 0;
-        pdf.addPage();
-        pdf.addImage(imgData, 'JPEG', 0, -pageHeight + position + imgHeight, imgWidth, imgHeight);
-        heightLeft -= pageHeight;
-      }
-      
-      const fileName = `Dashboard_FossilEnergies_${format(new Date(), 'yyyyMMdd')}.pdf`;
-      pdf.save(fileName);
-      
-      toast({
-        title: "Exportación completada",
-        description: `El dashboard se ha exportado exitosamente como ${fileName}`,
-      });
-    } catch (error) {
-      console.error("Error exporting dashboard as PDF:", error);
-      toast({
-        title: "Error",
-        description: "No se pudo exportar el dashboard como PDF",
-        variant: "destructive",
-      });
-    } finally {
-      setExportLoading(null);
-    }
-  }, [selectedProjectId, stats, toast]);
-
   const kpiStats = useMemo(() => {
     return {
       testPacks: {
@@ -442,58 +246,14 @@ const Dashboard = () => {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">Dashboard</h1>
-          <p className="text-muted-foreground">
-            Sistema de Gestión de Proyectos y Test Packs
-          </p>
-        </div>
-        <div className="flex flex-col sm:flex-row w-full md:w-auto gap-2">
-          <ProjectSelector
-            onSelectProject={handleSelectProject}
-            selectedProjectId={selectedProjectId}
-          />
-          <div className="flex gap-2">
-            <Button 
-              variant="outline" 
-              onClick={exportDashboardData}
-              disabled={!!exportLoading || loading}
-              className="w-full sm:w-auto"
-            >
-              {exportLoading === 'excel' ? (
-                <span className="flex items-center gap-2">
-                  <span className="h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent"></span>
-                  Exportando...
-                </span>
-              ) : (
-                <span className="flex items-center gap-2">
-                  <FileText className="h-4 w-4" />
-                  Excel
-                </span>
-              )}
-            </Button>
-            <Button 
-              variant="default" 
-              onClick={exportDashboardAsPdf}
-              disabled={!!exportLoading || loading}
-              className="w-full sm:w-auto"
-            >
-              {exportLoading === 'pdf' ? (
-                <span className="flex items-center gap-2">
-                  <span className="h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent"></span>
-                  Exportando...
-                </span>
-              ) : (
-                <span className="flex items-center gap-2">
-                  <Download className="h-4 w-4" />
-                  PDF
-                </span>
-              )}
-            </Button>
-          </div>
-        </div>
-      </div>
+      <DashboardActions 
+        selectedProjectId={selectedProjectId}
+        onSelectProject={handleSelectProject}
+        stats={stats}
+        kpiChartData={kpiChartData}
+        ganttData={ganttData}
+        loading={loading}
+      />
 
       {loading ? (
         <DashboardSkeleton />
@@ -558,68 +318,7 @@ const Dashboard = () => {
               
               <div className="grid gap-4 md:grid-cols-2">
                 <DatabaseActivityTimeline />
-                
-                <Card>
-                  <CardHeader>
-                    <CardTitle>Recordatorios</CardTitle>
-                    <CardDescription>
-                      Actividades pendientes
-                    </CardDescription>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="relative">
-                      <div className="absolute left-4 h-full w-px bg-muted"></div>
-                      
-                      {[
-                        {
-                          date: addMonths(new Date(), 0.25),
-                          title: "Verificación de Tags pendientes",
-                          description: "Revisar Tags pendientes de liberación del sistema eléctrico",
-                          priority: "high"
-                        },
-                        {
-                          date: addMonths(new Date(), 0.5),
-                          title: "Reporte mensual de avance",
-                          description: "Preparar reporte mensual de avance para cliente",
-                          priority: "medium"
-                        },
-                        {
-                          date: addMonths(new Date(), 0.75),
-                          title: "Revisión de sistema mecánico",
-                          description: "Completar inspección de sistema mecánico",
-                          priority: "low"
-                        }
-                      ].map((event, index) => {
-                        let priorityColor = "bg-blue-500";
-                        if (event.priority === "high") priorityColor = "bg-red-500";
-                        if (event.priority === "medium") priorityColor = "bg-orange-500";
-                        
-                        return (
-                          <div key={index} className="mb-8 grid last:mb-0">
-                            <div className="flex items-start">
-                              <div className={`flex h-8 w-8 items-center justify-center rounded-full border border-muted bg-background z-10 mr-4`}>
-                                <span className={`flex h-2 w-2 rounded-full ${priorityColor}`}></span>
-                              </div>
-                              <div className="text-sm mr-4">
-                                {`${format(event.date, 'dd/MM')}`}
-                              </div>
-                              <div className="flex-1 rounded-lg border p-4">
-                                <h3 className="font-semibold tracking-tight">{event.title}</h3>
-                                <p className="text-sm text-muted-foreground mt-1">{event.description}</p>
-                                <div className="mt-2 flex items-center text-xs text-muted-foreground">
-                                  <CalendarIcon className="mr-1 h-3 w-3" />
-                                  <span>
-                                    {format(event.date, 'dd MMM yyyy', { locale: es })}
-                                  </span>
-                                </div>
-                              </div>
-                            </div>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </CardContent>
-                </Card>
+                <RemindersCard />
               </div>
             </TabsContent>
             
@@ -642,15 +341,7 @@ const Dashboard = () => {
             
             <TabsContent value="planificacion" className="space-y-6">
               <Card className="overflow-hidden">
-                <CardHeader>
-                  <CardTitle>Cronograma de Proyectos</CardTitle>
-                  <CardDescription>
-                    Planificación y progreso de Test Packs e ITRs
-                  </CardDescription>
-                </CardHeader>
-                <CardContent className="p-0">
-                  <EnhancedGanttChart data={ganttData} />
-                </CardContent>
+                <EnhancedGanttChart data={ganttData} />
               </Card>
             </TabsContent>
           </Tabs>

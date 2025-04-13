@@ -1,6 +1,4 @@
 
-// Aquí se exportarán todos los servicios relacionados con usuarios
-
 import { supabase } from "@/integrations/supabase/client";
 
 // Define available permissions
@@ -27,16 +25,18 @@ export interface UserProfile {
   updated_at: string;
 }
 
+/**
+ * User retrieval functions
+ */
+
 // Get all users with their profiles
 export const getUsers = async () => {
-  // This is the correct approach since we can't query "users" directly
   const { data: profiles, error } = await supabase
     .from('profiles')
     .select('*');
   
   if (error) throw error;
   
-  // Format response similar to how it would be if we could query users
   const users = profiles.map(profile => ({
     id: profile.id,
     email: profile.email,
@@ -59,16 +59,11 @@ export const getUserProfile = async (userId: string) => {
   return data;
 };
 
-// Update user profile - renamed from updateUser for clarity
-export const updateUserProfile = async (userId: string, userData: {
-  full_name?: string;
-  role?: string;
-  permissions?: string[];
-}) => {
+// Get all user profiles
+export const getUserProfiles = async () => {
   const { data, error } = await supabase
     .from('profiles')
-    .update(userData)
-    .eq('id', userId);
+    .select('*');
   
   if (error) throw error;
   return data;
@@ -86,7 +81,26 @@ export const getUserPermissions = async (userId: string) => {
   return data?.permissions || [];
 };
 
-// Update user
+/**
+ * User update functions
+ */
+
+// Update user profile
+export const updateUserProfile = async (userId: string, userData: {
+  full_name?: string;
+  role?: string;
+  permissions?: string[];
+}) => {
+  const { data, error } = await supabase
+    .from('profiles')
+    .update(userData)
+    .eq('id', userId);
+  
+  if (error) throw error;
+  return data;
+};
+
+// Update user - alias for updateUserProfile
 export const updateUser = updateUserProfile;
 
 // Update user permissions
@@ -100,28 +114,11 @@ export const updateUserPermissions = async (userId: string, permissions: string[
   return data;
 };
 
-// Delete user
-export const deleteUser = async (userId: string) => {
-  // First, delete from auth
-  const { error: authError } = await supabase.auth.admin.deleteUser(userId);
-  if (authError) throw authError;
-  
-  // Profile should be deleted automatically through RLS policies
-  return { success: true };
-};
+/**
+ * User creation functions
+ */
 
-// Change user password
-export const changeUserPassword = async (userId: string, newPassword: string) => {
-  const { data, error } = await supabase.auth.admin.updateUserById(
-    userId,
-    { password: newPassword }
-  );
-  
-  if (error) throw error;
-  return data;
-};
-
-// Create user function
+// Create a single user
 export const createUser = async (userData: {
   email: string;
   password: string;
@@ -169,11 +166,26 @@ export const bulkCreateUsers = async (users: any[]) => {
   return successCount;
 };
 
-// Get all user profiles
-export const getUserProfiles = async () => {
-  const { data, error } = await supabase
-    .from('profiles')
-    .select('*');
+/**
+ * User deletion and password management
+ */
+
+// Delete user
+export const deleteUser = async (userId: string) => {
+  // First, delete from auth
+  const { error: authError } = await supabase.auth.admin.deleteUser(userId);
+  if (authError) throw authError;
+  
+  // Profile should be deleted automatically through RLS policies
+  return { success: true };
+};
+
+// Change user password
+export const changeUserPassword = async (userId: string, newPassword: string) => {
+  const { data, error } = await supabase.auth.admin.updateUserById(
+    userId,
+    { password: newPassword }
+  );
   
   if (error) throw error;
   return data;
