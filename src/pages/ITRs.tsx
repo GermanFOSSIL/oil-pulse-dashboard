@@ -9,7 +9,7 @@ import { Input } from '@/components/ui/input';
 import { ProjectSelector } from '@/components/ProjectSelector';
 import { ITRFormModal } from '@/components/modals/ITRFormModal';
 import ITRList from '@/components/itr/ITRList';
-import { ITRWithDetails } from '@/types/itr-types';
+import { ITRWithDetails, ITR } from '@/types/itr-types';
 
 const ITRs = () => {
   const { toast } = useToast();
@@ -24,7 +24,7 @@ const ITRs = () => {
   const fetchITRs = async () => {
     setLoading(true);
     try {
-      const fetchedITRs = await getITRsWithDetails();
+      const fetchedITRs = await getITRsWithDetails(selectedProjectId);
       setITRs(fetchedITRs);
       filterITRs(fetchedITRs, selectedProjectId, searchQuery);
     } catch (error) {
@@ -41,7 +41,7 @@ const ITRs = () => {
 
   useEffect(() => {
     fetchITRs();
-  }, [toast]);
+  }, [toast, selectedProjectId]);
 
   const filterITRs = (itrList: ITRWithDetails[], projectId: string | null, query: string) => {
     let filtered = [...itrList];
@@ -142,40 +142,44 @@ const ITRs = () => {
         <CardContent>
           <div className="flex flex-col md:flex-row gap-4">
             <div className="flex-1">
-              <Input
-                placeholder="Search ITRs..."
-                value={searchQuery}
-                onChange={handleSearch}
-                className="w-full"
-                icon={<Search className="mr-2 h-4 w-4" />}
-              />
+              <div className="relative">
+                <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+                <Input
+                  placeholder="Search ITRs..."
+                  value={searchQuery}
+                  onChange={handleSearch}
+                  className="pl-8"
+                />
+              </div>
             </div>
-            <div className="flex-1">
-              <ProjectSelector
-                onSelectProject={handleProjectSelect}
-                selectedProjectId={selectedProjectId}
-              />
-            </div>
-            <div>
-              <Button variant="outline" onClick={handleClearFilters} className="w-full md:w-auto">
-                <FilterX className="mr-2 h-4 w-4" />
-                Clear Filters
-              </Button>
-            </div>
+            <ProjectSelector 
+              onSelectProject={handleProjectSelect}
+              selectedProjectId={selectedProjectId}
+            />
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleClearFilters}
+              disabled={!selectedProjectId && !searchQuery}
+            >
+              <FilterX className="mr-2 h-4 w-4" />
+              Clear Filters
+            </Button>
           </div>
         </CardContent>
       </Card>
 
-      <ITRList itrs={itrsWithActions} loading={loading} />
+      <ITRList
+        itrs={itrsWithActions as ITR[]}
+        loading={loading}
+      />
 
-      {isModalOpen && (
-        <ITRFormModal
-          open={isModalOpen}
-          onClose={() => setIsModalOpen(false)}
-          onSuccess={fetchITRs}
-          itr={selectedITR}
-        />
-      )}
+      <ITRFormModal
+        open={isModalOpen}
+        onClose={() => setIsModalOpen(false)}
+        itr={selectedITR as ITR | null}
+        onSuccess={fetchITRs}
+      />
     </div>
   );
 };

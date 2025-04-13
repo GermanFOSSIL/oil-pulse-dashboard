@@ -1,178 +1,234 @@
-import { useState } from "react";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+
+import { useState, useEffect } from "react";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Label } from "@/components/ui/label";
+import { createProject, updateProject } from "@/services/projectService";
 import { useToast } from "@/hooks/use-toast";
-import { Project, createProject, updateProject } from "@/services/supabaseService";
+import { Loader2 } from "lucide-react";
 
-interface ProjectFormModalProps {
+export interface ProjectFormModalProps {
   open: boolean;
   onClose: () => void;
-  onSuccess: () => void;
-  project?: Project;
+  project?: any;
+  onProjectCreated?: () => void;
+  onProjectUpdated?: () => void;
 }
 
-export const ProjectFormModal = ({ open, onClose, onSuccess, project }: ProjectFormModalProps) => {
-  const isEditMode = !!project;
+export const ProjectFormModal = ({
+  open,
+  onClose,
+  project,
+  onProjectCreated,
+  onProjectUpdated
+}: ProjectFormModalProps) => {
+  // Initialize state for form fields
+  const [formData, setFormData] = useState({
+    name: "",
+    description: "",
+    location: "",
+    status: "planning",
+    start_date: "",
+    end_date: "",
+  });
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const { toast } = useToast();
 
-  const [formData, setFormData] = useState({
-    name: project?.name || "",
-    location: project?.location || "",
-    status: project?.status || "inprogress",
-    progress: project?.progress || 0,
-    start_date: project?.start_date ? new Date(project.start_date).toISOString().split('T')[0] : "",
-    end_date: project?.end_date ? new Date(project.end_date).toISOString().split('T')[0] : ""
-  });
+  // When project data changes, update the form
+  useEffect(() => {
+    if (project) {
+      const startDate = project.start_date ? new Date(project.start_date).toISOString().split('T')[0] : "";
+      const endDate = project.end_date ? new Date(project.end_date).toISOString().split('T')[0] : "";
+      
+      setFormData({
+        name: project.name || "",
+        description: project.description || "",
+        location: project.location || "",
+        status: project.status || "planning",
+        start_date: startDate,
+        end_date: endDate,
+      });
+    } else {
+      // Reset form for new project
+      setFormData({
+        name: "",
+        description: "",
+        location: "",
+        status: "planning",
+        start_date: "",
+        end_date: "",
+      });
+    }
+  }, [project]);
 
-  const [loading, setLoading] = useState(false);
-
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleChange = (e) => {
     const { name, value } = e.target;
     setFormData(prev => ({ ...prev, [name]: value }));
   };
 
-  const handleSelectChange = (name: string, value: string) => {
+  const handleSelectChange = (name, value) => {
     setFormData(prev => ({ ...prev, [name]: value }));
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
-
-    if (!formData.name || !formData.location || !formData.status) {
-      toast({
-        title: "Campos requeridos",
-        description: "Por favor complete todos los campos obligatorios",
-        variant: "destructive"
-      });
-      return;
-    }
-
-    setLoading(true);
+    setIsSubmitting(true);
 
     try {
-      if (isEditMode && project) {
+      if (project) {
+        // Update existing project
         await updateProject(project.id, formData);
         toast({
-          title: "Proyecto actualizado",
-          description: "El proyecto ha sido actualizado correctamente"
+          title: "Project Updated",
+          description: "The project has been updated successfully",
         });
+        if (onProjectUpdated) onProjectUpdated();
       } else {
+        // Create new project
         await createProject(formData);
         toast({
-          title: "Proyecto creado",
-          description: "El proyecto ha sido creado correctamente"
+          title: "Project Created",
+          description: "The project has been created successfully",
         });
+        if (onProjectCreated) onProjectCreated();
       }
-
-      onSuccess();
+      onClose();
     } catch (error) {
-      console.error("Error al guardar proyecto:", error);
+      console.error("Error saving project:", error);
       toast({
         title: "Error",
-        description: "No se pudo guardar el proyecto",
-        variant: "destructive"
+        description: `Failed to ${project ? "update" : "create"} project: ${error.message}`,
+        variant: "destructive",
       });
     } finally {
-      setLoading(false);
+      setIsSubmitting(false);
     }
   };
 
   return (
-    <Dialog open={open} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-[425px]">
+    <Dialog open={open} onOpenChange={(open) => !isSubmitting && !open && onClose()}>
+      <DialogContent>
         <DialogHeader>
-          <DialogTitle>
-            {isEditMode ? "Editar Proyecto" : "Nuevo Proyecto"}
-          </DialogTitle>
+          <DialogTitle>{project ? "Edit Project" : "Create New Project"}</DialogTitle>
+          <DialogDescription>
+            {project
+              ? "Update the details for this project"
+              : "Enter the details for the new project"}
+          </DialogDescription>
         </DialogHeader>
-
-        <form onSubmit={handleSubmit} className="space-y-4 pt-4">
-          <div className="space-y-2">
-            <Label htmlFor="name">Nombre del Proyecto *</Label>
+        
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div>
+            <label htmlFor="name" className="block text-sm font-medium mb-1">
+              Project Name
+            </label>
             <Input
               id="name"
               name="name"
               value={formData.name}
-              onChange={handleInputChange}
-              placeholder="Ingrese nombre del proyecto"
+              onChange={handleChange}
               required
+              placeholder="Enter project name"
             />
           </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="location">Ubicación *</Label>
+          
+          <div>
+            <label htmlFor="description" className="block text-sm font-medium mb-1">
+              Description
+            </label>
+            <Textarea
+              id="description"
+              name="description"
+              value={formData.description}
+              onChange={handleChange}
+              placeholder="Enter project description"
+              rows={3}
+            />
+          </div>
+          
+          <div>
+            <label htmlFor="location" className="block text-sm font-medium mb-1">
+              Location
+            </label>
             <Input
               id="location"
               name="location"
               value={formData.location}
-              onChange={handleInputChange}
-              placeholder="Ingrese la ubicación"
-              required
+              onChange={handleChange}
+              placeholder="Enter project location"
             />
           </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="start_date">Fecha de inicio</Label>
-            <Input
-              id="start_date"
-              name="start_date"
-              type="date"
-              value={formData.start_date}
-              onChange={handleInputChange}
-            />
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="end_date">Fecha de fin</Label>
-            <Input
-              id="end_date"
-              name="end_date"
-              type="date"
-              value={formData.end_date}
-              onChange={handleInputChange}
-            />
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="status">Estado *</Label>
+          
+          <div>
+            <label htmlFor="status" className="block text-sm font-medium mb-1">
+              Status
+            </label>
             <Select
               value={formData.status}
               onValueChange={(value) => handleSelectChange("status", value)}
             >
-              <SelectTrigger id="status">
-                <SelectValue placeholder="Seleccionar estado" />
+              <SelectTrigger>
+                <SelectValue placeholder="Select status" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="inprogress">En progreso</SelectItem>
-                <SelectItem value="complete">Completado</SelectItem>
-                <SelectItem value="delayed">Retrasado</SelectItem>
+                <SelectItem value="planning">Planning</SelectItem>
+                <SelectItem value="inprogress">In Progress</SelectItem>
+                <SelectItem value="completed">Completed</SelectItem>
+                <SelectItem value="delayed">Delayed</SelectItem>
+                <SelectItem value="cancelled">Cancelled</SelectItem>
               </SelectContent>
             </Select>
           </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="progress">Progreso (%)</Label>
-            <Input
-              id="progress"
-              name="progress"
-              type="number"
-              min="0"
-              max="100"
-              value={formData.progress}
-              onChange={handleInputChange}
-              placeholder="0"
-            />
+          
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label htmlFor="start_date" className="block text-sm font-medium mb-1">
+                Start Date
+              </label>
+              <Input
+                id="start_date"
+                name="start_date"
+                type="date"
+                value={formData.start_date}
+                onChange={handleChange}
+              />
+            </div>
+            
+            <div>
+              <label htmlFor="end_date" className="block text-sm font-medium mb-1">
+                End Date
+              </label>
+              <Input
+                id="end_date"
+                name="end_date"
+                type="date"
+                value={formData.end_date}
+                onChange={handleChange}
+                min={formData.start_date}
+              />
+            </div>
           </div>
-
-          <div className="flex justify-end space-x-2 pt-4">
-            <Button type="button" variant="outline" onClick={onClose}>
-              Cancelar
+          
+          <div className="flex justify-end gap-2 pt-2">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={onClose}
+              disabled={isSubmitting}
+            >
+              Cancel
             </Button>
-            <Button type="submit" disabled={loading}>
-              {loading ? "Guardando..." : isEditMode ? "Actualizar" : "Crear"}
+            <Button type="submit" disabled={isSubmitting}>
+              {isSubmitting ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  {project ? "Updating..." : "Creating..."}
+                </>
+              ) : (
+                project ? "Update Project" : "Create Project"
+              )}
             </Button>
           </div>
         </form>

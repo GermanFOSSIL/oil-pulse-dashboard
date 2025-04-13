@@ -1,3 +1,4 @@
+
 import { useState, useEffect, useCallback, useMemo } from "react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { EnhancedGanttChart } from "@/components/EnhancedGanttChart";
@@ -95,6 +96,7 @@ const Dashboard = () => {
       
       const chartData = dashboardStats.chartData || [];
       
+      // Create default tags data if not available
       const tagsData = [
         { name: 'Liberados', value: dashboardStats.tags?.released || 0 },
         { name: 'Pendientes', value: (dashboardStats.tags?.total || 0) - (dashboardStats.tags?.released || 0) || 0 }
@@ -109,6 +111,7 @@ const Dashboard = () => {
         monthlyActivity: monthlyData
       });
 
+      // Fetch Gantt chart data
       let projectsData: any[] = [];
       let ganttSystemsData: any[] = [];
       let subsystemsData: any[] = [];

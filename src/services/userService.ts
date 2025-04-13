@@ -1,6 +1,65 @@
-
 import { supabase } from "@/integrations/supabase/client";
 import { useNavigate } from "react-router-dom";
+
+export const AVAILABLE_PERMISSIONS = [
+  "view_dashboard",
+  "manage_projects",
+  "manage_systems",
+  "manage_subsystems",
+  "manage_itrs",
+  "manage_users",
+  "manage_reports",
+  "export_data"
+];
+
+export interface UserProfile {
+  id: string;
+  full_name?: string;
+  email?: string;
+  role?: string;
+  permissions?: string[];
+  avatar_url?: string;
+  created_at?: string;
+  updated_at?: string;
+}
+
+export interface BulkUserData {
+  email: string;
+  full_name: string;
+  role?: string;
+  password?: string;
+}
+
+export const getUserPermissions = async (userId: string) => {
+  try {
+    const { data, error } = await supabase
+      .from("profiles")
+      .select("permissions")
+      .eq("id", userId)
+      .single();
+
+    if (error) throw error;
+    return data?.permissions || [];
+  } catch (error) {
+    console.error("Error fetching user permissions:", error);
+    return [];
+  }
+};
+
+export const getUserProfiles = async () => {
+  try {
+    const { data, error } = await supabase
+      .from("profiles")
+      .select("*")
+      .order("created_at", { ascending: false });
+
+    if (error) throw error;
+    return data || [];
+  } catch (error) {
+    console.error("Error fetching user profiles:", error);
+    throw error;
+  }
+};
 
 export const getUserByEmail = async (email) => {
   try {
@@ -68,7 +127,6 @@ export const updateUser = async (userId, userData) => {
 
 export const deleteUser = async (userId) => {
   try {
-    // Delete user profile
     const { error: profileError } = await supabase
       .from("profiles")
       .delete()
@@ -76,7 +134,6 @@ export const deleteUser = async (userId) => {
 
     if (profileError) throw profileError;
 
-    // Delete auth user (requires admin rights)
     const { error: authError } = await supabase.auth.admin.deleteUser(userId);
     if (authError) throw authError;
 
@@ -89,7 +146,6 @@ export const deleteUser = async (userId) => {
 
 export const createUser = async (userData) => {
   try {
-    // Check if email is already in use
     const { data: existingUsers } = await supabase
       .from("profiles")
       .select("id")
@@ -99,7 +155,6 @@ export const createUser = async (userData) => {
       throw new Error("Email already in use");
     }
 
-    // Create auth user with Supabase Auth
     const { data: authData, error: authError } = await supabase.auth.signUp({
       email: userData.email,
       password: userData.password,
@@ -112,12 +167,48 @@ export const createUser = async (userData) => {
 
     if (authError) throw authError;
 
-    // Create profile (handle in signUp trigger)
-    return authData;
+    return { 
+      success: true, 
+      userId: authData.user?.id,
+      message: "User created successfully"
+    };
   } catch (error) {
     console.error("Error creating user:", error);
-    throw error;
+    return { success: false, message: error.message };
   }
+};
+
+export const bulkCreateUsers = async (users: BulkUserData[]) => {
+  let successCount = 0;
+  
+  for (const userData of users) {
+    try {
+      const result = await createUser({
+        email: userData.email,
+        password: userData.password || generateRandomPassword(),
+        full_name: userData.full_name,
+        role: userData.role || 'user',
+        permissions: []
+      });
+      
+      if (result.success) {
+        successCount++;
+      }
+    } catch (error) {
+      console.error(`Error creating user ${userData.email}:`, error);
+    }
+  }
+  
+  return successCount;
+};
+
+const generateRandomPassword = () => {
+  const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789!@#$%^&*";
+  let password = "";
+  for (let i = 0; i < 10; i++) {
+    password += chars.charAt(Math.floor(Math.random() * chars.length));
+  }
+  return password;
 };
 
 export const updateUserRole = async (userId, role) => {
@@ -214,7 +305,6 @@ export const getCurrentUser = async () => {
     if (error) throw error;
     if (!data.user) return null;
     
-    // Get the user profile
     const { data: profile, error: profileError } = await supabase
       .from("profiles")
       .select("*")
@@ -275,7 +365,6 @@ export const sendPasswordResetEmail = async (email) => {
   }
 };
 
-// Fix the method to properly return a Promise
 export const confirmPasswordReset = (token, newPassword) => {
   return supabase.auth.updateUser({ password: newPassword })
     .then(({ data, error }) => {
@@ -286,4 +375,55 @@ export const confirmPasswordReset = (token, newPassword) => {
       console.error("Error confirming password reset:", error);
       throw error;
     });
+};
+
+export const changeUserPassword = async ({ userId, newPassword }) => {
+  try {
+    const { error } = await supabase.auth.admin.updateUserById(
+      userId,
+      { password: newPassword }
+    );
+    
+    if (error) throw error;
+    
+    return { 
+      success: true, 
+      message: "Password updated successfully" 
+    };
+  } catch (error) {
+    console.error("Error updating password:", error);
+    return { 
+      success: false, 
+      message: error.message || "Failed to update password" 
+    };
+  }
+};
+
+export const setRodrigoAsAdmin = async () => {
+  try {
+    const { data: rodrigoProfile } = await supabase
+      .from("profiles")
+      .select("*")
+      .or("email.eq.rodrigo@fossilenergies.com,full_name.ilike.%rodrigo%peredo%")
+      .limit(1);
+    
+    if (!rodrigoProfile || rodrigoProfile.length === 0) {
+      console.log("Rodrigo's profile not found");
+      return false;
+    }
+    
+    const { error } = await supabase
+      .from("profiles")
+      .update({
+        role: "admin",
+        permissions: AVAILABLE_PERMISSIONS
+      })
+      .eq("id", rodrigoProfile[0].id);
+    
+    if (error) throw error;
+    return true;
+  } catch (error) {
+    console.error("Error setting admin:", error);
+    return false;
+  }
 };

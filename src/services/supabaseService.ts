@@ -1,15 +1,26 @@
-
 // This file re-exports all service functions from their respective modules
 // to maintain backward compatibility with existing code
 
 export * from './types';
-// Import and re-export from userService without the Profile interface
-import { AVAILABLE_PERMISSIONS, getUserPermissions, getUserProfiles as getUserProfilesList, updateUserProfile, bulkCreateUsers } from './userService';
-export { AVAILABLE_PERMISSIONS, getUserPermissions, updateUserProfile, bulkCreateUsers };
-export type { UserProfile } from './userService';
+// Import and re-export from userService
+import { 
+  AVAILABLE_PERMISSIONS, 
+  getUserPermissions, 
+  getUserProfiles, 
+  updateUserProfile, 
+  bulkCreateUsers,
+  UserProfile 
+} from './userService';
+export { 
+  AVAILABLE_PERMISSIONS, 
+  getUserPermissions, 
+  updateUserProfile, 
+  bulkCreateUsers 
+};
+export type { UserProfile };
 
-// Rename the function to avoid naming collision
-export const getUserProfiles = getUserProfilesList;
+// Export getUserProfiles as a named function
+export const getUserProfilesList = getUserProfiles;
 
 export * from './projectService';
 export * from './systemService';
