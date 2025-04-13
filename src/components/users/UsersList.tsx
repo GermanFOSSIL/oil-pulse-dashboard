@@ -1,4 +1,3 @@
-
 import { memo, useMemo } from "react";
 import { User } from "@supabase/supabase-js";
 import { 
@@ -37,11 +36,11 @@ interface UsersListProps {
   users: Array<User & { profile?: UserProfile }>;
   onEdit: (user: User & { profile?: UserProfile }) => void;
   onDelete: (userId: string) => void;
-  onResetPassword: (userId: string) => void;
+  onChangePassword: (user: User & { profile?: UserProfile }) => void;
   isLoading?: boolean;
 }
 
-const UsersList = memo(({ users, onEdit, onDelete, onResetPassword, isLoading = false }: UsersListProps) => {
+const UsersList = memo(({ users, onEdit, onDelete, onChangePassword, isLoading = false }: UsersListProps) => {
   // Memoize these functions to prevent unnecessary re-renders
   const getRoleBadge = useMemo(() => (role?: string) => {
     switch (role) {
@@ -157,7 +156,7 @@ const UsersList = memo(({ users, onEdit, onDelete, onResetPassword, isLoading = 
                     </DropdownMenuItem>
                     <DropdownMenuItem 
                       onClick={() => {
-                        onResetPassword(user.id);
+                        onChangePassword(user);
                       }}
                     >
                       <KeyRound className="mr-2 h-4 w-4" />

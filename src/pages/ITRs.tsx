@@ -10,6 +10,7 @@ import { ProjectSelector } from '@/components/ProjectSelector';
 import { ITRFormModal } from '@/components/modals/ITRFormModal';
 import ITRList from '@/components/itr/ITRList';
 import { ITRWithDetails } from '@/types/itr-types';
+import { getSubsystems } from '@/services/subsystemService';
 
 const ITRs = () => {
   const { toast } = useToast();
@@ -20,6 +21,7 @@ const ITRs = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedITR, setSelectedITR] = useState<ITRWithDetails | null>(null);
+  const [subsystems, setSubsystems] = useState([]);
 
   const fetchITRs = async () => {
     setLoading(true);
@@ -41,6 +43,16 @@ const ITRs = () => {
 
   useEffect(() => {
     fetchITRs();
+    // Fetch subsystems for the modal
+    const loadSubsystems = async () => {
+      try {
+        const subsystemData = await getSubsystems();
+        setSubsystems(subsystemData);
+      } catch (error) {
+        console.error('Error fetching subsystems:', error);
+      }
+    };
+    loadSubsystems();
   }, [toast, selectedProjectId]);
 
   const filterITRs = (itrList: ITRWithDetails[], projectId: string | null, query: string) => {
@@ -179,6 +191,7 @@ const ITRs = () => {
         onClose={() => setIsModalOpen(false)}
         itr={selectedITR}
         onSuccess={fetchITRs}
+        subsystems={subsystems}
       />
     </div>
   );

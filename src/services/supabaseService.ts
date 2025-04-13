@@ -1,16 +1,17 @@
+
 // This file re-exports all service functions from their respective modules
 // to maintain backward compatibility with existing code
 
-export * from './types';
 // Import and re-export from userService
 import { 
   AVAILABLE_PERMISSIONS, 
   getUserPermissions, 
   getUserProfiles, 
-  updateUserProfile, 
   bulkCreateUsers,
-  UserProfile 
+  UserProfile,
+  updateUserProfile 
 } from './userService';
+
 export { 
   AVAILABLE_PERMISSIONS, 
   getUserPermissions, 
@@ -20,6 +21,10 @@ export {
 };
 export type { UserProfile };
 
+// Export types separately to avoid ambiguity
+export * from './types';
+
+// Re-export other services
 export * from './projectService';
 export * from './systemService';
 export * from './subsystemService';

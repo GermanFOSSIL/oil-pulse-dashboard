@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -53,7 +52,6 @@ const Users = () => {
         });
         setIsUserFormOpen(false);
         
-        // Optimistically add the new user to the list
         const newUser = {
           id: result.user.id,
           email: formData.email,
@@ -219,21 +217,6 @@ const Users = () => {
           />
         </CardContent>
       </Card>
-
-      <Dialog open={isUserFormOpen} onOpenChange={(open) => !isSubmitting && setIsUserFormOpen(open)}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>
-              {selectedUser ? "Editar Usuario" : "Crear Usuario"}
-            </DialogTitle>
-          </DialogHeader>
-          <UserForm
-            user={selectedUser}
-            onSubmit={handleFormSubmit}
-            isSubmitting={isSubmitting}
-          />
-        </DialogContent>
-      </Dialog>
 
       <Dialog open={isPasswordModalOpen} onOpenChange={setIsPasswordModalOpen}>
         <DialogContent>

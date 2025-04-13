@@ -1,4 +1,3 @@
-
 // Aquí se exportarán todos los servicios relacionados con usuarios
 
 import { supabase } from "@/integrations/supabase/client";
@@ -29,11 +28,21 @@ export interface UserProfile {
 
 // Get all users with their profiles
 export const getUsers = async () => {
-  const { data: users, error } = await supabase
-    .from('users')
-    .select('*, profile:profiles(*)');
+  // This is the correct approach since we can't query "users" directly
+  const { data: profiles, error } = await supabase
+    .from('profiles')
+    .select('*');
   
   if (error) throw error;
+  
+  // Format response similar to how it would be if we could query users
+  const users = profiles.map(profile => ({
+    id: profile.id,
+    email: profile.email,
+    profile: profile,
+    created_at: profile.created_at
+  }));
+  
   return users;
 };
 
@@ -49,69 +58,8 @@ export const getUserProfile = async (userId: string) => {
   return data;
 };
 
-// Get user permissions
-export const getUserPermissions = async (userId: string): Promise<string[]> => {
-  try {
-    const { data, error } = await supabase
-      .from('profiles')
-      .select('permissions')
-      .eq('id', userId)
-      .single();
-    
-    if (error) throw error;
-    
-    return data?.permissions || [];
-  } catch (error) {
-    console.error('Error getting user permissions:', error);
-    return [];
-  }
-};
-
-// Create new user
-export const createUser = async (userData: {
-  email: string;
-  password: string;
-  full_name: string;
-  role: string;
-  permissions?: string[];
-}) => {
-  // Create auth user
-  const { data: authData, error: authError } = await supabase.auth.signUp({
-    email: userData.email,
-    password: userData.password,
-  });
-  
-  if (authError) throw authError;
-  
-  if (authData?.user) {
-    // Create profile
-    const { data: profileData, error: profileError } = await supabase
-      .from('profiles')
-      .update({
-        full_name: userData.full_name,
-        role: userData.role,
-        permissions: userData.permissions || []
-      })
-      .eq('id', authData.user.id);
-    
-    if (profileError) {
-      // Attempt to clean up on error
-      try {
-        await supabase.auth.admin.deleteUser(authData.user.id);
-      } catch (e) {
-        console.error('Failed to clean up user after profile creation error:', e);
-      }
-      throw profileError;
-    }
-    
-    return authData;
-  }
-  
-  throw new Error('Failed to create user: No user data returned');
-};
-
-// Update user
-export const updateUser = async (userId: string, userData: {
+// Update user profile - renamed from updateUser for clarity
+export const updateUserProfile = async (userId: string, userData: {
   full_name?: string;
   role?: string;
   permissions?: string[];
@@ -124,6 +72,9 @@ export const updateUser = async (userId: string, userData: {
   if (error) throw error;
   return data;
 };
+
+// Update user
+export const updateUser = updateUserProfile;
 
 // Update user permissions
 export const updateUserPermissions = async (userId: string, permissions: string[]) => {

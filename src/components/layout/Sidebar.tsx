@@ -20,7 +20,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Button } from "@/components/ui/button";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { useAuth } from "@/contexts/AuthContext";
-import { getUserPermissions } from "@/services/userService";
+import { getUserPermissions, AVAILABLE_PERMISSIONS } from "@/services/userService";
 import { LogoutButton } from "@/components/ui/logout-button";
 
 type NavItem = {
