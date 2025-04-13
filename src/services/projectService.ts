@@ -1,8 +1,19 @@
-
 import { supabase } from "@/integrations/supabase/client";
-import { Project } from "@/services/types";
 
-export const getProjects = async (): Promise<Project[]> => {
+export interface Project {
+  id: string;
+  name: string;
+  description: string;
+  location: string;
+  status: "complete" | "inprogress" | "delayed";
+  progress: number;
+  start_date: string;
+  end_date: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export const getProjects = async () => {
   const { data, error } = await supabase
     .from('projects')
     .select('*');
@@ -15,7 +26,7 @@ export const getProjects = async (): Promise<Project[]> => {
   return (data as unknown as Project[]) || [];
 };
 
-export const getProjectById = async (id: string): Promise<Project | null> => {
+export const getProject = async (id: string) => {
   const { data, error } = await supabase
     .from('projects')
     .select('*')
@@ -30,10 +41,10 @@ export const getProjectById = async (id: string): Promise<Project | null> => {
   return data as unknown as Project;
 };
 
-export const createProject = async (project: Omit<Project, "id" | "created_at" | "updated_at">): Promise<Project> => {
+export const createProject = async (projectData: Omit<Project, "id" | "created_at" | "updated_at">) => {
   const { data, error } = await supabase
     .from('projects')
-    .insert(project)
+    .insert(projectData)
     .select()
     .single();
 
@@ -45,10 +56,10 @@ export const createProject = async (project: Omit<Project, "id" | "created_at" |
   return data as unknown as Project;
 };
 
-export const updateProject = async (id: string, updates: Partial<Project>): Promise<Project> => {
+export const updateProject = async (id: string, projectData: Partial<Project>) => {
   const { data, error } = await supabase
     .from('projects')
-    .update(updates)
+    .update(projectData)
     .eq('id', id)
     .select()
     .single();
@@ -61,7 +72,7 @@ export const updateProject = async (id: string, updates: Partial<Project>): Prom
   return data as unknown as Project;
 };
 
-export const deleteProject = async (id: string): Promise<void> => {
+export const deleteProject = async (id: string) => {
   const { error } = await supabase
     .from('projects')
     .delete()
@@ -73,7 +84,7 @@ export const deleteProject = async (id: string): Promise<void> => {
   }
 };
 
-export const getProjectsSummary = async (): Promise<{ total: number, complete: number, inProgress: number, delayed: number }> => {
+export const getProjectsSummary = async () => {
   const { data, error } = await supabase
     .from('projects')
     .select('*');

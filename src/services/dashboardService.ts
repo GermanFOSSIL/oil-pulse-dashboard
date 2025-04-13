@@ -114,7 +114,9 @@ export const getDashboardStats = async (projectId: string | null) => {
         total: tags.length,
         released: releasedTags,
         progress: tagsProgress
-      }
+      },
+      tagsReleased: releasedTags,
+      tagsTotal: tags.length
     };
   } catch (error) {
     console.error("Error fetching dashboard stats:", error);
@@ -215,7 +217,7 @@ const prepareGanttData = (projects, systems, subsystems, itrs) => {
   return ganttItems;
 };
 
-function addMonths(date, months) {
+function addMonths(date: Date, months: number): string {
   const result = new Date(date);
   result.setMonth(result.getMonth() + months);
   return result.toISOString();

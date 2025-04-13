@@ -3,7 +3,7 @@ import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { getUsers, deleteUser, createUser, updateUser, changeUserPassword } from "@/services/userService";
+import { getUsers, deleteUser, createUser, updateUser, changeUserPassword, bulkCreateUsers } from "@/services/userService";
 import { useToast } from "@/hooks/use-toast";
 import UserForm from "@/components/users/UserForm";
 import UsersList from "@/components/users/UsersList";
@@ -46,7 +46,6 @@ const Users = () => {
     try {
       const result = await createUser(formData);
       
-      // Fix the user creation part by handling the createUser response format correctly:
       if (result.user) {
         toast({
           title: "Usuario creado",
@@ -171,18 +170,7 @@ const Users = () => {
 
   const handleBulkUpload = async (users) => {
     try {
-      // Implement bulk user upload
-      let successCount = 0;
-      
-      for (const userData of users) {
-        try {
-          await createUser(userData);
-          successCount++;
-        } catch (error) {
-          console.error(`Error creating user ${userData.email}:`, error);
-        }
-      }
-      
+      const successCount = await bulkCreateUsers(users);
       fetchUsers();
       return successCount;
     } catch (error) {
@@ -227,7 +215,7 @@ const Users = () => {
             isLoading={loading}
             onEdit={handleOpenUserForm}
             onDelete={handleDeleteUser}
-            onResetPassword={handleOpenPasswordModal}
+            onChangePassword={handleOpenPasswordModal}
           />
         </CardContent>
       </Card>
@@ -253,7 +241,7 @@ const Users = () => {
             <DialogTitle>Cambiar Contraseña</DialogTitle>
           </DialogHeader>
           <PasswordChangeForm 
-            userId={selectedUser?.id} 
+            userId={selectedUser?.id}
             onSubmit={handleChangePassword}
             isSubmitting={isSubmitting}
           />

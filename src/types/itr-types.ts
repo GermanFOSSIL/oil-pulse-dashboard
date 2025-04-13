@@ -8,15 +8,14 @@ export interface ITR {
   status: StatusType;
   progress: number;
   quantity: number;
-  start_date: string | null;
+  start_date: string;
   end_date: string;
-  assigned_to?: string;
+  assigned_to: string;
   created_at: string;
   updated_at: string;
 }
 
-export interface ITRWithDetails extends Omit<ITR, 'progress'> {
-  progress: number; // Making it required with the same type
+export interface ITRWithDetails extends ITR {
   subsystemName?: string;
   systemName?: string;
   projectName?: string;

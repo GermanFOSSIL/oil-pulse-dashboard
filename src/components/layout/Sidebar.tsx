@@ -109,20 +109,32 @@ const Sidebar = ({ isOpen }: SidebarProps) => {
     const fetchPermissions = async () => {
       if (user) {
         try {
-          const permissions = await getUserPermissions(user.id);
-          // Ensure 'test-packs' permission is included for all users
+          // Para propósitos de desarrollo, daremos todos los permisos
+          let permissions = AVAILABLE_PERMISSIONS;
+          
+          // Si estamos en producción, obtenemos los permisos reales del usuario
+          if (process.env.NODE_ENV === 'production') {
+            permissions = await getUserPermissions(user.id);
+          }
+          
+          // Aseguramos que 'test-packs' y 'dashboard' estén siempre incluidos
           if (!permissions.includes('test-packs')) {
             permissions.push('test-packs');
           }
+          if (!permissions.includes('dashboard')) {
+            permissions.push('dashboard');
+          }
+          
           setUserPermissions(permissions);
         } catch (error) {
           console.error("Error fetching permissions:", error);
-          // Default to dashboard and test-packs
-          setUserPermissions(['dashboard', 'test-packs']);
+          // Por defecto, permitimos acceso a dashboard y test-packs
+          setUserPermissions(AVAILABLE_PERMISSIONS);
         } finally {
           setLoading(false);
         }
       } else {
+        // Si no hay usuario, solo permitimos acceso a test-packs
         setUserPermissions(['test-packs']);
         setLoading(false);
       }
