@@ -4,12 +4,17 @@ import { supabase } from "@/integrations/supabase/client";
 export const getDashboardStats = async (projectId: string | null) => {
   try {
     // Get all projects
-    const projectFilter = projectId ? `id.eq.${projectId}` : '';
-    const { data: projects, error: projectsError } = await supabase
+    let projectQuery = supabase
       .from('projects')
       .select('*')
-      .order('created_at', { ascending: false })
-      .or(projectFilter);
+      .order('created_at', { ascending: false });
+    
+    // Apply filter only if projectId is provided
+    if (projectId) {
+      projectQuery = projectQuery.eq('id', projectId);
+    }
+    
+    const { data: projects, error: projectsError } = await projectQuery;
     
     if (projectsError) throw projectsError;
     
@@ -19,33 +24,37 @@ export const getDashboardStats = async (projectId: string | null) => {
     const delayedProjects = projects.filter(p => p.status === 'delayed').length;
     
     // Get systems
-    let systemsFilter = '';
+    let systemsQuery = supabase.from('systems').select('*');
+    
     if (projectId) {
-      systemsFilter = `project_id.eq.${projectId}`;
+      systemsQuery = systemsQuery.eq('project_id', projectId);
     }
     
-    const { data: systems, error: systemsError } = await supabase
-      .from('systems')
-      .select('*')
-      .or(systemsFilter);
+    const { data: systems, error: systemsError } = await systemsQuery;
     
     if (systemsError) throw systemsError;
     
     // Get subsystems
     const systemIds = systems.map(s => s.id);
-    const { data: subsystems, error: subsystemsError } = await supabase
-      .from('subsystems')
-      .select('*')
-      .in('system_id', systemIds);
+    let subsystemsQuery = supabase.from('subsystems').select('*');
+    
+    if (systemIds.length > 0) {
+      subsystemsQuery = subsystemsQuery.in('system_id', systemIds);
+    }
+    
+    const { data: subsystems, error: subsystemsError } = await subsystemsQuery;
     
     if (subsystemsError) throw subsystemsError;
     
     // Get ITRs
     const subsystemIds = subsystems.map(s => s.id);
-    const { data: itrs, error: itrsError } = await supabase
-      .from('itrs')
-      .select('*')
-      .in('subsystem_id', subsystemIds);
+    let itrsQuery = supabase.from('itrs').select('*');
+    
+    if (subsystemIds.length > 0) {
+      itrsQuery = itrsQuery.in('subsystem_id', subsystemIds);
+    }
+    
+    const { data: itrs, error: itrsError } = await itrsQuery;
     
     if (itrsError) throw itrsError;
     
