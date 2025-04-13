@@ -1,3 +1,4 @@
+
 // Aquí se exportarán todos los servicios relacionados con usuarios
 
 import { supabase } from "@/integrations/supabase/client";
@@ -73,6 +74,18 @@ export const updateUserProfile = async (userId: string, userData: {
   return data;
 };
 
+// Get user permissions
+export const getUserPermissions = async (userId: string) => {
+  const { data, error } = await supabase
+    .from('profiles')
+    .select('permissions')
+    .eq('id', userId)
+    .single();
+  
+  if (error) throw error;
+  return data?.permissions || [];
+};
+
 // Update user
 export const updateUser = updateUserProfile;
 
@@ -106,6 +119,38 @@ export const changeUserPassword = async (userId: string, newPassword: string) =>
   
   if (error) throw error;
   return data;
+};
+
+// Create user function
+export const createUser = async (userData: {
+  email: string;
+  password: string;
+  full_name: string;
+  role?: string;
+  permissions?: string[];
+}) => {
+  // Create the user in auth
+  const { data: authData, error: authError } = await supabase.auth.admin.createUser({
+    email: userData.email,
+    password: userData.password,
+    email_confirm: true,
+    user_metadata: {
+      full_name: userData.full_name
+    }
+  });
+  
+  if (authError) throw authError;
+  
+  // Update the profile with role and permissions
+  if (authData.user) {
+    await updateUserProfile(authData.user.id, {
+      full_name: userData.full_name,
+      role: userData.role || 'user',
+      permissions: userData.permissions || []
+    });
+  }
+  
+  return authData;
 };
 
 // Bulk create users

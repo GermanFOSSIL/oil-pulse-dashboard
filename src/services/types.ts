@@ -1,8 +1,10 @@
+
 export type Project = {
   id: string;
   created_at: string;
   updated_at: string;
   name: string;
+  description: string | null;
   location: string | null;
   status: "complete" | "inprogress" | "delayed";
   progress: number | null;

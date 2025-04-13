@@ -9,7 +9,8 @@ import {
   getUserProfiles, 
   bulkCreateUsers,
   UserProfile,
-  updateUserProfile 
+  updateUserProfile,
+  createUser
 } from './userService';
 
 export { 
@@ -17,12 +18,29 @@ export {
   getUserPermissions, 
   updateUserProfile, 
   bulkCreateUsers,
-  getUserProfiles
+  getUserProfiles,
+  createUser
 };
 export type { UserProfile };
 
 // Export types separately to avoid ambiguity
-export * from './types';
+export { Project, System, Subsystem, ITR } from './types';
+export type { 
+  BulkUserData, 
+  ReportType, 
+  UserUpdateData, 
+  UserCreateData, 
+  PasswordChangeData,
+  TestPack,
+  Tag,
+  AccionesLog,
+  TestPackStats,
+  TagStats,
+  StatsData,
+  DbActivityLog,
+  Profile,
+  Task
+} from './types';
 
 // Re-export other services
 export * from './projectService';
