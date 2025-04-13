@@ -13,7 +13,7 @@ import { Project } from "@/services/types";
 export interface ProjectFormModalProps {
   open: boolean;
   onClose: () => void;
-  project?: any;
+  project?: Project;
   onProjectCreated?: () => void;
   onProjectUpdated?: () => void;
 }
@@ -26,11 +26,19 @@ export const ProjectFormModal = ({
   onProjectUpdated
 }: ProjectFormModalProps) => {
   // Initialize state for form fields
-  const [formData, setFormData] = useState({
+  const [formData, setFormData] = useState<{
+    name: string;
+    description: string;
+    location: string;
+    status: "complete" | "inprogress" | "delayed";
+    start_date: string;
+    end_date: string;
+    progress: number;
+  }>({
     name: "",
     description: "",
     location: "",
-    status: "planning" as "complete" | "inprogress" | "delayed",
+    status: "inprogress",
     start_date: "",
     end_date: "",
     progress: 0
@@ -48,7 +56,7 @@ export const ProjectFormModal = ({
         name: project.name || "",
         description: project.description || "",
         location: project.location || "",
-        status: project.status || "planning",
+        status: project.status || "inprogress",
         start_date: startDate,
         end_date: endDate,
         progress: project.progress || 0
@@ -59,7 +67,7 @@ export const ProjectFormModal = ({
         name: "",
         description: "",
         location: "",
-        status: "planning",
+        status: "inprogress",
         start_date: "",
         end_date: "",
         progress: 0
@@ -211,6 +219,22 @@ export const ProjectFormModal = ({
                 min={formData.start_date}
               />
             </div>
+          </div>
+          
+          <div>
+            <label htmlFor="progress" className="block text-sm font-medium mb-1">
+              Progress
+            </label>
+            <Input
+              id="progress"
+              name="progress"
+              type="number"
+              min="0"
+              max="100"
+              value={formData.progress}
+              onChange={handleChange}
+              placeholder="Enter progress (0-100)"
+            />
           </div>
           
           <div className="flex justify-end gap-2 pt-2">

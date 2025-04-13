@@ -1,7 +1,6 @@
 
 import { memo, useMemo } from "react";
 import { User } from "@supabase/supabase-js";
-import { UserProfile } from "@/services/userService";
 import { 
   Table, 
   TableBody, 
@@ -22,6 +21,17 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Skeleton } from "@/components/ui/skeleton";
+
+interface UserProfile {
+  id: string;
+  full_name?: string;
+  email?: string;
+  avatar_url?: string;
+  role?: string;
+  permissions?: string[];
+  created_at: string;
+  updated_at: string;
+}
 
 interface UsersListProps {
   users: Array<User & { profile?: UserProfile }>;

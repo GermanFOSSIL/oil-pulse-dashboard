@@ -1,7 +1,4 @@
 
-import { supabase } from "@/integrations/supabase/client";
-
-// Define las interfaces para los tipos de ITR
 export type StatusType = "complete" | "inprogress" | "delayed";
 
 export interface ITR {
@@ -12,7 +9,7 @@ export interface ITR {
   progress: number;
   quantity: number;
   start_date: string | null;
-  end_date?: string;
+  end_date: string;
   assigned_to?: string;
   created_at: string;
   updated_at: string;

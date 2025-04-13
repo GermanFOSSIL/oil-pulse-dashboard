@@ -3,8 +3,8 @@ import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { getUsers, deleteUser, createUser, updateUser } from "@/services/userService";
-import { toast } from "@/hooks/use-toast";
+import { getUsers, deleteUser, createUser, updateUser, changeUserPassword } from "@/services/userService";
+import { useToast } from "@/hooks/use-toast";
 import UserForm from "@/components/users/UserForm";
 import UsersList from "@/components/users/UsersList";
 import PasswordChangeForm from "@/components/users/PasswordChangeForm";
@@ -18,6 +18,7 @@ const Users = () => {
   const [isBulkUploadOpen, setIsBulkUploadOpen] = useState(false);
   const [selectedUser, setSelectedUser] = useState(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const { toast } = useToast();
 
   useEffect(() => {
     fetchUsers();
@@ -147,6 +148,49 @@ const Users = () => {
     }
   };
 
+  const handleChangePassword = async (userId, password) => {
+    setIsSubmitting(true);
+    try {
+      await changeUserPassword(userId, password);
+      toast({
+        title: "Contraseña actualizada",
+        description: "La contraseña se ha actualizado exitosamente",
+      });
+      setIsPasswordModalOpen(false);
+    } catch (error) {
+      console.error("Error changing password:", error);
+      toast({
+        title: "Error",
+        description: "No se pudo cambiar la contraseña",
+        variant: "destructive",
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleBulkUpload = async (users) => {
+    try {
+      // Implement bulk user upload
+      let successCount = 0;
+      
+      for (const userData of users) {
+        try {
+          await createUser(userData);
+          successCount++;
+        } catch (error) {
+          console.error(`Error creating user ${userData.email}:`, error);
+        }
+      }
+      
+      fetchUsers();
+      return successCount;
+    } catch (error) {
+      console.error("Error in bulk upload:", error);
+      throw error;
+    }
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
@@ -180,10 +224,10 @@ const Users = () => {
         <CardContent>
           <UsersList
             users={users}
-            loading={loading}
+            isLoading={loading}
             onEdit={handleOpenUserForm}
             onDelete={handleDeleteUser}
-            onChangePassword={handleOpenPasswordModal}
+            onResetPassword={handleOpenPasswordModal}
           />
         </CardContent>
       </Card>
@@ -208,7 +252,11 @@ const Users = () => {
           <DialogHeader>
             <DialogTitle>Cambiar Contraseña</DialogTitle>
           </DialogHeader>
-          <PasswordChangeForm userId={selectedUser?.id} />
+          <PasswordChangeForm 
+            userId={selectedUser?.id} 
+            onSubmit={handleChangePassword}
+            isSubmitting={isSubmitting}
+          />
         </DialogContent>
       </Dialog>
 
@@ -217,10 +265,9 @@ const Users = () => {
           <DialogHeader>
             <DialogTitle>Importar Usuarios</DialogTitle>
           </DialogHeader>
-          <BulkUserUpload onSuccess={() => {
-            setIsBulkUploadOpen(false);
-            fetchUsers();
-          }} />
+          <BulkUserUpload 
+            onUpload={handleBulkUpload} 
+          />
         </DialogContent>
       </Dialog>
     </div>

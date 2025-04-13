@@ -110,9 +110,11 @@ export const getDashboardStats = async (projectId: string | null) => {
         completed: completedTestPacks,
         progress: testPackProgress
       },
-      tagsTotal: tags.length,
-      tagsReleased: releasedTags,
-      tagsProgress: tagsProgress
+      tags: {
+        total: tags.length,
+        released: releasedTags,
+        progress: tagsProgress
+      }
     };
   } catch (error) {
     console.error("Error fetching dashboard stats:", error);
@@ -158,7 +160,7 @@ const prepareGanttData = (projects, systems, subsystems, itrs) => {
       id: `project-${project.id}`,
       task: project.name,
       start: project.start_date || new Date().toISOString(),
-      end: project.end_date || addMonths(new Date(), 3).toISOString(),
+      end: project.end_date || addMonths(new Date(), 3),
       progress: project.progress || 0,
       type: 'project',
       status: project.status
@@ -171,7 +173,7 @@ const prepareGanttData = (projects, systems, subsystems, itrs) => {
         id: `system-${system.id}`,
         task: system.name,
         start: system.start_date || new Date().toISOString(),
-        end: system.end_date || addMonths(new Date(), 2).toISOString(),
+        end: system.end_date || addMonths(new Date(), 2),
         progress: system.completion_rate || 0,
         parent: `project-${project.id}`,
         type: 'system',
@@ -185,7 +187,7 @@ const prepareGanttData = (projects, systems, subsystems, itrs) => {
           id: `subsystem-${subsystem.id}`,
           task: subsystem.name,
           start: subsystem.start_date || new Date().toISOString(),
-          end: subsystem.end_date || addMonths(new Date(), 1).toISOString(),
+          end: subsystem.end_date || addMonths(new Date(), 1),
           progress: subsystem.completion_rate || 0,
           parent: `system-${system.id}`,
           type: 'subsystem',
@@ -199,7 +201,7 @@ const prepareGanttData = (projects, systems, subsystems, itrs) => {
             id: `itr-${itr.id}`,
             task: itr.name,
             start: itr.start_date || new Date().toISOString(),
-            end: itr.end_date || addMonths(new Date(), 0.5).toISOString(),
+            end: itr.end_date || addMonths(new Date(), 0.5),
             progress: itr.progress || 0,
             parent: `subsystem-${subsystem.id}`,
             type: 'task',

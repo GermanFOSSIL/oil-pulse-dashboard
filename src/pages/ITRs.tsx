@@ -4,7 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { getITRsWithDetails, deleteITR } from '@/services/itrService';
 import { useToast } from '@/hooks/use-toast';
 import { Button } from '@/components/ui/button';
-import { Plus, Search, Trash, Edit, Eye, FilterX } from 'lucide-react';
+import { Plus, Search, FilterX } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { ProjectSelector } from '@/components/ProjectSelector';
 import { ITRFormModal } from '@/components/modals/ITRFormModal';
@@ -24,7 +24,7 @@ const ITRs = () => {
   const fetchITRs = async () => {
     setLoading(true);
     try {
-      const fetchedITRs = await getITRsWithDetails(selectedProjectId || null);
+      const fetchedITRs = await getITRsWithDetails(selectedProjectId);
       setITRs(fetchedITRs);
       filterITRs(fetchedITRs, selectedProjectId, searchQuery);
     } catch (error) {

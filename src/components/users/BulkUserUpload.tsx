@@ -3,9 +3,15 @@ import { useState } from "react";
 import * as XLSX from 'xlsx';
 import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { BulkUserData } from "@/services/types";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Upload, Download } from "lucide-react";
+
+interface BulkUserData {
+  email: string;
+  full_name: string;
+  password: string;
+  role: string;
+}
 
 interface BulkUserUploadProps {
   onUpload: (users: BulkUserData[]) => Promise<number>;
