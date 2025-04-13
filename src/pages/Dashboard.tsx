@@ -4,6 +4,7 @@ import { EnhancedGanttChart } from "@/components/EnhancedGanttChart";
 import { getProjects, getSystems, getSubsystems, getITRs } from "@/services/supabaseService";
 import { getDashboardStats } from "@/services/dashboardService";
 import { format, addMonths, subMonths } from "date-fns";
+import { es } from "date-fns/locale";
 import { BarChart3, CheckCircle2, Clock3, Tag } from "lucide-react";
 import { DatabaseActivityTimeline } from "@/components/DatabaseActivityTimeline";
 import { useToast } from "@/hooks/use-toast";
@@ -37,7 +38,6 @@ const Dashboard = () => {
       const dashboardStats = await getDashboardStats(projectId);
       setStats(dashboardStats);
 
-      // Prepare KPI chart data
       const testPackData = [
         { name: 'Completados', value: dashboardStats.completedProjects || 0 },
         { name: 'En Progreso', value: dashboardStats.inProgressProjects || 0 },
@@ -46,13 +46,11 @@ const Dashboard = () => {
       
       const systemsData = dashboardStats.chartData || [];
       
-      // Create default tags data if not available
       const tagsData = [
         { name: 'Liberados', value: dashboardStats.tags?.released || 0 },
         { name: 'Pendientes', value: dashboardStats.tags?.total - (dashboardStats.tags?.released || 0) || 0 }
       ];
       
-      // Ensure we have monthly data, or generate mock data
       const monthlyData = dashboardStats.areaChartData || generateMonthlyMockData();
       
       setKpiChartData({
@@ -62,7 +60,6 @@ const Dashboard = () => {
         monthlyActivity: monthlyData
       });
 
-      // Fetch Gantt chart data
       let projectsData: any[] = [];
       let ganttSystemsData: any[] = [];
       let subsystemsData: any[] = [];
