@@ -2,7 +2,8 @@
 import { useState, useEffect, useCallback, useMemo } from "react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { EnhancedGanttChart } from "@/components/EnhancedGanttChart";
-import { getProjects, getSystems, getSubsystems, getITRs, getDashboardStats } from "@/services/supabaseService";
+import { getProjects, getSystems, getSubsystems, getITRs } from "@/services/supabaseService";
+import { getDashboardStats } from "@/services/dashboardService";
 import { format, addMonths, subMonths } from "date-fns";
 import { es } from "date-fns/locale";
 import { ProjectSelector } from "@/components/ProjectSelector";
@@ -27,6 +28,7 @@ import { KPICard } from "@/components/DashboardWidgets/KPICard";
 import { TestPacksChart } from "@/components/Dashboard/TestPacksChart";
 import { MonthlyEfficiencyChart } from "@/components/Dashboard/MonthlyEfficiencyChart";
 import { TagsChart } from "@/components/Dashboard/TagsChart";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 // Dashboard skeleton loader
 const DashboardSkeleton = () => (
@@ -72,6 +74,7 @@ const Dashboard = () => {
   const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null);
   const [ganttData, setGanttData] = useState<any[]>([]);
   const [exportLoading, setExportLoading] = useState<string | null>(null);
+  const [activeTab, setActiveTab] = useState("general");
   
   // KPI data for charts
   const [kpiChartData, setKpiChartData] = useState({
@@ -477,7 +480,6 @@ const Dashboard = () => {
           <ProjectSelector
             onSelectProject={handleSelectProject}
             selectedProjectId={selectedProjectId}
-            className="w-full sm:w-auto"
           />
           <div className="flex gap-2">
             <Button 
@@ -524,136 +526,165 @@ const Dashboard = () => {
         <DashboardSkeleton />
       ) : (
         <div id="dashboard-content" className="space-y-6">
-          {/* KPI Cards */}
-          <div className="grid gap-4 grid-cols-1 md:grid-cols-2 lg:grid-cols-4">
-            <KPICard
-              title="Test Packs"
-              value={kpiStats.testPacks.total}
-              description={`${kpiStats.testPacks.completed} completados (${kpiStats.testPacks.progress}%)`}
-              icon={<BarChart3 className="h-4 w-4" />}
-              className="border-l-4 border-l-primary"
-            />
+          <Tabs defaultValue="general" value={activeTab} onValueChange={setActiveTab}>
+            <TabsList className="mb-4">
+              <TabsTrigger value="general">Visión General</TabsTrigger>
+              <TabsTrigger value="graficos">Gráficos</TabsTrigger>
+              <TabsTrigger value="planificacion">Planificación</TabsTrigger>
+            </TabsList>
             
-            <KPICard
-              title="Tags"
-              value={kpiStats.tags.total}
-              description={`${kpiStats.tags.released} liberados (${kpiStats.tags.progress}%)`}
-              icon={<Tag className="h-4 w-4" />}
-              className="border-l-4 border-l-orange-500"
-            />
-            
-            <KPICard
-              title="Completados"
-              value={kpiStats.itrs.completed}
-              description={`de ${kpiStats.itrs.total} ITRs totales`}
-              icon={<CheckCircle2 className="h-4 w-4" />}
-              className="border-l-4 border-l-green-500"
-            />
-            
-            <KPICard
-              title="Pendientes"
-              value={kpiStats.itrs.inProgress + kpiStats.itrs.delayed}
-              description={`${kpiStats.itrs.delayed} con retraso`}
-              icon={<Clock3 className="h-4 w-4" />}
-              className="border-l-4 border-l-red-500"
-            />
-          </div>
+            <TabsContent value="general" className="space-y-6">
+              {/* KPI Cards */}
+              <div className="grid gap-4 grid-cols-1 md:grid-cols-2 lg:grid-cols-4">
+                <KPICard
+                  title="Test Packs"
+                  value={kpiStats.testPacks.total}
+                  description={`${kpiStats.testPacks.completed} completados (${kpiStats.testPacks.progress}%)`}
+                  icon={<BarChart3 className="h-4 w-4" />}
+                  className="border-l-4 border-l-primary"
+                />
+                
+                <KPICard
+                  title="Tags"
+                  value={kpiStats.tags.total}
+                  description={`${kpiStats.tags.released} liberados (${kpiStats.tags.progress}%)`}
+                  icon={<Tag className="h-4 w-4" />}
+                  className="border-l-4 border-l-orange-500"
+                />
+                
+                <KPICard
+                  title="Completados"
+                  value={kpiStats.itrs.completed}
+                  description={`de ${kpiStats.itrs.total} ITRs totales`}
+                  icon={<CheckCircle2 className="h-4 w-4" />}
+                  className="border-l-4 border-l-green-500"
+                />
+                
+                <KPICard
+                  title="Pendientes"
+                  value={kpiStats.itrs.inProgress + kpiStats.itrs.delayed}
+                  description={`${kpiStats.itrs.delayed} con retraso`}
+                  icon={<Clock3 className="h-4 w-4" />}
+                  className="border-l-4 border-l-red-500"
+                />
+              </div>
 
-          {/* Charts */}
-          <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-            <TestPacksChart 
-              data={kpiChartData.systems} 
-              className="lg:col-span-2"
-            />
-            
-            <TagsChart 
-              data={kpiChartData.tags} 
-            />
-          </div>
-          
-          <MonthlyEfficiencyChart 
-            data={kpiChartData.monthlyActivity} 
-          />
-
-          {/* Gantt Chart */}
-          <Card className="overflow-hidden">
-            <CardHeader>
-              <CardTitle>Cronograma de ITRs</CardTitle>
-              <CardDescription>
-                Planificación y progreso de Test Packs e ITRs
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="p-0">
-              <EnhancedGanttChart data={ganttData} />
-            </CardContent>
-          </Card>
-
-          {/* Database Activity */}
-          <div className="grid gap-4 md:grid-cols-2">
-            <DatabaseActivityTimeline />
-            
-            <Card>
-              <CardHeader>
-                <CardTitle>Recordatorios</CardTitle>
-                <CardDescription>
-                  Actividades pendientes
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="relative">
-                  <div className="absolute left-4 h-full w-px bg-muted"></div>
-                  
-                  {[
-                    {
-                      date: addMonths(new Date(), 0.25),
-                      title: "Verificación de Tags pendientes",
-                      description: "Revisar Tags pendientes de liberación del sistema eléctrico",
-                      priority: "high"
-                    },
-                    {
-                      date: addMonths(new Date(), 0.5),
-                      title: "Reporte mensual de avance",
-                      description: "Preparar reporte mensual de avance para cliente",
-                      priority: "medium"
-                    },
-                    {
-                      date: addMonths(new Date(), 0.75),
-                      title: "Revisión de sistema mecánico",
-                      description: "Completar inspección de sistema mecánico",
-                      priority: "low"
-                    }
-                  ].map((event, index) => {
-                    let priorityColor = "bg-blue-500";
-                    if (event.priority === "high") priorityColor = "bg-red-500";
-                    if (event.priority === "medium") priorityColor = "bg-orange-500";
-                    
-                    return (
-                      <div key={index} className="mb-8 grid last:mb-0">
-                        <div className="flex items-start">
-                          <div className={`flex h-8 w-8 items-center justify-center rounded-full border border-muted bg-background z-10 mr-4`}>
-                            <span className={`flex h-2 w-2 rounded-full ${priorityColor}`}></span>
-                          </div>
-                          <div className="text-sm mr-4">
-                            {`${format(event.date, 'dd/MM')}`}
-                          </div>
-                          <div className="flex-1 rounded-lg border p-4">
-                            <h3 className="font-semibold tracking-tight">{event.title}</h3>
-                            <p className="text-sm text-muted-foreground mt-1">{event.description}</p>
-                            <div className="mt-2 flex items-center text-xs text-muted-foreground">
-                              <CalendarIcon className="mr-1 h-3 w-3" />
-                              <span>
-                                {format(event.date, 'dd MMM yyyy', { locale: es })}
-                              </span>
+              {/* Charts */}
+              <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+                <TestPacksChart 
+                  data={kpiChartData.systems} 
+                  className="lg:col-span-2"
+                />
+                
+                <TagsChart 
+                  data={kpiChartData.tags} 
+                />
+              </div>
+              
+              <MonthlyEfficiencyChart 
+                data={kpiChartData.monthlyActivity} 
+              />
+              
+              {/* Database Activity */}
+              <div className="grid gap-4 md:grid-cols-2">
+                <DatabaseActivityTimeline />
+                
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Recordatorios</CardTitle>
+                    <CardDescription>
+                      Actividades pendientes
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="relative">
+                      <div className="absolute left-4 h-full w-px bg-muted"></div>
+                      
+                      {[
+                        {
+                          date: addMonths(new Date(), 0.25),
+                          title: "Verificación de Tags pendientes",
+                          description: "Revisar Tags pendientes de liberación del sistema eléctrico",
+                          priority: "high"
+                        },
+                        {
+                          date: addMonths(new Date(), 0.5),
+                          title: "Reporte mensual de avance",
+                          description: "Preparar reporte mensual de avance para cliente",
+                          priority: "medium"
+                        },
+                        {
+                          date: addMonths(new Date(), 0.75),
+                          title: "Revisión de sistema mecánico",
+                          description: "Completar inspección de sistema mecánico",
+                          priority: "low"
+                        }
+                      ].map((event, index) => {
+                        let priorityColor = "bg-blue-500";
+                        if (event.priority === "high") priorityColor = "bg-red-500";
+                        if (event.priority === "medium") priorityColor = "bg-orange-500";
+                        
+                        return (
+                          <div key={index} className="mb-8 grid last:mb-0">
+                            <div className="flex items-start">
+                              <div className={`flex h-8 w-8 items-center justify-center rounded-full border border-muted bg-background z-10 mr-4`}>
+                                <span className={`flex h-2 w-2 rounded-full ${priorityColor}`}></span>
+                              </div>
+                              <div className="text-sm mr-4">
+                                {`${format(event.date, 'dd/MM')}`}
+                              </div>
+                              <div className="flex-1 rounded-lg border p-4">
+                                <h3 className="font-semibold tracking-tight">{event.title}</h3>
+                                <p className="text-sm text-muted-foreground mt-1">{event.description}</p>
+                                <div className="mt-2 flex items-center text-xs text-muted-foreground">
+                                  <CalendarIcon className="mr-1 h-3 w-3" />
+                                  <span>
+                                    {format(event.date, 'dd MMM yyyy', { locale: es })}
+                                  </span>
+                                </div>
+                              </div>
                             </div>
                           </div>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              </CardContent>
-            </Card>
-          </div>
+                        );
+                      })}
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
+            </TabsContent>
+            
+            <TabsContent value="graficos" className="space-y-6">
+              <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+                <TestPacksChart 
+                  data={kpiChartData.systems} 
+                  className="lg:col-span-2"
+                />
+                
+                <TagsChart 
+                  data={kpiChartData.tags} 
+                />
+              </div>
+              
+              <MonthlyEfficiencyChart 
+                data={kpiChartData.monthlyActivity} 
+              />
+            </TabsContent>
+            
+            <TabsContent value="planificacion" className="space-y-6">
+              {/* Gantt Chart */}
+              <Card className="overflow-hidden">
+                <CardHeader>
+                  <CardTitle>Cronograma de Proyectos</CardTitle>
+                  <CardDescription>
+                    Planificación y progreso de Test Packs e ITRs
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="p-0">
+                  <EnhancedGanttChart data={ganttData} />
+                </CardContent>
+              </Card>
+            </TabsContent>
+          </Tabs>
         </div>
       )}
     </div>

@@ -1,164 +1,196 @@
 
-import { getITRs, getSubsystems, getSystemsByProjectId, ITR, Subsystem, System } from "@/services/supabaseService";
-import { ITRWithDetails } from "@/types/itr-types";
-import { createITR } from "@/services/itrDataService";
 import { supabase } from "@/integrations/supabase/client";
+import { ITRWithDetails } from "@/types/itr-types";
 
-export const fetchITRsWithDetails = async (selectedProjectId: string | null): Promise<ITRWithDetails[]> => {
+// Get all ITRs for a specific project including subsystem and system information
+export const getITRsWithDetails = async (projectId: string): Promise<ITRWithDetails[]> => {
   try {
-    console.log(`Fetching ITRs with details for project: ${selectedProjectId || 'todos'}`);
-    
-    const subsystemsData = await getSubsystems();
-    console.log(`Total subsystems in the database: ${subsystemsData.length}`);
-    
-    if (selectedProjectId) {
-      const systemsData = await getSystemsByProjectId(selectedProjectId);
-      console.log(`Systems for project ${selectedProjectId}: ${systemsData.length}`);
-      
-      const systemIds = systemsData.map(system => system.id);
-      const filteredSubsystems = subsystemsData.filter(
-        subsystem => systemIds.includes(subsystem.system_id)
-      );
-      console.log(`Filtered subsystems for this project: ${filteredSubsystems.length}`);
-      
-      const itrsData = await getITRs();
-      console.log(`Total ITRs in the database: ${itrsData.length}`);
-      
-      const enrichedITRs = itrsData
-        .filter(itr => {
-          return filteredSubsystems.some(sub => sub.id === itr.subsystem_id);
-        })
-        .map(itr => {
-          const relatedSubsystem = subsystemsData.find(sub => sub.id === itr.subsystem_id);
-          const relatedSystem = systemsData.find(sys => sys.id === relatedSubsystem?.system_id);
-          
-          return {
-            ...itr,
-            subsystemName: relatedSubsystem?.name || 'Subsistema Desconocido',
-            systemName: relatedSystem?.name || 'Sistema Desconocido',
-            projectName: selectedProjectId ? 'Proyecto actual' : 'Desconocido'
-          };
-        });
-      
-      console.log(`Enriched ITRs for this project: ${enrichedITRs.length}`);
-      return enrichedITRs;
-    } else {
-      const itrsData = await getITRs();
-      console.log(`Total ITRs in the database: ${itrsData.length}`);
-      
-      const enrichedITRs = itrsData.map(itr => {
-        const relatedSubsystem = subsystemsData.find(sub => sub.id === itr.subsystem_id);
-        
-        return {
-          ...itr,
-          subsystemName: relatedSubsystem?.name || 'Subsistema Desconocido',
-          systemName: 'No filtrado por proyecto'
-        };
-      });
-      
-      console.log(`Enriched ITRs (all projects): ${enrichedITRs.length}`);
-      return enrichedITRs;
-    }
+    // Step 1: Get all systems for the specified project
+    const { data: systems, error: systemsError } = await supabase
+      .from('systems')
+      .select('*')
+      .eq('project_id', projectId);
+
+    if (systemsError) throw systemsError;
+    if (!systems || systems.length === 0) return [];
+
+    // Extract system IDs for the next query
+    const systemIds = systems.map(system => system.id);
+
+    // Step 2: Get all subsystems for these systems
+    const { data: subsystems, error: subsystemsError } = await supabase
+      .from('subsystems')
+      .select('*')
+      .in('system_id', systemIds);
+
+    if (subsystemsError) throw subsystemsError;
+    if (!subsystems || subsystems.length === 0) return [];
+
+    // Extract subsystem IDs for the next query
+    const subsystemIds = subsystems.map(subsystem => subsystem.id);
+
+    // Step 3: Get all ITRs for these subsystems
+    const { data: itrs, error: itrsError } = await supabase
+      .from('itrs')
+      .select('*')
+      .in('subsystem_id', subsystemIds);
+
+    if (itrsError) throw itrsError;
+    if (!itrs || itrs.length === 0) return [];
+
+    // Step 4: Enrich ITR data with subsystem and system information
+    const enrichedITRs = itrs.map(itr => {
+      const subsystem = subsystems.find(s => s.id === itr.subsystem_id);
+      const system = subsystem ? systems.find(s => s.id === subsystem.system_id) : null;
+
+      return {
+        ...itr,
+        subsystemName: subsystem ? subsystem.name : 'Desconocido',
+        systemName: system ? system.name : 'Desconocido',
+        projectName: 'Proyecto', // We already know the project ID, but not the name here
+        quantity: itr.quantity || 1,
+        status: itr.status as "complete" | "inprogress" | "delayed"
+      } as ITRWithDetails;
+    });
+
+    return enrichedITRs;
   } catch (error) {
     console.error("Error fetching ITRs with details:", error);
     throw error;
   }
 };
 
-export const createTestITRs = async (): Promise<{ success: boolean; message: string; data?: any }> => {
+// Get all ITRs for a specific subsystem including subsystem and system information
+export const getITRsBySubsystem = async (subsystemId: string): Promise<ITRWithDetails[]> => {
   try {
-    console.log("Iniciando creación de ITRs de prueba...");
-    
-    // Obtener subsistemas disponibles
-    const subsystems = await getSubsystems();
-    console.log(`Subsistemas encontrados: ${subsystems.length}`);
-    
-    if (subsystems.length === 0) {
-      console.error("No hay subsistemas disponibles para crear ITRs de prueba");
-      return { success: false, message: "No hay subsistemas disponibles" };
-    }
-    
-    // Usar el primer subsistema para las pruebas
-    const subsystemId = subsystems[0].id;
-    console.log(`Usando subsistema con ID: ${subsystemId}`);
-    
-    // Verificar que el subsistema existe realmente en la base de datos
-    const { data: subsystemCheck, error: subsystemError } = await supabase
+    // Step 1: Get the subsystem
+    const { data: subsystem, error: subsystemError } = await supabase
       .from('subsystems')
-      .select('id, name')
+      .select('*')
       .eq('id', subsystemId)
       .single();
-      
-    if (subsystemError || !subsystemCheck) {
-      console.error("Error al verificar el subsistema:", subsystemError);
-      return { success: false, message: "Error al verificar el subsistema" };
-    }
-    
-    console.log(`Subsistema confirmado: ${subsystemCheck.name}`);
-    
-    // Crear 4 ITRs de prueba
-    const itrPromises = [];
-    const createdITRs = [];
-    
-    for (let i = 1; i <= 4; i++) {
-      const startDate = new Date();
-      const endDate = new Date();
-      endDate.setDate(startDate.getDate() + 14); // Fecha fin 14 días después
-      
-      const status = i % 3 === 0 
-        ? "delayed" as const 
-        : i % 2 === 0 
-          ? "complete" as const 
-          : "inprogress" as const;
-      
-      const itrData = {
-        name: `ITR Test ${i}`,
-        subsystem_id: subsystemId,
-        status: status,
-        progress: i * 25, // 25, 50, 75, 100
-        assigned_to: `Técnico ${i}`,
-        start_date: startDate.toISOString().split('T')[0],
-        end_date: endDate.toISOString().split('T')[0],
-        quantity: i  // Agregar la cantidad basada en el índice
-      };
-      
-      console.log(`Creando ITR ${i}:`, itrData);
-      
-      try {
-        const newITR = await createITR(itrData);
-        console.log(`ITR ${i} creado con éxito:`, newITR);
-        createdITRs.push(newITR);
-      } catch (err) {
-        console.error(`Error al crear ITR ${i}:`, err);
-      }
-    }
-    
-    console.log(`Se crearon ${createdITRs.length} ITRs de prueba correctamente`);
-    
-    // Verificar que los ITRs se crearon correctamente
-    const { data: verifyITRs, error: verifyError } = await supabase
+
+    if (subsystemError) throw subsystemError;
+    if (!subsystem) throw new Error('Subsystem not found');
+
+    // Step 2: Get the system for this subsystem
+    const { data: system, error: systemError } = await supabase
+      .from('systems')
+      .select('*')
+      .eq('id', subsystem.system_id)
+      .single();
+
+    if (systemError) throw systemError;
+    if (!system) throw new Error('System not found');
+
+    // Step 3: Get all ITRs for this subsystem
+    const { data: itrs, error: itrsError } = await supabase
       .from('itrs')
       .select('*')
-      .eq('subsystem_id', subsystemId)
-      .order('created_at', { ascending: false })
-      .limit(4);
-      
-    if (verifyError) {
-      console.error("Error al verificar ITRs creados:", verifyError);
-    } else {
-      console.log(`Verificación: Se encontraron ${verifyITRs.length} ITRs recientes para el subsistema`);
-    }
-    
-    return { 
-      success: true, 
-      message: `${createdITRs.length} ITRs de prueba creados correctamente`, 
-      data: createdITRs 
-    };
+      .eq('subsystem_id', subsystemId);
+
+    if (itrsError) throw itrsError;
+    if (!itrs || itrs.length === 0) return [];
+
+    // Step 4: Enrich ITR data with subsystem and system information
+    const enrichedITRs = itrs.map(itr => {
+      return {
+        ...itr,
+        subsystemName: subsystem.name,
+        systemName: system.name,
+        quantity: itr.quantity || 1,
+        status: itr.status as "complete" | "inprogress" | "delayed"
+      } as ITRWithDetails;
+    });
+
+    return enrichedITRs;
   } catch (error) {
-    console.error("Error al crear ITRs de prueba:", error);
-    return { 
-      success: false, 
-      message: `Error al crear ITRs de prueba: ${error instanceof Error ? error.message : error}`, 
+    console.error("Error fetching ITRs by subsystem:", error);
+    throw error;
+  }
+};
+
+// Create a new ITR
+export const createITR = async (itrData: {
+  name: string;
+  subsystem_id: string;
+  status?: "complete" | "inprogress" | "delayed";
+  progress?: number;
+  quantity?: number;
+  start_date?: string;
+  end_date?: string;
+  assigned_to?: string;
+}) => {
+  try {
+    // Ensure required fields
+    if (!itrData.name || !itrData.subsystem_id) {
+      throw new Error('Name and subsystem_id are required fields');
+    }
+
+    // Set default values if not provided
+    const itrWithDefaults = {
+      ...itrData,
+      status: itrData.status || 'inprogress',
+      progress: itrData.progress || 0,
+      quantity: itrData.quantity || 1
     };
+
+    const { data, error } = await supabase
+      .from('itrs')
+      .insert([itrWithDefaults])
+      .select()
+      .single();
+
+    if (error) throw error;
+    return data;
+  } catch (error) {
+    console.error("Error creating ITR:", error);
+    throw error;
+  }
+};
+
+// Update an existing ITR
+export const updateITR = async (
+  itrId: string,
+  itrData: {
+    name?: string;
+    subsystem_id?: string;
+    status?: "complete" | "inprogress" | "delayed";
+    progress?: number;
+    quantity?: number;
+    start_date?: string;
+    end_date?: string;
+    assigned_to?: string;
+  }
+) => {
+  try {
+    const { data, error } = await supabase
+      .from('itrs')
+      .update(itrData)
+      .eq('id', itrId)
+      .select()
+      .single();
+
+    if (error) throw error;
+    return data;
+  } catch (error) {
+    console.error("Error updating ITR:", error);
+    throw error;
+  }
+};
+
+// Delete an ITR
+export const deleteITR = async (itrId: string) => {
+  try {
+    const { error } = await supabase
+      .from('itrs')
+      .delete()
+      .eq('id', itrId);
+
+    if (error) throw error;
+    return true;
+  } catch (error) {
+    console.error("Error deleting ITR:", error);
+    throw error;
   }
 };

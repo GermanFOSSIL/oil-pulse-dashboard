@@ -1,51 +1,38 @@
 
 import { useState, useEffect } from "react";
+import { getITRsWithDetails } from "@/services/itrService";
+import { getSubsystems } from "@/services/supabaseService";
 import { ProjectSelector } from "@/components/ProjectSelector";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { useToast } from "@/hooks/use-toast";
-import { getSubsystems, Subsystem, getSystemsByProjectId, System } from "@/services/supabaseService";
+import ITRList from "@/components/itr/ITRList";
 import { ITRWithDetails } from "@/types/itr-types";
-import { ITRList } from "@/components/itr/ITRList";
-import { fetchITRsWithDetails, createTestITRs } from "@/services/itrService";
-import { addSampleITRs } from "@/scripts/addSampleData";
-import { DatabaseActivityTimeline } from "@/components/DatabaseActivityTimeline";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { AlertCircle } from "lucide-react";
+import { useToast } from "@/hooks/use-toast";
+import { ITRFormModal } from "@/components/modals/ITRFormModal";
 
 const ITRs = () => {
   const [itrs, setITRs] = useState<ITRWithDetails[]>([]);
-  const [subsystems, setSubsystems] = useState<Subsystem[]>([]);
-  const [systems, setSystems] = useState<System[]>([]);
+  const [subsystems, setSubsystems] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null);
-  const [addingSampleData, setAddingSampleData] = useState(false);
-  const [activeTab, setActiveTab] = useState("itrs");
+  const [selectedITR, setSelectedITR] = useState<ITRWithDetails | null>(null);
+  const [isModalOpen, setIsModalOpen] = useState(false);
   const { toast } = useToast();
 
-  const fetchData = async () => {
+  const fetchITRs = async () => {
+    if (!selectedProjectId) {
+      setITRs([]);
+      setLoading(false);
+      return;
+    }
+
     setLoading(true);
     try {
-      if (selectedProjectId) {
-        const systemsData = await getSystemsByProjectId(selectedProjectId);
-        setSystems(systemsData);
-        
-        // Get subsystems
-        const subsystemsData = await getSubsystems();
-        setSubsystems(subsystemsData);
-        
-        const enrichedITRs = await fetchITRsWithDetails(selectedProjectId);
-        setITRs(enrichedITRs);
-      } else {
-        setSystems([]);
-        setSubsystems([]);
-        setITRs([]);
-      }
+      const itrData = await getITRsWithDetails(selectedProjectId);
+      setITRs(itrData);
     } catch (error) {
-      console.error("Error fetching data:", error);
+      console.error("Error fetching ITRs:", error);
       toast({
         title: "Error",
-        description: "No se pudieron cargar los datos de ITRs",
+        description: "No se pudieron cargar los ITRs",
         variant: "destructive"
       });
     } finally {
@@ -53,122 +40,95 @@ const ITRs = () => {
     }
   };
 
+  const fetchSubsystems = async () => {
+    try {
+      const subsystemsData = await getSubsystems();
+      setSubsystems(subsystemsData);
+    } catch (error) {
+      console.error("Error fetching subsystems:", error);
+      toast({
+        title: "Error",
+        description: "No se pudieron cargar los subsistemas",
+        variant: "destructive"
+      });
+    }
+  };
+
   useEffect(() => {
-    fetchData();
+    fetchSubsystems();
+  }, []);
+
+  useEffect(() => {
+    fetchITRs();
   }, [selectedProjectId]);
 
   const handleSelectProject = (projectId: string | null) => {
     setSelectedProjectId(projectId);
   };
 
-  const handleAddSampleData = async () => {
-    if (!selectedProjectId) {
-      toast({
-        title: "Error",
-        description: "Debe seleccionar un proyecto primero",
-        variant: "destructive"
-      });
-      return;
-    }
-    
-    setAddingSampleData(true);
-    try {
-      const testResult = await createTestITRs();
-      
-      if (testResult.success) {
-        toast({
-          title: "ITRs de prueba añadidos",
-          description: "Se han añadido 4 ITRs de prueba correctamente",
-        });
-        fetchData();
-      } else {
-        const result = await addSampleITRs();
-        if (result.success) {
-          toast({
-            title: "Datos de muestra añadidos",
-            description: "Se han añadido ITRs de muestra correctamente",
-          });
-          fetchData();
-        } else {
-          toast({
-            title: "Error",
-            description: "No se pudieron añadir los datos de muestra",
-            variant: "destructive"
-          });
-        }
-      }
-    } catch (error) {
-      console.error("Error adding sample data:", error);
-      toast({
-        title: "Error",
-        description: "Ocurrió un error al añadir datos de muestra",
-        variant: "destructive"
-      });
-    } finally {
-      setAddingSampleData(false);
-    }
+  const handleAddITR = () => {
+    setSelectedITR(null);
+    setIsModalOpen(true);
+  };
+
+  const handleEditITR = (itr: ITRWithDetails) => {
+    setSelectedITR(itr);
+    setIsModalOpen(true);
+  };
+
+  const handleDeleteITR = async (itr: ITRWithDetails) => {
+    // Implementar lógica de eliminación
+    console.log("Delete ITR:", itr);
+  };
+
+  const handleCloseModal = () => {
+    setIsModalOpen(false);
+    setSelectedITR(null);
+  };
+
+  const handleITRCreated = () => {
+    fetchITRs();
+    setIsModalOpen(false);
   };
 
   return (
     <div className="space-y-6">
-      <div className="flex justify-between items-center">
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div>
           <h1 className="text-3xl font-bold tracking-tight">ITRs</h1>
           <p className="text-muted-foreground">
-            Gestión de Registros de Inspección (ITRs)
+            Gestiona los ITRs de tus proyectos
           </p>
         </div>
-        <div className="flex items-center space-x-4">
-          <ProjectSelector 
-            onSelectProject={handleSelectProject}
-            selectedProjectId={selectedProjectId}
-          />
-        </div>
+        <ProjectSelector
+          onSelectProject={handleSelectProject}
+          selectedProjectId={selectedProjectId}
+        />
       </div>
 
-      {!selectedProjectId && (
-        <Alert variant="destructive">
-          <AlertCircle className="h-4 w-4" />
-          <AlertTitle>Selección requerida</AlertTitle>
-          <AlertDescription>
-            Debe seleccionar un proyecto para ver y gestionar los ITRs.
-          </AlertDescription>
-        </Alert>
-      )}
+      <ITRList
+        itrs={itrs}
+        loading={loading}
+        onAddITR={handleAddITR}
+        onEditITR={handleEditITR}
+        onDeleteITR={handleDeleteITR}
+        selectedSubsystemId={null}
+      />
 
-      <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-        <TabsList className="grid w-full md:w-[400px] grid-cols-2">
-          <TabsTrigger value="itrs">ITRs</TabsTrigger>
-          <TabsTrigger value="activity">Actividad Reciente</TabsTrigger>
-        </TabsList>
-        
-        <TabsContent value="itrs" className="mt-6">
-          {selectedProjectId ? (
-            <ITRList 
-              itrs={itrs}
-              subsystems={subsystems}
-              systems={systems}
-              loading={loading}
-              selectedProjectId={selectedProjectId}
-              onRefresh={fetchData}
-              onAddSampleData={handleAddSampleData}
-              addingSampleData={addingSampleData}
-            />
-          ) : (
-            <Card className="border-dashed border-muted">
-              <CardContent className="pt-6 pb-6 text-center">
-                <p className="text-muted-foreground">
-                  Seleccione un proyecto para ver los ITRs asociados.
-                </p>
-              </CardContent>
-            </Card>
-          )}
-        </TabsContent>
-        
-        <TabsContent value="activity" className="mt-6">
-          <DatabaseActivityTimeline />
-        </TabsContent>
-      </Tabs>
+      <ITRFormModal
+        isOpen={isModalOpen}
+        onClose={handleCloseModal}
+        onSuccess={handleITRCreated}
+        itr={selectedITR}
+        subsystems={subsystems.filter(sub => {
+          // Filtrar subsistemas por proyecto si hay un proyecto seleccionado
+          if (!selectedProjectId) return true;
+          
+          // Aquí necesitaríamos la relación subsistema -> sistema -> proyecto
+          // Esta es una implementación básica que asume que tienes la estructura de datos correcta
+          return true; // Implementa el filtro correcto según tu estructura de datos
+        })}
+      />
     </div>
   );
 };
