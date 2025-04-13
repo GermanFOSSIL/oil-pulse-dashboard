@@ -54,6 +54,14 @@ const Subsystems = () => {
     setSelectedProjectId(projectId);
   };
 
+  const handleEditSubsystem = () => {
+    // Implementation for edit
+  };
+
+  const handleDeleteSubsystem = () => {
+    // Implementation for delete
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center">
@@ -90,6 +98,8 @@ const Subsystems = () => {
           onOpenModal={() => setIsModalOpen(true)}
           onRefresh={fetchData}
           selectedProjectId={selectedProjectId}
+          onEdit={handleEditSubsystem}
+          onDelete={handleDeleteSubsystem}
         />
       ) : (
         <Card className="border-dashed border-muted">
@@ -102,7 +112,7 @@ const Subsystems = () => {
       )}
 
       <SubsystemFormModal
-        isOpen={isModalOpen}
+        open={isModalOpen}
         onClose={() => setIsModalOpen(false)}
         onSuccess={fetchData}
         systems={systems}

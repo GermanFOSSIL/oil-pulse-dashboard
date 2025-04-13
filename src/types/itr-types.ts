@@ -22,6 +22,7 @@ export interface ITRWithDetails extends ITR {
   subsystemName?: string;
   systemName?: string;
   projectName?: string;
+  projectId?: string;
 }
 
 // Interface with action handlers for components

@@ -1,68 +1,85 @@
 
-import { useState, useEffect } from "react";
-import { getITRsWithDetails } from "@/services/itrService";
-import { getSubsystems } from "@/services/supabaseService";
-import { ProjectSelector } from "@/components/ProjectSelector";
-import ITRList from "@/components/itr/ITRList";
-import { ITRWithDetails } from "@/types/itr-types";
-import { useToast } from "@/hooks/use-toast";
-import { ITRFormModal } from "@/components/modals/ITRFormModal";
+import React, { useState, useEffect } from 'react';
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { getITRsWithDetails, deleteITR } from '@/services/itrService';
+import { useToast } from '@/hooks/use-toast';
+import { Button } from '@/components/ui/button';
+import { Plus, Search, Trash, Edit, Eye, FilterX } from 'lucide-react';
+import { Input } from '@/components/ui/input';
+import { ProjectSelector } from '@/components/ProjectSelector';
+import { ITRFormModal } from '@/components/modals/ITRFormModal';
+import ITRList from '@/components/itr/ITRList';
+import { ITRWithDetails } from '@/types/itr-types';
 
 const ITRs = () => {
+  const { toast } = useToast();
   const [itrs, setITRs] = useState<ITRWithDetails[]>([]);
-  const [subsystems, setSubsystems] = useState<any[]>([]);
+  const [filteredITRs, setFilteredITRs] = useState<ITRWithDetails[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null);
-  const [selectedITR, setSelectedITR] = useState<ITRWithDetails | null>(null);
+  const [searchQuery, setSearchQuery] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const { toast } = useToast();
+  const [selectedITR, setSelectedITR] = useState<ITRWithDetails | null>(null);
 
   const fetchITRs = async () => {
-    if (!selectedProjectId) {
-      setITRs([]);
-      setLoading(false);
-      return;
-    }
-
     setLoading(true);
     try {
-      const itrData = await getITRsWithDetails(selectedProjectId);
-      setITRs(itrData);
+      const fetchedITRs = await getITRsWithDetails();
+      setITRs(fetchedITRs);
+      filterITRs(fetchedITRs, selectedProjectId, searchQuery);
     } catch (error) {
-      console.error("Error fetching ITRs:", error);
+      console.error('Error fetching ITRs:', error);
       toast({
-        title: "Error",
-        description: "No se pudieron cargar los ITRs",
-        variant: "destructive"
+        title: 'Error',
+        description: 'Failed to load ITRs',
+        variant: 'destructive',
       });
     } finally {
       setLoading(false);
     }
   };
 
-  const fetchSubsystems = async () => {
-    try {
-      const subsystemsData = await getSubsystems();
-      setSubsystems(subsystemsData);
-    } catch (error) {
-      console.error("Error fetching subsystems:", error);
-      toast({
-        title: "Error",
-        description: "No se pudieron cargar los subsistemas",
-        variant: "destructive"
+  useEffect(() => {
+    fetchITRs();
+  }, [toast]);
+
+  const filterITRs = (itrList: ITRWithDetails[], projectId: string | null, query: string) => {
+    let filtered = [...itrList];
+
+    if (projectId) {
+      filtered = filtered.filter(itr => {
+        // This assumes there's a project property on the ITR that has an id
+        const projectMatch = itr.projectId === projectId;
+        return projectMatch;
       });
     }
+
+    if (query) {
+      const lowerQuery = query.toLowerCase();
+      filtered = filtered.filter(itr => 
+        itr.name.toLowerCase().includes(lowerQuery) ||
+        (itr.subsystemName && itr.subsystemName.toLowerCase().includes(lowerQuery)) ||
+        (itr.systemName && itr.systemName.toLowerCase().includes(lowerQuery))
+      );
+    }
+
+    setFilteredITRs(filtered);
   };
 
   useEffect(() => {
-    fetchSubsystems();
-  }, []);
+    filterITRs(itrs, selectedProjectId, searchQuery);
+  }, [selectedProjectId, searchQuery, itrs]);
 
-  useEffect(() => {
-    fetchITRs();
-  }, [selectedProjectId]);
+  const handleSearch = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setSearchQuery(e.target.value);
+  };
 
-  const handleSelectProject = (projectId: string | null) => {
+  const handleClearFilters = () => {
+    setSelectedProjectId(null);
+    setSearchQuery('');
+  };
+
+  const handleProjectSelect = (projectId: string | null) => {
     setSelectedProjectId(projectId);
   };
 
@@ -77,58 +94,88 @@ const ITRs = () => {
   };
 
   const handleDeleteITR = async (itr: ITRWithDetails) => {
-    // Implementar lógica de eliminación
-    console.log("Delete ITR:", itr);
+    try {
+      await deleteITR(itr.id);
+      toast({
+        title: 'Success',
+        description: 'ITR deleted successfully',
+        variant: 'default',
+      });
+      fetchITRs();
+    } catch (error) {
+      console.error('Error deleting ITR:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to delete ITR',
+        variant: 'destructive',
+      });
+    }
   };
 
-  const handleCloseModal = () => {
-    setIsModalOpen(false);
-    setSelectedITR(null);
-  };
-
-  const handleITRCreated = () => {
-    fetchITRs();
-    setIsModalOpen(false);
-  };
+  const itrsWithActions = filteredITRs.map(itr => ({
+    ...itr,
+    progress: itr.progress || 0, // Ensure progress is defined
+    onEdit: () => handleEditITR(itr),
+    onDelete: () => handleDeleteITR(itr),
+    onView: () => {/* View implementation */}
+  }));
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+      <div className="flex justify-between items-center">
         <div>
           <h1 className="text-3xl font-bold tracking-tight">ITRs</h1>
           <p className="text-muted-foreground">
-            Gestiona los ITRs de tus proyectos
+            Manage Inspection Test Records
           </p>
         </div>
-        <ProjectSelector
-          onSelectProject={handleSelectProject}
-          selectedProjectId={selectedProjectId}
-        />
+        <Button onClick={handleAddITR}>
+          <Plus className="mr-2 h-4 w-4" />
+          Add ITR
+        </Button>
       </div>
 
-      <ITRList
-        itrs={itrs}
-        loading={loading}
-        onAddITR={handleAddITR}
-        onEditITR={handleEditITR}
-        onDeleteITR={handleDeleteITR}
-        selectedSubsystemId={null}
-      />
+      <Card>
+        <CardHeader>
+          <CardTitle>Filters</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="flex flex-col md:flex-row gap-4">
+            <div className="flex-1">
+              <Input
+                placeholder="Search ITRs..."
+                value={searchQuery}
+                onChange={handleSearch}
+                className="w-full"
+                icon={<Search className="mr-2 h-4 w-4" />}
+              />
+            </div>
+            <div className="flex-1">
+              <ProjectSelector
+                onSelectProject={handleProjectSelect}
+                selectedProjectId={selectedProjectId}
+              />
+            </div>
+            <div>
+              <Button variant="outline" onClick={handleClearFilters} className="w-full md:w-auto">
+                <FilterX className="mr-2 h-4 w-4" />
+                Clear Filters
+              </Button>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
 
-      <ITRFormModal
-        isOpen={isModalOpen}
-        onClose={handleCloseModal}
-        onSuccess={handleITRCreated}
-        itr={selectedITR}
-        subsystems={subsystems.filter(sub => {
-          // Filtrar subsistemas por proyecto si hay un proyecto seleccionado
-          if (!selectedProjectId) return true;
-          
-          // Aquí necesitaríamos la relación subsistema -> sistema -> proyecto
-          // Esta es una implementación básica que asume que tienes la estructura de datos correcta
-          return true; // Implementa el filtro correcto según tu estructura de datos
-        })}
-      />
+      <ITRList itrs={itrsWithActions} loading={loading} />
+
+      {isModalOpen && (
+        <ITRFormModal
+          open={isModalOpen}
+          onClose={() => setIsModalOpen(false)}
+          onSuccess={fetchITRs}
+          itr={selectedITR}
+        />
+      )}
     </div>
   );
 };

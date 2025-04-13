@@ -87,11 +87,10 @@ const Projects = () => {
 
       <ProjectFormModal
         open={isFormModalOpen}
-        onOpenChange={setIsFormModalOpen}
+        onClose={handleCloseModal}
         project={selectedProject}
         onProjectCreated={handleProjectCreated}
         onProjectUpdated={handleProjectUpdated}
-        onClose={handleCloseModal}
       />
     </div>
   );

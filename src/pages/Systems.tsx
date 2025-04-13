@@ -65,6 +65,14 @@ const Systems = () => {
     setSelectedProjectId(projectId);
   };
 
+  const handleEditSystem = () => {
+    // Implementation for edit
+  };
+
+  const handleDeleteSystem = () => {
+    // Implementation for delete
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center">
@@ -104,10 +112,12 @@ const Systems = () => {
         loading={loading}
         selectedProjectId={selectedProjectId}
         onRefresh={fetchData}
+        onEdit={handleEditSystem}
+        onDelete={handleDeleteSystem}
       />
 
       <SystemFormModal
-        isOpen={isSystemFormModalOpen}
+        open={isSystemFormModalOpen}
         onClose={() => setIsSystemFormModalOpen(false)}
         projects={projects}
         onSuccess={() => {

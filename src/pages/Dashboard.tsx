@@ -1,4 +1,3 @@
-
 import { useState, useEffect, useCallback, useMemo } from "react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { EnhancedGanttChart } from "@/components/EnhancedGanttChart";
@@ -30,7 +29,6 @@ import { MonthlyEfficiencyChart } from "@/components/Dashboard/MonthlyEfficiency
 import { TagsChart } from "@/components/Dashboard/TagsChart";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
-// Dashboard skeleton loader
 const DashboardSkeleton = () => (
   <div className="space-y-6 animate-pulse">
     <div className="grid gap-4 grid-cols-1 md:grid-cols-2 lg:grid-cols-4">
@@ -76,7 +74,6 @@ const Dashboard = () => {
   const [exportLoading, setExportLoading] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState("general");
   
-  // KPI data for charts
   const [kpiChartData, setKpiChartData] = useState({
     testPacks: [] as any[],
     systems: [] as any[],
@@ -90,33 +87,30 @@ const Dashboard = () => {
       const dashboardStats = await getDashboardStats(projectId);
       setStats(dashboardStats);
 
-      // Prepare KPI chart data
       const testPackData = [
         { name: 'Completados', value: dashboardStats.completedProjects || 0 },
         { name: 'En Progreso', value: dashboardStats.inProgressProjects || 0 },
         { name: 'Retrasados', value: dashboardStats.delayedProjects || 0 }
       ];
       
-      const systemsData = dashboardStats.chartData || [];
+      const chartData = dashboardStats.chartData || [];
       
       const tagsData = [
         { name: 'Liberados', value: dashboardStats.tags?.released || 0 },
-        { name: 'Pendientes', value: dashboardStats.tags?.total - (dashboardStats.tags?.released || 0) || 0 }
+        { name: 'Pendientes', value: (dashboardStats.tags?.total || 0) - (dashboardStats.tags?.released || 0) || 0 }
       ];
       
-      // Ensure we have monthly data, or generate mock data
       const monthlyData = dashboardStats.areaChartData || generateMonthlyMockData();
       
       setKpiChartData({
         testPacks: testPackData,
-        systems: systemsData,
+        systems: chartData,
         tags: tagsData,
         monthlyActivity: monthlyData
       });
 
-      // Fetch Gantt chart data
       let projectsData: any[] = [];
-      let systemsData: any[] = [];
+      let ganttSystemsData: any[] = [];
       let subsystemsData: any[] = [];
       let itrsData: any[] = [];
 
@@ -127,20 +121,19 @@ const Dashboard = () => {
 
       if (projectId) {
         projectsData = projects.filter(p => p.id === projectId);
-        systemsData = allSystems.filter(s => s.project_id === projectId);
+        ganttSystemsData = allSystems.filter(s => s.project_id === projectId);
       } else {
         projectsData = projects;
-        systemsData = allSystems;
+        ganttSystemsData = allSystems;
       }
       
-      const systemIds = systemsData.map(s => s.id);
+      const systemIds = ganttSystemsData.map(s => s.id);
       subsystemsData = allSubsystems.filter(sub => systemIds.includes(sub.system_id));
       
       const subsystemIds = subsystemsData.map(sub => sub.id);
       itrsData = allITRs.filter(itr => subsystemIds.includes(itr.subsystem_id));
 
-      // Build Gantt chart data structure
-      const ganttItems = buildGanttItems(projectsData, systemsData, subsystemsData, itrsData);
+      const ganttItems = buildGanttItems(projectsData, ganttSystemsData, subsystemsData, itrsData);
       setGanttData(ganttItems);
 
     } catch (error) {
@@ -155,7 +148,6 @@ const Dashboard = () => {
     }
   }, [toast]);
 
-  // Generate mock monthly data if needed
   const generateMonthlyMockData = useCallback(() => {
     const currentDate = new Date();
     const monthlyData = [];
@@ -175,11 +167,9 @@ const Dashboard = () => {
     return monthlyData;
   }, []);
 
-  // Build Gantt chart data items
   const buildGanttItems = useCallback((projects: any[], systems: any[], subsystems: any[], itrs: any[]) => {
     const ganttItems = [];
     
-    // Add projects
     for (const project of projects) {
       ganttItems.push({
         id: `project-${project.id}`,
@@ -193,7 +183,6 @@ const Dashboard = () => {
       });
     }
 
-    // Add systems
     for (const system of systems) {
       const projectId = system.project_id;
       ganttItems.push({
@@ -209,7 +198,6 @@ const Dashboard = () => {
       });
     }
 
-    // Add subsystems
     for (const subsystem of subsystems) {
       const systemId = subsystem.system_id;
       ganttItems.push({
@@ -225,7 +213,6 @@ const Dashboard = () => {
       });
     }
 
-    // Group ITRs by name and subsystem
     const itrGroups: Record<string, {
       count: number,
       progress: number,
@@ -253,7 +240,6 @@ const Dashboard = () => {
       itrGroups[key].progress += itr.progress || 0;
     });
     
-    // Add ITR groups to Gantt
     Object.entries(itrGroups).forEach(([key, group], index) => {
       const itrName = key.split('-')[0];
       const avgProgress = group.count > 0 ? Math.round(group.progress / group.count) : 0;
@@ -282,13 +268,11 @@ const Dashboard = () => {
     setSelectedProjectId(projectId);
   };
 
-  // Export dashboard data to Excel
   const exportDashboardData = useCallback(async () => {
     setExportLoading('excel');
     try {
       const wb = XLSX.utils.book_new();
       
-      // KPI Summary sheet
       const kpiData = [
         ['Métrica', 'Valor'],
         ['Total Test Packs', stats.testPacks?.total || 0],
@@ -302,7 +286,6 @@ const Dashboard = () => {
       const kpiWs = XLSX.utils.aoa_to_sheet(kpiData);
       XLSX.utils.book_append_sheet(wb, kpiWs, "Resumen");
       
-      // Systems data
       if (kpiChartData.systems && kpiChartData.systems.length > 0) {
         const systemsExportData = kpiChartData.systems.map((system: any) => ({
           'Sistema': system.name,
@@ -316,7 +299,6 @@ const Dashboard = () => {
         XLSX.utils.book_append_sheet(wb, systemsWs, "Sistemas");
       }
       
-      // Monthly activity data
       if (kpiChartData.monthlyActivity && kpiChartData.monthlyActivity.length > 0) {
         const activityExportData = kpiChartData.monthlyActivity.map((item: any) => ({
           'Mes': item.name,
@@ -329,7 +311,6 @@ const Dashboard = () => {
         XLSX.utils.book_append_sheet(wb, activityWs, "Actividad Mensual");
       }
       
-      // Gantt data
       if (ganttData && ganttData.length > 0) {
         const ganttExportData = ganttData.map(item => ({
           'Tarea': item.task,
@@ -345,7 +326,6 @@ const Dashboard = () => {
         XLSX.utils.book_append_sheet(wb, ganttWs, "Cronograma");
       }
       
-      // Generate file name with current date
       const fileName = `Dashboard_FossilEnergies_${format(new Date(), 'yyyyMMdd')}.xlsx`;
       XLSX.writeFile(wb, fileName);
       
@@ -365,19 +345,16 @@ const Dashboard = () => {
     }
   }, [stats, kpiChartData, ganttData, toast]);
 
-  // Export dashboard as PDF
   const exportDashboardAsPdf = useCallback(async () => {
     setExportLoading('pdf');
     try {
-      // Target the dashboard content container
       const dashboardElement = document.getElementById('dashboard-content');
       if (!dashboardElement) {
         throw new Error('No se pudo encontrar el contenido del dashboard');
       }
       
-      // Capture the dashboard as an image
       const canvas = await html2canvas(dashboardElement, {
-        scale: 1.5, // Higher scale for better quality
+        scale: 1.5,
         useCORS: true,
         logging: false,
         allowTaint: true,
@@ -386,15 +363,12 @@ const Dashboard = () => {
       
       const imgData = canvas.toDataURL('image/jpeg', 1.0);
       
-      // Calculate dimensions to fit in A4 page
-      const imgWidth = 210; // A4 width in mm
-      const pageHeight = 297; // A4 height in mm
+      const imgWidth = 210;
+      const pageHeight = 297;
       const imgHeight = (canvas.height * imgWidth) / canvas.width;
       
-      // Create PDF
       const pdf = new jsPDF('p', 'mm', 'a4');
       
-      // Add header
       pdf.setFontSize(18);
       pdf.setTextColor(40, 40, 40);
       pdf.text('Dashboard Fossil Energies', 105, 15, { align: 'center' });
@@ -402,21 +376,17 @@ const Dashboard = () => {
       pdf.setFontSize(12);
       pdf.text(`Generado: ${format(new Date(), 'dd/MM/yyyy HH:mm')}`, 105, 22, { align: 'center' });
       
-      // Add project filter if selected
       if (selectedProjectId) {
         const projectName = stats.projectName || 'Proyecto seleccionado';
         pdf.text(`Proyecto: ${projectName}`, 105, 29, { align: 'center' });
       }
       
-      // Add image
       let heightLeft = imgHeight;
-      let position = 35; // Start after header
+      let position = 35;
       
-      // Add first page
       pdf.addImage(imgData, 'JPEG', 0, position, imgWidth, imgHeight);
       heightLeft -= (pageHeight - position);
       
-      // Add new pages if content is longer than one page
       while (heightLeft > 0) {
         position = 0;
         pdf.addPage();
@@ -424,7 +394,6 @@ const Dashboard = () => {
         heightLeft -= pageHeight;
       }
       
-      // Generate file name with current date
       const fileName = `Dashboard_FossilEnergies_${format(new Date(), 'yyyyMMdd')}.pdf`;
       pdf.save(fileName);
       
@@ -444,7 +413,6 @@ const Dashboard = () => {
     }
   }, [selectedProjectId, stats, toast]);
 
-  // Compute KPI stats
   const kpiStats = useMemo(() => {
     return {
       testPacks: {
@@ -534,7 +502,6 @@ const Dashboard = () => {
             </TabsList>
             
             <TabsContent value="general" className="space-y-6">
-              {/* KPI Cards */}
               <div className="grid gap-4 grid-cols-1 md:grid-cols-2 lg:grid-cols-4">
                 <KPICard
                   title="Test Packs"
@@ -569,7 +536,6 @@ const Dashboard = () => {
                 />
               </div>
 
-              {/* Charts */}
               <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
                 <TestPacksChart 
                   data={kpiChartData.systems} 
@@ -585,7 +551,6 @@ const Dashboard = () => {
                 data={kpiChartData.monthlyActivity} 
               />
               
-              {/* Database Activity */}
               <div className="grid gap-4 md:grid-cols-2">
                 <DatabaseActivityTimeline />
                 
@@ -671,7 +636,6 @@ const Dashboard = () => {
             </TabsContent>
             
             <TabsContent value="planificacion" className="space-y-6">
-              {/* Gantt Chart */}
               <Card className="overflow-hidden">
                 <CardHeader>
                   <CardTitle>Cronograma de Proyectos</CardTitle>
