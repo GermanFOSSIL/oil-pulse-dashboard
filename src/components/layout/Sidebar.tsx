@@ -109,15 +109,18 @@ const Sidebar = ({ isOpen }: SidebarProps) => {
     const fetchPermissions = async () => {
       if (user) {
         try {
-          // Para propósitos de desarrollo, daremos todos los permisos
-          let permissions = AVAILABLE_PERMISSIONS;
+          // For development purposes, give all permissions
+          let permissions = [...AVAILABLE_PERMISSIONS];
           
-          // Si estamos en producción, obtenemos los permisos reales del usuario
+          // If we're in production, get actual user permissions
           if (process.env.NODE_ENV === 'production') {
-            permissions = await getUserPermissions(user.id);
+            const userPerms = await getUserPermissions(user.id);
+            if (Array.isArray(userPerms) && userPerms.length > 0) {
+              permissions = userPerms;
+            }
           }
           
-          // Aseguramos que 'test-packs' y 'dashboard' estén siempre incluidos
+          // Ensure 'test-packs' and 'dashboard' are always included
           if (!permissions.includes('test-packs')) {
             permissions.push('test-packs');
           }
@@ -128,13 +131,13 @@ const Sidebar = ({ isOpen }: SidebarProps) => {
           setUserPermissions(permissions);
         } catch (error) {
           console.error("Error fetching permissions:", error);
-          // Por defecto, permitimos acceso a dashboard y test-packs
-          setUserPermissions(AVAILABLE_PERMISSIONS);
+          // By default, allow access to dashboard and test-packs
+          setUserPermissions(['dashboard', 'test-packs']);
         } finally {
           setLoading(false);
         }
       } else {
-        // Si no hay usuario, solo permitimos acceso a test-packs
+        // If no user, only allow access to test-packs
         setUserPermissions(['test-packs']);
         setLoading(false);
       }
@@ -143,13 +146,22 @@ const Sidebar = ({ isOpen }: SidebarProps) => {
     fetchPermissions();
   }, [user]);
 
+  // Force sidebar to stay open if not mobile
+  useEffect(() => {
+    if (!isMobile) {
+      setOpen(true);
+    } else {
+      setOpen(isOpen);
+    }
+  }, [isMobile, isOpen]);
+
   const closeSidebar = () => {
     if (isMobile) {
       setOpen(false);
     }
   };
 
-  if (!isOpen) return null;
+  if (!open) return null;
 
   return (
     <div

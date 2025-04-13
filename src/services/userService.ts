@@ -1,4 +1,3 @@
-
 import { supabase } from "@/integrations/supabase/client";
 
 // Define available permissions
@@ -71,14 +70,19 @@ export const getUserProfiles = async () => {
 
 // Get user permissions
 export const getUserPermissions = async (userId: string) => {
-  const { data, error } = await supabase
-    .from('profiles')
-    .select('permissions')
-    .eq('id', userId)
-    .single();
-  
-  if (error) throw error;
-  return data?.permissions || [];
+  try {
+    const { data, error } = await supabase
+      .from('profiles')
+      .select('permissions')
+      .eq('id', userId)
+      .single();
+    
+    if (error) throw error;
+    return data?.permissions || [];
+  } catch (error) {
+    console.error("Error getting user permissions:", error);
+    return [];
+  }
 };
 
 /**
