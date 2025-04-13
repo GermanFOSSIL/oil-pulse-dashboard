@@ -1,5 +1,6 @@
+
 import { supabase } from "@/integrations/supabase/client";
-import { useNavigate } from "react-router-dom";
+import { User, Session } from '@supabase/supabase-js';
 
 export const AVAILABLE_PERMISSIONS = [
   "view_dashboard",
@@ -155,7 +156,7 @@ export const createUser = async (userData) => {
       throw new Error("Email already in use");
     }
 
-    const { data: authData, error: authError } = await supabase.auth.signUp({
+    const { data, error } = await supabase.auth.signUp({
       email: userData.email,
       password: userData.password,
       options: {
@@ -165,16 +166,12 @@ export const createUser = async (userData) => {
       },
     });
 
-    if (authError) throw authError;
+    if (error) throw error;
 
-    return { 
-      success: true, 
-      userId: authData.user?.id,
-      message: "User created successfully"
-    };
+    return data;
   } catch (error) {
     console.error("Error creating user:", error);
-    return { success: false, message: error.message };
+    throw error;
   }
 };
 
@@ -191,7 +188,7 @@ export const bulkCreateUsers = async (users: BulkUserData[]) => {
         permissions: []
       });
       
-      if (result.success) {
+      if (result.user) {
         successCount++;
       }
     } catch (error) {

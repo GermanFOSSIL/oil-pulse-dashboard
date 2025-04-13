@@ -15,12 +15,10 @@ export {
   AVAILABLE_PERMISSIONS, 
   getUserPermissions, 
   updateUserProfile, 
-  bulkCreateUsers 
+  bulkCreateUsers,
+  getUserProfiles
 };
 export type { UserProfile };
-
-// Export getUserProfiles as a named function
-export const getUserProfilesList = getUserProfiles;
 
 export * from './projectService';
 export * from './systemService';

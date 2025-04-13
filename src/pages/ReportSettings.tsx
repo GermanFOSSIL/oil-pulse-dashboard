@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
@@ -8,7 +9,24 @@ import { useToast } from "@/hooks/use-toast";
 import { getReportSchedule, updateReportSchedule } from "@/services/reportService";
 import { format } from 'date-fns';
 
-const DEFAULT_SCHEDULE = {
+interface ScheduleSettings {
+  daily: {
+    enabled: boolean;
+    time: string;
+  };
+  weekly: {
+    enabled: boolean;
+    day: string;
+    time: string;
+  };
+  monthly: {
+    enabled: boolean;
+    day: string;
+    time: string;
+  };
+}
+
+const DEFAULT_SCHEDULE: ScheduleSettings = {
   daily: {
     enabled: false,
     time: "08:00",
@@ -27,7 +45,7 @@ const DEFAULT_SCHEDULE = {
 
 const ReportSettings = () => {
   const { toast } = useToast();
-  const [schedule, setSchedule] = useState(DEFAULT_SCHEDULE);
+  const [schedule, setSchedule] = useState<ScheduleSettings>(DEFAULT_SCHEDULE);
   const [loading, setLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
 
@@ -36,7 +54,7 @@ const ReportSettings = () => {
       setLoading(true);
       try {
         const data = await getReportSchedule();
-        setSchedule(data as typeof DEFAULT_SCHEDULE || DEFAULT_SCHEDULE);
+        setSchedule(data as ScheduleSettings || DEFAULT_SCHEDULE);
       } catch (error) {
         console.error("Error fetching report schedule:", error);
         toast({
@@ -52,7 +70,7 @@ const ReportSettings = () => {
     fetchSchedule();
   }, [toast]);
 
-  const handleScheduleChange = (type, field, value) => {
+  const handleScheduleChange = (type: keyof ScheduleSettings, field: string, value: any) => {
     setSchedule((prev) => ({
       ...prev,
       [type]: {

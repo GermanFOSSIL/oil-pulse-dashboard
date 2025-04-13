@@ -1,4 +1,3 @@
-
 import { supabase } from "@/integrations/supabase/client";
 import { jsPDF } from 'jspdf';
 import autoTable from 'jspdf-autotable';
@@ -393,5 +392,69 @@ export const exportToExcel = (
   } catch (error) {
     console.error("Error exporting to Excel:", error);
     return false;
+  }
+};
+
+export const getReportSchedule = async () => {
+  try {
+    const { data, error } = await supabase
+      .from('report_schedule')
+      .select('*')
+      .single();
+    
+    if (error) throw error;
+    return data?.settings || {
+      daily: {
+        enabled: false,
+        time: "08:00",
+      },
+      weekly: {
+        enabled: false,
+        day: "monday",
+        time: "08:00",
+      },
+      monthly: {
+        enabled: false,
+        day: "1",
+        time: "08:00",
+      },
+    };
+  } catch (error) {
+    console.error("Error fetching report schedule:", error);
+    throw error;
+  }
+};
+
+export const updateReportSchedule = async (settings) => {
+  try {
+    // Check if a schedule already exists
+    const { data: existingSchedule } = await supabase
+      .from('report_schedule')
+      .select('id')
+      .limit(1);
+
+    if (existingSchedule && existingSchedule.length > 0) {
+      // Update existing schedule
+      const { data, error } = await supabase
+        .from('report_schedule')
+        .update({ settings })
+        .eq('id', existingSchedule[0].id)
+        .select();
+      
+      if (error) throw error;
+      return data;
+    } else {
+      // Create a new schedule
+      const { data, error } = await supabase
+        .from('report_schedule')
+        .insert({ settings })
+        .select();
+      
+      if (error) throw error;
+      return data;
+    }
+  } catch (error) {
+    console.error("Error updating report schedule:", error);
+    throw error;
   }
 };

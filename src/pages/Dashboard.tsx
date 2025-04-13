@@ -88,25 +88,27 @@ const Dashboard = () => {
       const dashboardStats = await getDashboardStats(projectId);
       setStats(dashboardStats);
 
+      // Prepare KPI chart data
       const testPackData = [
         { name: 'Completados', value: dashboardStats.completedProjects || 0 },
         { name: 'En Progreso', value: dashboardStats.inProgressProjects || 0 },
         { name: 'Retrasados', value: dashboardStats.delayedProjects || 0 }
       ];
       
-      const chartData = dashboardStats.chartData || [];
+      const systemsData = dashboardStats.chartData || [];
       
       // Create default tags data if not available
       const tagsData = [
-        { name: 'Liberados', value: dashboardStats.tags?.released || 0 },
-        { name: 'Pendientes', value: (dashboardStats.tags?.total || 0) - (dashboardStats.tags?.released || 0) || 0 }
+        { name: 'Liberados', value: dashboardStats.tagsReleased || 0 },
+        { name: 'Pendientes', value: dashboardStats.tagsTotal - (dashboardStats.tagsReleased || 0) || 0 }
       ];
       
+      // Ensure we have monthly data, or generate mock data
       const monthlyData = dashboardStats.areaChartData || generateMonthlyMockData();
       
       setKpiChartData({
         testPacks: testPackData,
-        systems: chartData,
+        systems: systemsData,
         tags: tagsData,
         monthlyActivity: monthlyData
       });

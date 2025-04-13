@@ -11,7 +11,7 @@ export interface ITR {
   status: StatusType;
   progress: number;
   quantity: number;
-  start_date?: string;
+  start_date: string | null;
   end_date?: string;
   assigned_to?: string;
   created_at: string;

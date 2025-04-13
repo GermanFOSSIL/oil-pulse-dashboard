@@ -9,7 +9,7 @@ import { Input } from '@/components/ui/input';
 import { ProjectSelector } from '@/components/ProjectSelector';
 import { ITRFormModal } from '@/components/modals/ITRFormModal';
 import ITRList from '@/components/itr/ITRList';
-import { ITRWithDetails, ITR } from '@/types/itr-types';
+import { ITRWithDetails } from '@/types/itr-types';
 
 const ITRs = () => {
   const { toast } = useToast();
@@ -24,7 +24,7 @@ const ITRs = () => {
   const fetchITRs = async () => {
     setLoading(true);
     try {
-      const fetchedITRs = await getITRsWithDetails(selectedProjectId);
+      const fetchedITRs = await getITRsWithDetails(selectedProjectId || null);
       setITRs(fetchedITRs);
       filterITRs(fetchedITRs, selectedProjectId, searchQuery);
     } catch (error) {
@@ -170,14 +170,14 @@ const ITRs = () => {
       </Card>
 
       <ITRList
-        itrs={itrsWithActions as ITR[]}
+        itrs={itrsWithActions}
         loading={loading}
       />
 
       <ITRFormModal
         open={isModalOpen}
         onClose={() => setIsModalOpen(false)}
-        itr={selectedITR as ITR | null}
+        itr={selectedITR}
         onSuccess={fetchITRs}
       />
     </div>

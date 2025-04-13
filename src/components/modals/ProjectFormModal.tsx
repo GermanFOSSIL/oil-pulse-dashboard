@@ -8,6 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { createProject, updateProject } from "@/services/projectService";
 import { useToast } from "@/hooks/use-toast";
 import { Loader2 } from "lucide-react";
+import { Project } from "@/services/types";
 
 export interface ProjectFormModalProps {
   open: boolean;
@@ -29,9 +30,10 @@ export const ProjectFormModal = ({
     name: "",
     description: "",
     location: "",
-    status: "planning",
+    status: "planning" as "complete" | "inprogress" | "delayed",
     start_date: "",
     end_date: "",
+    progress: 0
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
   const { toast } = useToast();
@@ -49,6 +51,7 @@ export const ProjectFormModal = ({
         status: project.status || "planning",
         start_date: startDate,
         end_date: endDate,
+        progress: project.progress || 0
       });
     } else {
       // Reset form for new project
@@ -59,6 +62,7 @@ export const ProjectFormModal = ({
         status: "planning",
         start_date: "",
         end_date: "",
+        progress: 0
       });
     }
   }, [project]);
@@ -173,11 +177,9 @@ export const ProjectFormModal = ({
                 <SelectValue placeholder="Select status" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="planning">Planning</SelectItem>
                 <SelectItem value="inprogress">In Progress</SelectItem>
-                <SelectItem value="completed">Completed</SelectItem>
+                <SelectItem value="complete">Completed</SelectItem>
                 <SelectItem value="delayed">Delayed</SelectItem>
-                <SelectItem value="cancelled">Cancelled</SelectItem>
               </SelectContent>
             </Select>
           </div>
